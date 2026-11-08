@@ -5,6 +5,7 @@ const QUARTER_MILE = ft(1320)
 const ROAD_REACH = ft(350)
 const PLANNED_RUNWAY = ft(3500)
 const OUTDOOR_POOL_GAP = ft(60)
+const MAX_WALKWAY = ft(300)
 
 const n = (v: number) => Math.round(v).toLocaleString('en-US')
 const check = (id: string, label: string, ok: boolean, detail: string, failAs: CheckStatus = 'fail'): Check =>
@@ -72,6 +73,10 @@ export function validateEstate(e: Estate): Check[] {
     const d = rectDistance(house.rect, pool.rect)
     checks.push(check('pool-link', 'Outdoor pool is next to the house', d <= OUTDOOR_POOL_GAP, `${n(toFt(d))} ft apart`))
   }
+
+  const longWalks = e.walkways.filter(w => pathLength(w.points) > MAX_WALKWAY)
+  checks.push(check('walkways', 'Covered walkways are 300 ft or shorter', longWalks.length === 0,
+    e.walkways.map(w => `${n(toFt(pathLength(w.points)))} ft`).join(', ')))
 
   const overlapsInHouse: string[] = []
   for (const level of e.house.levels) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {

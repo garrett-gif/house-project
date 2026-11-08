@@ -20,8 +20,9 @@ const approach = [
 const inset = 100
 const roads: Road[] = [
   { id: 'estate-drive', name: 'Estate drive', kind: 'estate', points: approach, gate: 'Estate gate' },
-  { id: 'guest-road', name: 'Guest and collection road', kind: 'estate', points: line([350, 3400], [2520, 3400], [2520, 5150], [2350, 5150]) },
-  { id: 'entertainment-spur', name: 'Entertainment shop spur', kind: 'estate', points: line([2050, 3400], [2050, 4130]) },
+  { id: 'guest-road', name: 'Estate cross road', kind: 'estate', points: line([350, 3400], [2520, 3400]) },
+  { id: 'guest-north', name: 'Guest and transporter road', kind: 'estate', points: line([1800, 3400], [1800, 5450]) },
+  { id: 'entertainment-spur', name: 'Entertainment shop spur', kind: 'estate', points: line([1800, 5050], [1440, 5050]) },
   { id: 'work-main', name: 'Work main road', kind: 'work', points: line([3000, 0], [3000, 1800], [5600, 1800]), gate: 'Work gate' },
   { id: 'work-loop', name: 'Work loop', kind: 'work', points: line([3000, 1800], [3550, 2250], [3550, 4450], [5750, 4450], [5750, 2120], [5600, 1800]) },
   { id: 'ops-yard', name: 'Operations yard road', kind: 'work', points: line([3000, 720], [5400, 720]) },
@@ -33,13 +34,13 @@ const roads: Road[] = [
 
 export const sampleEstate: Estate = {
   name: 'House Project',
-  layoutVersion: 1,
+  layoutVersion: 2,
   parcel: { seed: 1876, size: ft(SIZE), gridSize: 128 },
   buildings: [
     { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', rect: { x: ft(990), y: ft(5415), w: ft(226), d: ft(70) }, height: ft(32) },
     b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1025, 5360, 190, 40, 14),
-    b('car-building', 'Car collection building', 'accessory', 'private', 2070, 5180, 220, 160, 30),
-    b('entertainment', 'Entertainment shop', 'assembly', 'private', 2050, 4340, 240, 160, 32),
+    b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
+    b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
     b('guest-house', 'Guest house', 'residence', 'private', 640, 4880, 70, 45, 24),
     b('lodge-1', 'Lodge 1', 'lodging', 'work', 2050, 1650, 150, 60, 26),
     b('lodge-2', 'Lodge 2', 'lodging', 'work', 2700, 1650, 150, 60, 26),
@@ -74,8 +75,8 @@ export const sampleEstate: Estate = {
   ],
   roads,
   walkways: [
-    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1216, 5450], [1960, 5450], [1960, 5180]) },
-    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1216, 5430], [1880, 5430], [1880, 4400], [1930, 4400]) },
+    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1180, 5450], [1466, 5450]) },
+    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1200, 5415], [1200, 5130]) },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   house: mainHouse,
