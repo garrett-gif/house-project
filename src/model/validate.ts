@@ -1,5 +1,5 @@
 import type { Building, Check, CheckStatus, Estate } from './types'
-import { SQ_IN_PER_ACRE, area, ft, overlaps, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
+import { SQ_IN_PER_ACRE, area, center, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
 const ROAD_REACH = ft(350)
@@ -35,7 +35,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(check('inside-parcel', 'All buildings are inside the parcel', outside.length === 0, outside.length ? outside.map(b => b.name).join(', ') : `${e.buildings.length} buildings placed`))
 
   const collisions: string[] = []
-  e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(c => { if (overlaps(a.rect, c.rect)) collisions.push(`${a.name} and ${c.name}`) }))
+  e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(c => { if (partsOf(a).some(x => partsOf(c).some(y => overlaps(x, y)))) collisions.push(`${a.name} and ${c.name}`) }))
   checks.push(check('no-collisions', 'Buildings do not overlap', collisions.length === 0, collisions.join('; ') || 'No overlaps'))
 
   const privateBuildings = e.buildings.filter(b => b.access === 'private')
@@ -70,9 +70,22 @@ export function validateEstate(e: Estate): Check[] {
   const house = e.buildings.find(b => b.id === e.house.buildingId)
   const pool = e.buildings.find(b => b.id === 'outdoor-pool')
   if (house && pool) {
-    const d = rectDistance(house.rect, pool.rect)
+    const d = Math.min(...partsOf(house).map(part => rectDistance(part, pool.rect)))
     checks.push(check('pool-link', 'Outdoor pool is next to the house', d <= OUTDOOR_POOL_GAP, `${n(toFt(d))} ft apart`))
   }
+
+  const room = (id: string) => e.house.levels.flatMap(l => l.rooms).find(r => r.id === id)
+  const foyer = room('foyer'), garage = room('garage'), primary = room('primary'), kitchen = room('kitchen'), terrace = room('terrace')
+  const allRooms = e.house.levels.flatMap(l => l.rooms)
+  const midX = (Math.min(...allRooms.filter(r => r.type !== 'garage').map(r => r.rect.x)) + Math.max(...allRooms.map(r => r.rect.x + r.rect.w))) / 2
+  const north = Math.max(...allRooms.map(r => r.rect.y + r.rect.d))
+  const misplaced = [
+    foyer && foyer.rect.y + foyer.rect.d === north ? '' : 'Formal door is not on the north side',
+    garage && center(garage.rect).x < midX ? '' : 'Garage is not on the west side',
+    primary && center(primary.rect).x > midX ? '' : 'Primary suite is not on the east side',
+    kitchen && terrace && rectDistance(kitchen.rect, terrace.rect) === 0 ? '' : 'Kitchen does not reach the terrace',
+  ].filter(Boolean)
+  checks.push(check('house-placement', 'North door, west garage, east primary, kitchen to terrace', misplaced.length === 0, misplaced.join('; ') || 'Rooms match the brief'))
 
   const longWalks = e.walkways.filter(w => pathLength(w.points) > MAX_WALKWAY)
   checks.push(check('walkways', 'Covered walkways are 300 ft or shorter', longWalks.length === 0,
@@ -85,7 +98,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(check('house-rooms', 'House rooms do not overlap', overlapsInHouse.length === 0, overlapsInHouse.join('; ') || 'No overlaps'))
 
   const rooms = e.house.levels.flatMap(l => l.rooms)
-  const finished = rooms.filter(r => r.type !== 'garage').reduce((sum, r) => sum + area(r.rect), 0) / 144
+  const finished = rooms.filter(r => r.type !== 'garage' && r.type !== 'outdoor').reduce((sum, r) => sum + area(r.rect), 0) / 144
   checks.push(check('house-size', 'House is over 10,000 sq ft', finished > 10000, `${n(finished)} sq ft placeholder massing`))
 
   const kids = rooms.filter(r => r.id.startsWith('kid-') && r.type === 'bedroom')

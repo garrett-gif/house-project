@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { Estate, Rect } from '../model/types'
 import { Terrain } from '../model/parcel'
-import { ft, samplePath, toFt } from '../model/geometry'
+import { ft, partsOf, samplePath, toFt } from '../model/geometry'
 import { ROOM_COLOR } from './HousePlan'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
@@ -87,7 +87,7 @@ function buildSite(scene: THREE.Scene, estate: Estate) {
     const cx = toFt(r.x + r.w / 2), cy = toFt(r.y + r.d / 2)
     addBox(scene, X(cx), elev(cx, cy) + height / 2, Z(cy), toFt(r.w), height, toFt(r.d), color)
   }
-  estate.buildings.forEach(b => rectBox(b.rect, toFt(b.height), COLORS[b.access]))
+  estate.buildings.forEach(b => partsOf(b).forEach(part => rectBox(part, toFt(b.height), COLORS[b.access])))
   const pond = estate.zones.find(z => z.kind === 'water')
   if (pond) {
     const cx = toFt(pond.rect.x + pond.rect.w / 2), cy = toFt(pond.rect.y + pond.rect.d / 2)
@@ -103,12 +103,12 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
   const levels = estate.house.levels
   const top = levels.findIndex(l => l.id === levelId)
   const visible = levels.slice(0, (top < 0 ? 1 : top) + 1)
-  addBox(scene, 40, -12.5, 0, 340, 1, 180, 0xa9bb8c)
+  addBox(scene, 0, -12.5, 0, 420, 1, 260, 0xa9bb8c)
   for (const level of visible) {
     const base = toFt(level.elevation)
     const wall = toFt(level.floorHeight)
     for (const room of level.rooms) {
-      const x = toFt(room.rect.x) - 40, w = toFt(room.rect.w), d = toFt(room.rect.d), z = 35 - toFt(room.rect.y) - d / 2
+      const x = toFt(room.rect.x) - 76, w = toFt(room.rect.w), d = toFt(room.rect.d), z = 54 - toFt(room.rect.y) - d / 2
       addBox(scene, x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
       const t = 0.5, y = base + wall / 2, color = 0xf4f0e7
       addBox(scene, x + w / 2, y, z + d / 2, w, wall, t, color)
@@ -145,7 +145,7 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
       controls.target.set(0, 120, 0)
     } else {
       buildHouse(scene, estate, levelId)
-      camera.position.set(-60, 150, 230)
+      camera.position.set(-90, 210, 290)
       controls.target.set(0, 0, 0)
     }
 

@@ -17,6 +17,8 @@ export interface Building {
   access: Access
   rect: Rect
   height: Inches
+  /** Actual masses when the building is not a plain rectangle. `rect` remains the overall bounds. */
+  parts?: Rect[]
 }
 
 export interface Zone {
@@ -33,7 +35,7 @@ export interface Zone {
 export interface Road { id: string; name: string; kind: RoadKind; points: Pt[]; gate?: string }
 export interface Walkway { id: string; name: string; points: Pt[] }
 
-export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool'
+export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool' | 'outdoor'
 export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string }
 export interface Level { id: string; name: string; floorHeight: Inches; elevation: Inches; rooms: Room[] }
 export interface HouseModel { buildingId: string; origin: Pt; levels: Level[]; concept: true }

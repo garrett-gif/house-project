@@ -10,6 +10,7 @@ export const box = (cx: number, cy: number, w: number, d: number): Rect => ({
 })
 export const p = (x: number, y: number): Pt => ({ x: ft(x), y: ft(y) })
 
+export const partsOf = (b: { rect: Rect; parts?: Rect[] }) => b.parts ?? [b.rect]
 export const area = (r: Rect) => r.w * r.d
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.d / 2 })
 

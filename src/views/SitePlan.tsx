@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Estate, RoadKind, ZoneKind } from '../model/types'
-import { toFt } from '../model/geometry'
+import { partsOf, toFt } from '../model/geometry'
 
 const FOCUS = {
   'Whole property': [0, 0, 6600, 6600],
@@ -54,7 +54,7 @@ export function SitePlan({ estate }: { estate: Estate }) {
           const x = toFt(b.rect.x), w = toFt(b.rect.w), d = toFt(b.rect.d), y = Y(b.rect.y) - d
           return (
             <g key={b.id} onMouseEnter={() => setHover(b.name)}>
-              <rect x={x} y={y} width={w} height={d} fill={BUILDING[b.access]} stroke="#fff" strokeWidth={0.6 * scale} />
+              {partsOf(b).map((part, i) => <rect key={i} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} />)}
               {showLabels && <text x={x + w / 2} y={y - 5 * scale} fontSize={label} textAnchor="middle" className="site-label">{b.name}</text>}
             </g>
           )

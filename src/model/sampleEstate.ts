@@ -1,6 +1,6 @@
 import type { Access, Building, BuildingUse, Estate, Pt, Road, Zone, ZoneKind } from './types'
 import { bezier, box, ft, p } from './geometry'
-import { mainHouse } from './house'
+import { GARAGE_DEPTH, GARAGE_WIDTH, HOUSE_DEPTH, HOUSE_WIDTH, WING_DEPTH, WING_WIDTH, mainHouse } from './house'
 
 const SIZE = 6600
 
@@ -15,7 +15,12 @@ const line = (...coords: [number, number][]): Pt[] => coords.map(([x, y]) => p(x
 const approach = [
   ...bezier(p(1000, 0), p(500, 1300), p(600, 2500), p(350, 3400)),
   ...bezier(p(350, 3400), p(200, 4300), p(250, 5400), p(750, 5450)).slice(1),
+  ...line([750, 5520], [1152, 5520]),
 ]
+
+// The main house is a U opening south, with the garage projecting west from the north bar.
+const HX = 1060, HY = 5360
+const mass = (x: number, y: number, w: number, d: number) => ({ x: ft(HX + x), y: ft(HY + y), w: ft(w), d: ft(d) })
 
 const inset = 100
 const roads: Road[] = [
@@ -34,11 +39,20 @@ const roads: Road[] = [
 
 export const sampleEstate: Estate = {
   name: 'House Project',
-  layoutVersion: 2,
+  layoutVersion: 3,
   parcel: { seed: 1876, size: ft(SIZE), gridSize: 128 },
   buildings: [
-    { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', rect: { x: ft(990), y: ft(5415), w: ft(226), d: ft(70) }, height: ft(32) },
-    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1025, 5360, 190, 40, 14),
+    {
+      id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32),
+      rect: mass(-GARAGE_WIDTH, 0, HOUSE_WIDTH + GARAGE_WIDTH, HOUSE_DEPTH),
+      parts: [
+        mass(0, 0, WING_WIDTH, WING_DEPTH),
+        mass(HOUSE_WIDTH - WING_WIDTH, 0, WING_WIDTH, WING_DEPTH),
+        mass(0, WING_DEPTH, HOUSE_WIDTH, HOUSE_DEPTH - WING_DEPTH),
+        mass(-GARAGE_WIDTH, WING_DEPTH, GARAGE_WIDTH, GARAGE_DEPTH),
+      ],
+    },
+    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5388, 80, 40, 14),
     b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
     b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
     b('guest-house', 'Guest house', 'residence', 'private', 640, 4880, 70, 45, 24),
@@ -75,8 +89,8 @@ export const sampleEstate: Estate = {
   ],
   roads,
   walkways: [
-    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1180, 5450], [1466, 5450]) },
-    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1200, 5415], [1200, 5130]) },
+    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1250, 5430], [1466, 5430]) },
+    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1230, 5360], [1230, 5130]) },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   house: mainHouse,
