@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Estate } from './model/types'
 import type { EditOp } from './model/edits'
-import { applyEdits, describeEdits } from './model/edits'
+import { applyOperations, describeEdits } from './model/edits'
 import { sampleEstate } from './model/sampleEstate'
 import { diffChecks, validateEstate } from './model/validate'
 import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
 import type { ChatTurn } from './chat/protocol'
 import { requestEdits } from './chat/client'
+import { browserProjectStore } from './storage/projectStore'
 import { SitePlan } from './views/SitePlan'
 import { HousePlan } from './views/HousePlan'
 import { Scene3D } from './views/Scene3D'
@@ -40,6 +41,28 @@ export function App() {
   const abort = useRef<AbortController | null>(null)
   const nextId = useRef(1)
   const fileInput = useRef<HTMLInputElement>(null)
+  const store = useMemo(() => browserProjectStore(), [])
+  const [restored, setRestored] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+
+  // Restore the last session once, then save after every change. Storage sits behind ProjectStore so it can move to Supabase.
+  useEffect(() => {
+    let live = true
+    store.load().then(data => {
+      if (!live) return
+      if (data) {
+        const r = loadProject(data)
+        if (r.ok) setTimeline(r.timeline)
+        else setNotice(`The saved project could not be restored (${r.error}). Starting from the sample estate.`)
+      }
+    }).catch(() => setNotice('Browser storage is unavailable, so changes will not be kept after reload.'))
+      .finally(() => { if (live) setRestored(true) })
+    return () => { live = false }
+  }, [store])
+  useEffect(() => {
+    if (!restored) return
+    store.save(saveProject(timeline)).catch(() => setNotice('Could not save in this browser. Use Save to download a copy.'))
+  }, [restored, store, timeline])
 
   const current = currentEstate(timeline)
   const estate = proposal?.estate ?? current
@@ -63,7 +86,7 @@ export function App() {
     if (!res.ok) { addTurn({ role: 'assistant', text: res.error, status: 'error' }); return }
     if (res.ops.length === 0) { addTurn({ role: 'assistant', text: res.reply || 'No edits proposed.', status: 'question' }); return }
     // Recheck locally with the browser's own copy of the model. The server's dry run is advisory.
-    const applied = applyEdits(current, res.ops)
+    const applied = applyOperations(current, res.ops)
     if (!applied.ok) { addTurn({ role: 'assistant', text: `The proposed edits do not apply: ${applied.error}`, status: 'error' }); return }
     setProposal({ request: text, ops: res.ops, estate: applied.estate })
     addTurn({
@@ -120,6 +143,15 @@ export function App() {
     setNotice(`Opened ${file.name} with ${loaded.timeline.revisions.length} revision(s).`)
   }
 
+  const reset = () => {
+    if (!confirmReset) { setConfirmReset(true); setTimeout(() => setConfirmReset(false), 4000); return }
+    setConfirmReset(false)
+    setTimeline(startTimeline(sampleEstate))
+    setProposal(null)
+    settlePending('discarded')
+    setNotice('Reset to the sample estate. Use Open to bring back a saved copy.')
+  }
+
   const revisions = timeline.revisions
   const appliedCount = appliedRevisions(timeline).length
 
@@ -140,6 +172,7 @@ export function App() {
           <button onClick={() => step('redo')} disabled={!!proposal || !canRedo(timeline)} title="Redo (Ctrl+Shift+Z)">Redo</button>
           <button onClick={save} title="Download the project as JSON">Save</button>
           <button onClick={() => fileInput.current?.click()} title="Open a saved project">Open</button>
+          <button onClick={reset} className={confirmReset ? 'danger' : ''} title="Start over from the sample estate">{confirmReset ? 'Click again to reset' : 'Reset'}</button>
           <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void open(f); e.target.value = '' }} />
         </div>
       </header>

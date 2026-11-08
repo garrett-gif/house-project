@@ -6,7 +6,7 @@ Slice 1 holds the sample parcel, approved site layout version 1, a placeholder m
 
 ```bash
 npm install
-cp server/.env.example server/.env   # then add your ANTHROPIC_API_KEY
+cp server/.env.example server/.env   # then add your ANTHROPIC_API_KEY (HOUSE_MODEL is optional)
 npm run dev                          # app and local chat server
 npm test
 ```

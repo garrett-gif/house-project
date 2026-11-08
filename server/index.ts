@@ -3,12 +3,13 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { PROPOSE_PATH } from '../src/chat/protocol'
-import { parseRequest, proposeEdits } from './proposeEdits'
+import { DEFAULT_MODEL, parseRequest, proposeEdits } from './proposeEdits'
 
 // The API key lives only here, in server/.env or the shell environment. Browser code never sees it.
 try { process.loadEnvFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '.env')) } catch { /* optional */ }
 
 const PORT = Number(process.env.HOUSE_API_PORT ?? 8787)
+const MODEL = process.env.HOUSE_MODEL?.trim() || DEFAULT_MODEL
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
 
 let client: Anthropic | undefined
@@ -29,7 +30,7 @@ app.post(PROPOSE_PATH, async (req, res) => {
   const parsed = parseRequest(req.body)
   if (!parsed.ok) return void res.status(400).json(parsed)
   try {
-    res.json(await proposeEdits(params => getClient().beta.messages.create(params), parsed.req))
+    res.json(await proposeEdits(params => getClient().beta.messages.create(params), parsed.req, MODEL))
   } catch (err) {
     const [status, error] =
       err instanceof Anthropic.AuthenticationError ? [401, 'The Anthropic API key is missing or invalid. Set ANTHROPIC_API_KEY in server/.env and restart.']
@@ -43,4 +44,4 @@ app.post(PROPOSE_PATH, async (req, res) => {
   }
 })
 
-app.listen(PORT, '127.0.0.1', () => console.log(`House Project chat server on http://127.0.0.1:${PORT}`))
+app.listen(PORT, '127.0.0.1', () => console.log(`House Project chat server on http://127.0.0.1:${PORT} using ${MODEL}`))

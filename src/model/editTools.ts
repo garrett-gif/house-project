@@ -31,7 +31,7 @@ export const EDIT_TOOLS: EditToolSpec[] = [
   },
   {
     name: 'resizeRoom',
-    description: 'Set a room of the main house to a new east-west width and north-south depth in feet. It does not move neighboring rooms; resize or move them separately if they would overlap.',
+    description: 'Set a room of the main house to a new east-west width and north-south depth in feet. It does not move neighboring rooms. Rooms on the same level may not overlap, so when a room grows into a neighbor, shrink or move that neighbor in the same set of edits.',
     input_schema: object({ roomId: str('Room id from the model summary.'), widthFt: num('New east-west width in feet.'), depthFt: num('New north-south depth in feet.'), anchor }),
   },
   {
@@ -58,6 +58,11 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     name: 'renameRoom',
     description: 'Change the name of a room in the main house.',
     input_schema: object({ roomId: str('Room id from the model summary.'), name: str('New room name.') }),
+  },
+  {
+    name: 'setRoomType',
+    description: 'Change the type of a room in the main house, for example from service to wellness.',
+    input_schema: object({ roomId: str('Room id from the model summary.'), type: { type: 'string', enum: ROOM_TYPES, description: 'New room type.' } }),
   },
 ]
 
@@ -102,5 +107,6 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     }
     case 'removeRoom': return { ok: true, op: { op: 'removeRoom', roomId: s('roomId') } }
     case 'renameRoom': return { ok: true, op: { op: 'renameRoom', roomId: s('roomId'), name: s('name') } }
+    case 'setRoomType': return { ok: true, op: { op: 'setRoomType', roomId: s('roomId'), type: s('type') as never } }
   }
 }

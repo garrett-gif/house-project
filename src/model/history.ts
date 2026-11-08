@@ -1,6 +1,6 @@
 import type { Check, Estate } from './types'
 import type { EditOp } from './edits'
-import { applyEdits } from './edits'
+import { applyOperations } from './edits'
 import { validateEstate } from './validate'
 
 /** One saved change: who made it, the edits, and the results of this app's checks afterward. */
@@ -33,7 +33,7 @@ export type CommitResult = { ok: true; timeline: Timeline } | { ok: false; error
 /** Applies a group of edits as one undo step. Redo history past the current state is dropped. */
 export function commit(t: Timeline, ops: EditOp[], author: Revision['author'], request?: string, now = new Date()): CommitResult {
   if (ops.length === 0) return { ok: false, error: 'There are no edits to apply.' }
-  const result = applyEdits(currentEstate(t), ops)
+  const result = applyOperations(currentEstate(t), ops)
   if (!result.ok) return result
   const revision: Revision = {
     id: (t.revisions[t.index - 1]?.id ?? 0) + 1,
@@ -51,11 +51,14 @@ export function commit(t: Timeline, ops: EditOp[], author: Revision['author'], r
   }
 }
 
-export interface SavedProject { format: 'house-project'; version: 1; base: Estate; revisions: Revision[] }
+/**
+ * A saved project keeps the starting estate and every revision, including undone ones, so it can be replayed
+ * exactly and redo still works after reopening. `index` is how many revisions are applied.
+ */
+export interface SavedProject { format: 'house-project'; version: 1; base: Estate; revisions: Revision[]; index: number }
 
-/** A saved project keeps the starting estate and the applied revisions, so it can be replayed exactly. */
 export const saveProject = (t: Timeline): SavedProject =>
-  ({ format: 'house-project', version: 1, base: t.states[0], revisions: appliedRevisions(t) })
+  ({ format: 'house-project', version: 1, base: t.states[0], revisions: t.revisions, index: t.index })
 
 export function loadProject(data: unknown): CommitResult {
   const p = data as Partial<SavedProject> | null
@@ -68,5 +71,6 @@ export function loadProject(data: unknown): CommitResult {
     if (!next.ok) return { ok: false, error: `Revision ${r.id} no longer applies: ${next.error}` }
     t = next.timeline
   }
-  return { ok: true, timeline: t }
+  const index = typeof p.index === 'number' ? Math.max(0, Math.min(Math.trunc(p.index), t.revisions.length)) : t.revisions.length
+  return { ok: true, timeline: { ...t, index } }
 }

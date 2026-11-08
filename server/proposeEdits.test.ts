@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type Anthropic from '@anthropic-ai/sdk'
-import { MODEL, parseRequest, proposeEdits } from './proposeEdits'
+import { DEFAULT_MODEL, parseRequest, proposeEdits } from './proposeEdits'
 import type { CreateMessage } from './proposeEdits'
 import { sampleEstate } from '../src/model/sampleEstate'
 
@@ -9,7 +9,7 @@ type Block = Message['content'][number]
 type Params = Parameters<CreateMessage>[0]
 
 const reply = (content: unknown[], stop_reason: Message['stop_reason'] = 'end_turn') =>
-  ({ id: 'msg', type: 'message', role: 'assistant', model: MODEL, content: content as Block[], stop_reason, stop_sequence: null, usage: {} }) as unknown as Message
+  ({ id: 'msg', type: 'message', role: 'assistant', model: DEFAULT_MODEL, content: content as Block[], stop_reason, stop_sequence: null, usage: {} }) as unknown as Message
 const tool = (id: string, name: string, input: unknown) => ({ type: 'tool_use', id, name, input })
 const text = (t: string) => ({ type: 'text', text: t })
 
@@ -30,7 +30,7 @@ describe('proposeEdits', () => {
     )
     const out = await proposeEdits(create, request('move the forestry shop 100 feet east'))
     expect(out).toEqual({ ok: true, ops: [{ op: 'moveBuilding', buildingId: 'forestry-shop', dx: 1200, dy: 0 }], reply: 'Moved the forestry shop 100 ft east. No checks changed.' })
-    expect(calls[0].model).toBe('claude-opus-5-5')
+    expect(calls[0].model).toBe('claude-sonnet-5-5')
     expect(calls[0].tools?.every(t => 'strict' in t && t.strict)).toBe(true)
     const results = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaContentBlockParam[]
     expect(results[0]).toMatchObject({ type: 'tool_result', tool_use_id: 't1', content: 'Applied to the preview.' })
@@ -61,6 +61,43 @@ describe('proposeEdits', () => {
     await proposeEdits(create, request('move the forestry shop next to the house'))
     const blocks = calls[1].messages.at(-1)!.content as { type: string; text?: string }[]
     expect(blocks.find(b => b.type === 'text')?.text).toMatch(/1\/4 mile.*pass -> fail/)
+  })
+
+  it('uses the configured model, adding the refusal fallback only where supported', async () => {
+    const a = scripted(reply([text('ok')]))
+    await proposeEdits(a.create, request('x'), 'claude-opus-5-5')
+    expect(a.calls[0]).toMatchObject({ model: 'claude-opus-5-5', fallbacks: 'default' })
+    const b = scripted(reply([text('ok')]))
+    await proposeEdits(b.create, request('x'), 'claude-haiku-5-5')
+    expect(b.calls[0].model).toBe('claude-haiku-5-5')
+    expect(b.calls[0]).not.toHaveProperty('fallbacks')
+  })
+
+  it('tells Claude what a widened kitchen collides with, then accepts a valid fix', async () => {
+    const { create, calls } = scripted(
+      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 60, depthFt: 24, anchor: 'w' })], 'tool_use'),
+      reply([
+        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 60, depthFt: 24, anchor: 'w' }),
+        tool('c', 'resizeRoom', { roomId: 'great', widthFt: 38, depthFt: 24, anchor: 'e' }),
+      ], 'tool_use'),
+      reply([text('Widened the kitchen 10 ft east and took the space from the great room.')]),
+    )
+    const out = await proposeEdits(create, request('Make the kitchen 10 feet wider.'))
+    const first = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaToolResultBlockParam[]
+    expect(first[0]).toMatchObject({ is_error: true })
+    expect(first[0].content).toContain('Great room (great) would overlap by 10 ft × 24 ft')
+    expect(out.ok && out.ops.map(o => o.op)).toEqual(['resizeRoom', 'resizeRoom'])
+  })
+
+  it('gives the set-level error to every call when the set as a whole collides', async () => {
+    const { create, calls } = scripted(
+      reply([tool('a', 'renameRoom', { roomId: 'kitchen', name: 'Kitchen' }), tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 60, depthFt: 24, anchor: 'w' })], 'tool_use'),
+      reply([text('The kitchen cannot grow without taking space from the great room. Which room should give it up?')]),
+    )
+    const out = await proposeEdits(create, request('Make the kitchen 10 feet wider.'))
+    const results = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaToolResultBlockParam[]
+    expect(results.every(r => r.is_error && /would overlap/.test(String(r.content)))).toBe(true)
+    expect(out).toEqual({ ok: true, ops: [], reply: 'The kitchen cannot grow without taking space from the great room. Which room should give it up?' })
   })
 
   it('returns a question with no edits', async () => {
