@@ -1,6 +1,7 @@
 import type { Access, Building, BuildingUse, Estate, Pt, Road, Zone, ZoneKind } from './types'
 import { bezier, box, ft, p } from './geometry'
-import { GARAGE_DEPTH, GARAGE_WIDTH, HOUSE_DEPTH, HOUSE_WIDTH, WING_DEPTH, WING_WIDTH, mainHouse } from './house'
+import { mainHouse } from './house'
+import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
 
@@ -18,10 +19,6 @@ const approach = [
   ...line([750, 5520], [1152, 5520]),
 ]
 
-// The main house is a U opening south, with the garage projecting west from the north bar.
-const HX = 1060, HY = 5360
-const mass = (x: number, y: number, w: number, d: number) => ({ x: ft(HX + x), y: ft(HY + y), w: ft(w), d: ft(d) })
-
 const inset = 100
 const roads: Road[] = [
   { id: 'estate-drive', name: 'Estate drive', kind: 'estate', points: approach, gate: 'Estate gate' },
@@ -37,21 +34,13 @@ const roads: Road[] = [
   { id: 'perimeter', name: 'Perimeter road', kind: 'perimeter', points: line([inset, inset], [SIZE - inset, inset], [SIZE - inset, SIZE - inset], [inset, SIZE - inset], [inset, inset]) },
 ]
 
-export const sampleEstate: Estate = {
+export const sampleEstate: Estate = withDerivedGeometry({
   name: 'House Project',
   layoutVersion: 3,
   parcel: { seed: 1876, size: ft(SIZE), gridSize: 128 },
   buildings: [
-    {
-      id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32),
-      rect: mass(-GARAGE_WIDTH, 0, HOUSE_WIDTH + GARAGE_WIDTH, HOUSE_DEPTH),
-      parts: [
-        mass(0, 0, WING_WIDTH, WING_DEPTH),
-        mass(HOUSE_WIDTH - WING_WIDTH, 0, WING_WIDTH, WING_DEPTH),
-        mass(0, WING_DEPTH, HOUSE_WIDTH, HOUSE_DEPTH - WING_DEPTH),
-        mass(-GARAGE_WIDTH, WING_DEPTH, GARAGE_WIDTH, GARAGE_DEPTH),
-      ],
-    },
+    // The U-shaped outline is derived from the house rooms and origin by withDerivedGeometry.
+    { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), rect: { x: 0, y: 0, w: 0, d: 0 } },
     b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5388, 80, 40, 14),
     b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
     b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
@@ -89,9 +78,9 @@ export const sampleEstate: Estate = {
   ],
   roads,
   walkways: [
-    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1250, 5430], [1466, 5430]) },
-    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1230, 5360], [1230, 5130]) },
+    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1250, 5430], [1466, 5430]), from: 'main-house', to: 'car-building' },
+    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1230, 5360], [1230, 5130]), from: 'main-house', to: 'entertainment' },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   house: mainHouse,
-}
+})

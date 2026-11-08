@@ -5,6 +5,7 @@ import type { Estate, Rect } from '../model/types'
 import { Terrain } from '../model/parcel'
 import { ft, partsOf, samplePath, toFt } from '../model/geometry'
 import { ROOM_COLOR } from './HousePlan'
+import { houseBounds } from '../model/derive'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
 
@@ -103,12 +104,14 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
   const levels = estate.house.levels
   const top = levels.findIndex(l => l.id === levelId)
   const visible = levels.slice(0, (top < 0 ? 1 : top) + 1)
-  addBox(scene, 0, -12.5, 0, 420, 1, 260, 0xa9bb8c)
+  const b = houseBounds(estate.house)
+  const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
+  addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
   for (const level of visible) {
     const base = toFt(level.elevation)
     const wall = toFt(level.floorHeight)
     for (const room of level.rooms) {
-      const x = toFt(room.rect.x) - 76, w = toFt(room.rect.w), d = toFt(room.rect.d), z = 54 - toFt(room.rect.y) - d / 2
+      const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
       addBox(scene, x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
       const t = 0.5, y = base + wall / 2, color = 0xf4f0e7
       addBox(scene, x + w / 2, y, z + d / 2, w, wall, t, color)

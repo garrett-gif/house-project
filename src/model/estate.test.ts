@@ -4,7 +4,7 @@ import { Terrain } from './parcel'
 import { validateEstate } from './validate'
 import { ft } from './geometry'
 
-describe('approved layout version 1', () => {
+describe('approved layout version 3', () => {
   const checks = validateEstate(sampleEstate)
 
   it.each(checks.map(c => [c.label, c] as const))('%s', (_label, c) => {

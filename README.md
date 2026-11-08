@@ -2,11 +2,12 @@
 
 A personal design tool for a 1,000-acre work-and-live estate: a private home and a forestry and wildland fire compound, planned from one shared model.
 
-Slice 1 holds the sample parcel, approved site layout version 1, a placeholder main house, 2D plans, basic 3D, and automatic checks. AI generation and chat editing come in later slices.
+Slice 1 holds the sample parcel, approved site layout version 1, a placeholder main house, 2D plans, basic 3D, and automatic checks. Chat editing turns a request into small named edits, previews them with the check changes, and applies them only when you say so. Every applied change can be undone. AI generation comes in a later slice.
 
 ```bash
 npm install
-npm run dev
+cp server/.env.example server/.env   # then add your ANTHROPIC_API_KEY
+npm run dev                          # app and local chat server
 npm test
 ```
 

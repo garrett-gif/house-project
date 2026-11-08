@@ -33,7 +33,8 @@ export interface Zone {
 }
 
 export interface Road { id: string; name: string; kind: RoadKind; points: Pt[]; gate?: string }
-export interface Walkway { id: string; name: string; points: Pt[] }
+/** `from` and `to` are building ids. Moving one of those buildings moves that end of the walkway with it. */
+export interface Walkway { id: string; name: string; points: Pt[]; from?: string; to?: string }
 
 export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool' | 'outdoor'
 export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string }

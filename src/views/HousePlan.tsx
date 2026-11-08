@@ -1,5 +1,6 @@
 import type { HouseModel, RoomType } from '../model/types'
 import { toFt } from '../model/geometry'
+import { houseBounds } from '../model/derive'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -8,10 +9,12 @@ export const ROOM_COLOR: Record<RoomType, string> = {
 
 export function HousePlan({ house, levelId }: { house: HouseModel; levelId: string }) {
   const level = house.levels.find(l => l.id === levelId) ?? house.levels[1]
-  const minX = -42, maxX = 194, top = 112
+  const b = houseBounds(house)
+  const x0 = toFt(b.x), x1 = toFt(b.x + b.w), y0 = toFt(b.y), y1 = toFt(b.y + b.d)
+  const minX = x0 - 4, maxX = x1 + 4, top = y1 + 4, mid = (x0 + x1) / 2
   return (
     <div className="plan">
-      <svg viewBox={`${minX} -2 ${maxX - minX} 124`} role="img" aria-label={`${level.name} floor plan`}>
+      <svg viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}>
         {level.rooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           const compact = w < 14 || d < 12
@@ -25,8 +28,8 @@ export function HousePlan({ house, levelId }: { house: HouseModel; levelId: stri
             </g>
           )
         })}
-        <text x={95} y={2} fontSize={2.2} textAnchor="middle" className="room-size">North, formal entry and road</text>
-        <text x={95} y={118} fontSize={2.2} textAnchor="middle" className="room-size">South, courtyard</text>
+        <text x={mid} y={top - y1 - 2} fontSize={2.2} textAnchor="middle" className="room-size">North, formal entry and road</text>
+        <text x={mid} y={top - y0 + 6} fontSize={2.2} textAnchor="middle" className="room-size">South, courtyard</text>
       </svg>
       <div className="legend"><span>{level.name}</span><span>Placeholder massing used to test the model, not a finished floor plan</span></div>
     </div>

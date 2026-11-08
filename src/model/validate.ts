@@ -110,3 +110,15 @@ export function validateEstate(e: Estate): Check[] {
 
   return checks
 }
+
+export interface CheckChange { id: string; label: string; from: CheckStatus | 'missing'; to: CheckStatus | 'missing'; detail: string }
+
+/** Checks whose status differs between two runs, with the newest detail. */
+export function diffChecks(before: Check[], after: Check[]): CheckChange[] {
+  const ids = [...new Set([...before, ...after].map(c => c.id))]
+  return ids.flatMap(id => {
+    const a = before.find(c => c.id === id), b = after.find(c => c.id === id)
+    const from = a?.status ?? 'missing', to = b?.status ?? 'missing'
+    return from === to ? [] : [{ id, label: (b ?? a)!.label, from, to, detail: (b ?? a)!.detail }]
+  })
+}

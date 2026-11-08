@@ -19,6 +19,42 @@ export function overlaps(a: Rect, b: Rect, tolerance = 0.01) {
     a.y + a.d > b.y + tolerance && b.y + b.d > a.y + tolerance
 }
 
+export const translate = (r: Rect, dx: number, dy: number): Rect => ({ ...r, x: r.x + dx, y: r.y + dy })
+
+export function bounds(rects: Rect[]): Rect {
+  const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y))
+  const x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.d))
+  return { x: x0, y: y0, w: x1 - x0, d: y1 - y0 }
+}
+
+/** Covers the union of the given rectangles with a small set of non-overlapping rectangles. */
+export function mergeRects(rects: Rect[]): Rect[] {
+  const uniq = (v: number[]) => [...new Set(v)].sort((a, b) => a - b)
+  const xs = uniq(rects.flatMap(r => [r.x, r.x + r.w]))
+  const ys = uniq(rects.flatMap(r => [r.y, r.y + r.d]))
+  const covers = (x: number, y: number) => rects.some(r => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d)
+  const out: Rect[] = []
+  let open = new Map<string, Rect>()
+  for (let j = 0; j < ys.length - 1; j++) {
+    const y = ys[j], cy = (ys[j] + ys[j + 1]) / 2
+    const next = new Map<string, Rect>()
+    for (let i = 0; i < xs.length - 1;) {
+      if (!covers((xs[i] + xs[i + 1]) / 2, cy)) { i++; continue }
+      let k = i
+      while (k < xs.length - 1 && covers((xs[k] + xs[k + 1]) / 2, cy)) k++
+      const key = `${xs[i]}:${xs[k]}`
+      const prev = open.get(key)
+      if (prev) { prev.d = ys[j + 1] - prev.y; next.set(key, prev); open.delete(key) }
+      else next.set(key, { x: xs[i], y, w: xs[k] - xs[i], d: ys[j + 1] - y })
+      i = k
+    }
+    out.push(...open.values())
+    open = next
+  }
+  out.push(...open.values())
+  return out
+}
+
 export function rectDistance(a: Rect, b: Rect) {
   const dx = Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w))
   const dy = Math.max(0, a.y - (b.y + b.d), b.y - (a.y + a.d))
