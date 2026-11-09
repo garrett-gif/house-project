@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { Estate, Rect } from '../model/types'
@@ -8,6 +8,7 @@ import { ROOM_COLOR } from './HousePlan'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
+import { flyoverKeyframes, step, walkStart } from '../ui/tour'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
 
@@ -118,11 +119,11 @@ function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number) {
   }
 }
 
-function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
+function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThisLevel = false) {
   const levels = estate.house.levels
   const top = levels.findIndex(l => l.id === levelId)
-  const visible = levels.slice(0, (top < 0 ? 1 : top) + 1)
-  const showRoofs = top === levels.length - 1
+  const visible = onlyThisLevel ? [levels[top < 0 ? 0 : top]] : levels.slice(0, (top < 0 ? 1 : top) + 1)
+  const showRoofs = !onlyThisLevel && top === levels.length - 1
   const b = houseBounds(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
   addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
@@ -164,8 +165,15 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
   if (showRoofs) addRoofs(scene, estate, cx, cy)
 }
 
+type Tour = 'none' | 'fly' | 'walk'
+const FLIGHT_SECONDS = 45
+const EYE_FT = 5.5
+const WALK_FT_PER_S = 6
+
 export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site' | 'house'; levelId: string }) {
   const host = useRef<HTMLDivElement>(null)
+  const [tour, setTour] = useState<Tour>('none')
+  useEffect(() => { setTour('none') }, [mode])
 
   useEffect(() => {
     const el = host.current
@@ -180,18 +188,71 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
     sun.position.set(-2, 3, 2)
     scene.add(sun)
 
-    const camera = new THREE.PerspectiveCamera(42, 1, mode === 'site' ? 10 : 1, mode === 'site' ? 40000 : 3000)
+    const walking = mode === 'house' && tour === 'walk'
+    const camera = new THREE.PerspectiveCamera(walking ? 70 : 42, 1, walking ? 0.3 : mode === 'site' ? 10 : 1, mode === 'site' ? 40000 : 3000)
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.maxPolarAngle = Math.PI * 0.49
+    /** Runs every frame during a tour. */
+    let animate: ((dt: number) => void) | null = null
+    const cleanups: (() => void)[] = []
+
     if (mode === 'site') {
       const S = buildSite(scene, estate)
       camera.position.set(-S * 0.25, S * 0.72, S * 1.02)
       controls.target.set(0, 120, 0)
+      if (tour === 'fly') {
+        // The flight path from the model, lifted over the terrain, smoothed into curves.
+        const terrain = new Terrain(estate.parcel)
+        const ground = (x: number, y: number) => toFt(terrain.at(ft(x), ft(y))) - 3600
+        const keys = flyoverKeyframes(estate)
+        const toScene = (x: number, y: number, z: number) => new THREE.Vector3(x - S / 2, ground(x, y) + z, S / 2 - y)
+        const path = new THREE.CatmullRomCurve3(keys.map(k => toScene(k.x, k.y, k.z)))
+        const look = new THREE.CatmullRomCurve3(keys.map(k => toScene(k.lookX, k.lookY, k.lookZ)))
+        controls.enabled = false
+        let t = 0
+        animate = dt => {
+          t = Math.min(1, t + dt / FLIGHT_SECONDS)
+          // Both curves are timed by keyframe, not by length, so the camera and what it looks at stay in step.
+          camera.position.copy(path.getPoint(t))
+          camera.lookAt(look.getPoint(t))
+          if (t >= 1) setTour('none')
+        }
+      }
     } else {
-      buildHouse(scene, estate, levelId)
+      buildHouse(scene, estate, levelId, walking)
       camera.position.set(-90, 210, 290)
       controls.target.set(0, 0, 0)
+      if (walking) {
+        // First person on the selected level. Walls block, doors and openings let you through.
+        const b = houseBounds(estate.house)
+        const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
+        const level = estate.house.levels.find(l => l.id === levelId) ?? estate.house.levels[0]
+        let pos = walkStart(estate.house, level.id)
+        let yaw = -Math.PI / 2, pitch = 0
+        const keys = new Set<string>()
+        controls.enabled = false
+        const down = (e: KeyboardEvent) => { if (!(e.target instanceof Element && e.target.closest('input, textarea'))) { keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault() } }
+        const up = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase())
+        const look = (e: PointerEvent) => { if (e.buttons) { yaw -= e.movementX * 0.005; pitch = Math.max(-1, Math.min(1, pitch - e.movementY * 0.004)) } }
+        window.addEventListener('keydown', down)
+        window.addEventListener('keyup', up)
+        renderer.domElement.addEventListener('pointermove', look)
+        cleanups.push(() => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); renderer.domElement.removeEventListener('pointermove', look) })
+        animate = dt => {
+          if (keys.has('arrowleft')) yaw += 1.6 * dt
+          if (keys.has('arrowright')) yaw -= 1.6 * dt
+          const fwd = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0)
+          const side = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0)
+          const speed = WALK_FT_PER_S * 12 * dt * (keys.has('shift') ? 2 : 1)
+          const dx = (Math.cos(yaw) * fwd + Math.sin(yaw) * side) * speed
+          const dy = (Math.sin(yaw) * fwd - Math.cos(yaw) * side) * speed
+          if (dx || dy) pos = step(estate.house, level.id, pos, dx, dy)
+          const eye = new THREE.Vector3(toFt(pos.x) - cx, toFt(level.elevation) + EYE_FT, cy - toFt(pos.y))
+          camera.position.copy(eye)
+          camera.lookAt(eye.x + Math.cos(yaw) * Math.cos(pitch), eye.y + Math.sin(pitch), eye.z - Math.sin(yaw) * Math.cos(pitch))
+        }
+      }
     }
 
     const resize = () => {
@@ -205,15 +266,20 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
     resize()
 
     let frame = 0
-    const tick = () => {
+    let last = performance.now()
+    const tick = (now = performance.now()) => {
       frame = requestAnimationFrame(tick)
-      controls.update()
+      const dt = Math.min(0.1, (now - last) / 1000)
+      last = now
+      if (animate) animate(dt)
+      else controls.update()
       renderer.render(scene, camera)
     }
     tick()
 
     return () => {
       cancelAnimationFrame(frame)
+      cleanups.forEach(c => c())
       observer.disconnect()
       controls.dispose()
       scene.traverse(o => {
@@ -225,7 +291,16 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [estate, mode, levelId])
+  }, [estate, mode, levelId, tour])
 
-  return <div className="scene" ref={host} aria-label="3D view. Drag to orbit, scroll to zoom." />
+  return (
+    <div className="scene-wrap">
+      <div className="scene" ref={host} aria-label={tour === 'walk' ? 'Walkthrough. W A S D or arrow keys to move, drag to look.' : '3D view. Drag to orbit, scroll to zoom.'} />
+      <div className="scene-tools">
+        {mode === 'site' && <button className={tour === 'fly' ? 'active' : ''} onClick={() => setTour(t => t === 'fly' ? 'none' : 'fly')}>{tour === 'fly' ? 'Stop flyover' : 'Fly over'}</button>}
+        {mode === 'house' && <button className={tour === 'walk' ? 'active' : ''} onClick={() => setTour(t => t === 'walk' ? 'none' : 'walk')}>{tour === 'walk' ? 'Stop walking' : 'Walk through'}</button>}
+        {tour === 'walk' && <span>W A S D or arrows to move, Shift to hurry, drag to look. Pick a floor above to change levels.</span>}
+      </div>
+    </div>
+  )
 }

@@ -85,3 +85,9 @@ button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
 }
 .plan svg.sheet { background: #fff; }
 .plan-tools .primary { margin-left: auto; }
+.scene-wrap { flex: 1; min-height: 0; position: relative; display: flex; }
+.scene-wrap .scene { flex: 1; }
+.scene-tools { position: absolute; left: 10px; top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--ink); }
+.scene-tools button { background: var(--card); }
+.scene-tools button.active { background: var(--accent); }
+.scene-tools span { background: rgba(255,253,248,.88); padding: 4px 8px; border-radius: 6px; }
