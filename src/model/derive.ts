@@ -1,6 +1,7 @@
 import type { Estate, HouseModel, Rect } from './types'
 import { bounds, mergeRects, translate } from './geometry'
 import { houseHeight } from './roofs'
+import { allHouses } from './houses'
 
 const rooms = (house: HouseModel) => house.levels.flatMap(l => l.rooms)
 
@@ -20,17 +21,16 @@ export const houseFootprint = (house: HouseModel, aboveGradeOnly = false): Rect[
 
 /**
  * Recomputes geometry that is stored for convenience but owned elsewhere.
- * The main house building's outline comes from its rooms and `house.origin`, so it can never drift from the floor plan.
+ * Each detailed building's outline comes from its rooms and `origin`, so it can never drift from the floor plan.
  */
 export function withDerivedGeometry(e: Estate): Estate {
-  const { origin } = e.house
-  const place = (rects: Rect[]) => rects.map(r => translate(r, origin.x, origin.y))
-  // Above-grade masses are what you see and what 3D extrudes. The full footprint adds rooms that are only below grade.
-  const parts = place(houseFootprint(e.house, true))
-  const footprint = place(houseFootprint(e.house))
-  return {
-    ...e,
+  const derived = new Map(allHouses(e).map(h => {
+    const place = (rects: Rect[]) => rects.map(r => translate(r, h.origin.x, h.origin.y))
+    // Above-grade masses are what you see and what 3D extrudes. The full footprint adds rooms that are only below grade.
+    const parts = place(houseFootprint(h, true))
+    const footprint = place(houseFootprint(h))
     // Height above the main floor comes from the roofs, so the site 3D view matches the house.
-    buildings: e.buildings.map(b => b.id === e.house.buildingId ? { ...b, rect: bounds(footprint), parts, footprint, height: Math.round(houseHeight(e.house)) } : b),
-  }
+    return [h.buildingId, { rect: bounds(footprint), parts, footprint, height: Math.round(houseHeight(h)) }]
+  }))
+  return { ...e, buildings: e.buildings.map(b => derived.has(b.id) ? { ...b, ...derived.get(b.id)! } : b) }
 }

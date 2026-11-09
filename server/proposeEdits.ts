@@ -27,7 +27,7 @@ How to work:
 - Make the smallest set of edits that does what the owner asked. Do not change anything they did not ask about.
 - The model summary in the latest message is the true current state. Earlier edits may since have been undone, so do not rely on earlier turns for positions or sizes.
 - Use ids exactly as they appear in the model summary. All tool lengths are feet. x is east and y is north.
-- Main house rooms use house-local coordinates. Moving the main house building moves all of its rooms and the walkways attached to it.
+- The main house and the guest house are detailed buildings with their own rooms, doors, windows, and roofs. Their rooms use each building's own house-local coordinates. Moving either building moves all of its rooms and the walkways attached to it.
 - Rooms on the same level, and buildings on the site, may never overlap. An edit set that creates an overlap is rejected with the reason. When a room must grow into a neighbor, shrink or move the neighbor in the same set of edits, or explain what it collides with.
 - Walls follow room edges. Use moveWall to grow a room into a neighbor; the neighbor shrinks by the same amount. Doors and windows stay where they are in plan when walls move, but every door and window must still sit on a single wall, so move or remove any that would fall off in the same set of edits.
 - Wildfire and fire-access checks are advisories using the owner's fire rules. Roads, turnarounds, fire water, and building ignition features can be edited; site coordinates are feet from the southwest parcel corner.

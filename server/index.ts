@@ -50,7 +50,7 @@ app.post(SHEETS_PATH, async (req, res) => {
     const date = new Date().toISOString().slice(0, 10)
     const sheets = drawingSet(estate, { revision: Number(revision) || 0, date, projectName: estate.name })
     const pdf = await sheetsToPdf(sheets, `${estate.name}, draft drawing set`)
-    res.type('application/pdf').set('Content-Disposition', `attachment; filename="house-project-drawings-${date}.pdf"`).send(pdf)
+    res.type('application/pdf').set('Content-Disposition', `attachment; filename="house-project-${estate.house.buildingId}-drawings-${date}.pdf"`).send(pdf)
   } catch (err) {
     console.error('[sheets]', err instanceof Error ? err.message : err)
     res.status(500).json({ ok: false, error: 'Could not draw the sheets.' })

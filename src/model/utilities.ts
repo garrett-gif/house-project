@@ -1,5 +1,6 @@
 import type { Building, BuildingUse, Estate, Rect, Utility, UtilityKind, UtilityRules } from './types'
 import { area, partsOf, toFt } from './geometry'
+import { houseByBuilding } from './houses'
 
 /**
  * Planning values for utilities and security, from common rules of thumb: 100 gallons of water and 75 gallons of
@@ -29,19 +30,17 @@ const WATTS_PER_SQFT: Record<BuildingUse, number> = { residence: 4, lodging: 4, 
 /** Ground cleared for building or utilities: cleared zones plus every utility's rectangle. */
 export const clearedRects = (e: Estate): Rect[] => [...e.zones.filter(z => z.cleared).map(z => z.rect), ...(e.utilities ?? []).map(u => u.rect)]
 
-const bedrooms = (e: Estate) => e.house.levels.flatMap(l => l.rooms).filter(r => r.type === 'bedroom').length
-
-/** People at peak: sleeping on site and there for the day. The main house counts two per bedroom unless set. */
+/** People at peak: sleeping on site and there for the day. Detailed houses count two per bedroom unless set. */
 export function occupancy(e: Estate, b: Building) {
-  const beds = b.beds ?? (b.id === e.house.buildingId ? 2 * bedrooms(e) : 0)
+  const house = houseByBuilding(e, b.id)
+  const beds = b.beds ?? (house ? 2 * house.levels.flatMap(l => l.rooms).filter(r => r.type === 'bedroom').length : 0)
   return { beds, staff: b.staff ?? 0 }
 }
 
 /** Floor area in square feet: the main house from its rooms, others from their footprint, two floors for tall homes and lodges. */
 export function floorArea(e: Estate, b: Building) {
-  if (b.id === e.house.buildingId) {
-    return e.house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor').reduce((s, r) => s + area(r.rect), 0) / 144
-  }
+  const house = houseByBuilding(e, b.id)
+  if (house) return house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor').reduce((s, r) => s + area(r.rect), 0) / 144
   const floors = (b.use === 'residence' || b.use === 'lodging') ? Math.max(1, Math.floor(toFt(b.height) / 12)) : 1
   return partsOf(b).reduce((s, r) => s + area(r), 0) / 144 * floors
 }

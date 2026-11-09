@@ -59,7 +59,7 @@ describe('utility checks', () => {
 
   it('flag a drainfield too small for its design flow', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'resizeUtility', utilityId: 'estate-septic', w: ft(50), d: ft(50), anchor: 'sw' }]))
-    expect(check(e, 'septic-capacity').detail).toMatch(/2,500 sq ft of drainfield, 8,000 needed/)
+    expect(check(e, 'septic-capacity').detail).toMatch(/2,500 sq ft of drainfield, 10,000 needed/)
   })
 
   it('flag a drainfield under a road', () => {
@@ -217,8 +217,8 @@ describe('older saves', () => {
   it('leave out utilities that would land on a moved building', () => {
     const old = structuredClone(sampleEstate)
     delete old.utilities
-    // The guest house was moved onto ground the sample uses for the estate drainfield.
-    old.buildings.find(b => b.id === 'guest-house')!.rect = { x: ft(920), y: ft(4720), w: ft(70), d: ft(45) }
+    // The pool house was moved onto ground the sample uses for the estate drainfield.
+    old.buildings.find(b => b.id === 'outdoor-pool')!.rect = { x: ft(920), y: ft(4720), w: ft(70), d: ft(45) }
     expect(withUtilityDefaults(old).utilities!.some(u => u.id === 'estate-septic')).toBe(false)
   })
 })
@@ -226,7 +226,7 @@ describe('older saves', () => {
 describe('the chat summary', () => {
   it('lists utilities, devices, occupancy, and the safe room', () => {
     const text = summarizeEstate(sampleEstate)
-    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 900,4710 size 100x90, 2,400 gallons a day, serves main-house/)
+    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 900,4700 size 100x100, 3,000 gallons a day, serves main-house/)
     expect(text).toMatch(/- lodge-1: Lodge 1, .* sleeps 22, 72 kW, on backup power/)
     expect(text).toMatch(/- cam-estate-gate: camera at 1000,0, facing \d+ deg, 60 deg view, 400 ft, solar/)
     expect(text).toMatch(/- safe-room: Safe room, service, .*, safe room/)

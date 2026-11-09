@@ -5,6 +5,7 @@ import { roofChecks } from './roofChecks'
 import { fireChecks } from './fireChecks'
 import { utilityChecks } from './utilityChecks'
 import { securityChecks } from './securityChecks'
+import { allHouses, checksForEachHouse } from './houses'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
@@ -105,7 +106,7 @@ export function validateEstate(e: Estate): Check[] {
     e.walkways.map(w => `${n(toFt(pathLength(w.points)))} ft`).join(', '), 'fail', longWalks.map(w => w.id)))
 
   const overlapsInHouse: string[] = [], overlappingRooms: string[] = []
-  for (const level of e.house.levels) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {
+  for (const level of allHouses(e).flatMap(h => h.levels)) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {
     if (overlaps(a.rect, c.rect)) { overlapsInHouse.push(`${level.name}: ${a.name} and ${c.name}`); overlappingRooms.push(a.id, c.id) }
   }))
   checks.push(check('house-rooms', 'House rooms do not overlap', overlapsInHouse.length === 0, overlapsInHouse.join('; ') || 'No overlaps', 'fail', overlappingRooms))
@@ -117,13 +118,14 @@ export function validateEstate(e: Estate): Check[] {
   const kids = rooms.filter(r => r.id.startsWith('kid-') && r.type === 'bedroom')
   checks.push(check('kids', 'Seven kids’ bedrooms', kids.length === 7, `${kids.length} on the kids floor`))
 
-  const bedrooms = rooms.filter(r => r.type === 'bedroom')
-  const noBath = bedrooms.filter(r => !rooms.some(o => o.id === r.bathId && o.type === 'bath'))
+  const everyRoom = allHouses(e).flatMap(h => h.levels.flatMap(l => l.rooms))
+  const bedrooms = everyRoom.filter(r => r.type === 'bedroom')
+  const noBath = bedrooms.filter(r => !everyRoom.some(o => o.id === r.bathId && o.type === 'bath'))
   checks.push(check('baths', 'Every bedroom has its own bathroom', noBath.length === 0, noBath.map(r => r.name).join(', ') || `${bedrooms.length} bedrooms matched`, 'fail', noBath.map(r => r.id)))
 
-  checks.push(...wallChecks(e))
-  checks.push(...programChecks(e))
-  checks.push(...roofChecks(e))
+  checks.push(...checksForEachHouse(e, wallChecks))
+  checks.push(...checksForEachHouse(e, programChecks))
+  checks.push(...checksForEachHouse(e, roofChecks))
   checks.push(...fireChecks(e))
   checks.push(...utilityChecks(e))
   checks.push(...securityChecks(e))

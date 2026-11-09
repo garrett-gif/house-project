@@ -1,6 +1,7 @@
 import type { Estate, Rect } from './types'
 import { pathLength, toFt } from './geometry'
 import { validateEstate } from './validate'
+import { allHouses, houseName } from './houses'
 import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
@@ -43,15 +44,16 @@ export function summarizeEstate(e: Estate): string {
   const ur = utilityRules(e)
   lines.push(`Utility rules (planning values): ${Object.entries(ur).map(([k, v]) => `${k} ${v}`).join(', ')}.`)
 
-  const { origin } = e.house
-  lines.push('', `Main house (building ${e.house.buildingId}). Placeholder massing. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
-  lines.push('Room positions are house-local: 0,0 is the house origin, x east, y north. The formal entry faces north.')
-  const t = e.house.wallThickness
+  for (const house of allHouses(e)) {
+  const { origin } = house
+  lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
+  lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
+  const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
   lines.push('Openings are listed under their host room as id: kind, side, offset from that side\'s west or south end to the center, width x height, sill, and what is on the other side.')
-  const placed = placeOpenings(e.house)
+  const placed = placeOpenings(house)
   const ft1 = (inches: number) => String(Math.round(inches / 12 * 100) / 100)
-  for (const level of e.house.levels) {
+  for (const level of house.levels) {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
       lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}`)
@@ -61,8 +63,9 @@ export function summarizeEstate(e: Estate): string {
     }
   }
 
-  if (e.house.roofs.length) lines.push('', `Roofs (id: name, over, form, pitch, ridge or low side, overhang; heights above the main floor): ${e.house.roofs.map(r => `${r.id}: ${r.name}, over ${box(r.rect)} on ${r.levelId}, ${r.form} ${r.pitch}:12, ${r.form === 'shed' ? `low side ${r.low}` : `ridge ${r.ridge}`}, ${f(r.overhang)} ft overhang, top at ${f(ridgeHeight(e.house, r))} ft`).join('; ')}.`)
-  if (e.house.stairs.length) lines.push('', `Stairs: ${e.house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
+  if (house.roofs.length) lines.push('', `Roofs (id: name, over, form, pitch, ridge or low side, overhang; heights above the main floor): ${house.roofs.map(r => `${r.id}: ${r.name}, over ${box(r.rect)} on ${r.levelId}, ${r.form} ${r.pitch}:12, ${r.form === 'shed' ? `low side ${r.low}` : `ridge ${r.ridge}`}, ${f(r.overhang)} ft overhang, top at ${f(ridgeHeight(house, r))} ft`).join('; ')}.`)
+  if (house.stairs.length) lines.push('', `Stairs: ${house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
+  }
   lines.push('', "This app's planning checks right now (these are planning aids, not code compliance):")
   for (const c of validateEstate(e)) lines.push(`- ${c.status.toUpperCase()} ${c.label}: ${c.detail}`)
   return lines.join('\n')

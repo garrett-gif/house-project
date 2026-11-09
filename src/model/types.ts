@@ -236,6 +236,8 @@ export interface Estate {
   walkways: Walkway[]
   runway: { name: string; rect: Rect }
   house: HouseModel
+  /** Other detailed buildings with their own rooms, such as the guest house. Ids are unique across all houses. */
+  houses?: HouseModel[]
   /** Fire water. Optional so older saves still load. */
   waterSources?: WaterSource[]
   /** Owner's planning values for wildfire checks. Absent means the defaults. */

@@ -1,6 +1,7 @@
 import type { Access, Building, BuildingUse, Estate, Ignition, Pt, Road, SecurityDevice, Utility, UtilityKind, WaterSource, Zone, ZoneKind } from './types'
 import { bezier, box, ft, p, samplePath } from './geometry'
 import { mainHouse } from './house'
+import { guestHouse } from './guestHouse'
 import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
@@ -53,7 +54,8 @@ const roads: Road[] = [
  */
 const PEOPLE: Record<string, Partial<Building>> = {
   'main-house': { staff: 10, backupPower: true },
-  'guest-house': { beds: 4, backupPower: true },
+  // Four suites at two each plus a bunk room for six.
+  'guest-house': { beds: 14, backupPower: true },
   ...Object.fromEntries([1, 2, 3, 4, 5].map(i => [`lodge-${i}`, { beds: 22, backupPower: true }])),
   commons: { staff: 20, backupPower: true },
   cabins: { beds: 24, backupPower: true },
@@ -83,7 +85,7 @@ const u = (id: string, name: string, kind: UtilityKind, x0: number, y0: number, 
 const utilities: Utility[] = [
   u('estate-well', 'Estate well', 'well', 860, 5620, 880, 5640, 15, ESTATE),
   u('estate-storage', 'Estate water storage', 'storage', 890, 5615, 915, 5645, 10000, ESTATE),
-  u('estate-septic', 'Estate septic and drainfield', 'septic', 900, 4710, 1000, 4800, 2400, ESTATE),
+  u('estate-septic', 'Estate septic and drainfield', 'septic', 900, 4700, 1000, 4800, 3000, ESTATE),
   u('estate-service', 'Estate power service', 'service', 1160, 5560, 1180, 5580, 600, ESTATE),
   u('estate-generator', 'Estate generator', 'generator', 1270, 5480, 1294, 5492, 150, ['main-house', 'guest-house']),
   u('estate-propane', 'Estate propane tank', 'propane', 1320, 5600, 1340, 5606, 1000, ['main-house', 'guest-house']),
@@ -156,7 +158,8 @@ const laidOut: Estate = withDerivedGeometry({
     b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5388, 80, 40, 14),
     b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
     b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
-    b('guest-house', 'Guest house', 'residence', 'private', 640, 4880, 70, 45, 24),
+    // Outline derived from the guest house rooms.
+    { id: 'guest-house', name: 'Guest house', use: 'residence', access: 'private', height: ft(30), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     b('lodge-1', 'Lodge 1', 'lodging', 'work', 2050, 1650, 150, 60, 26),
     b('lodge-2', 'Lodge 2', 'lodging', 'work', 2700, 1650, 150, 60, 26),
     b('lodge-3', 'Lodge 3', 'lodging', 'work', 2050, 1100, 150, 60, 26),
@@ -203,6 +206,7 @@ const laidOut: Estate = withDerivedGeometry({
   waterSources,
   utilities,
   house: mainHouse,
+  houses: [guestHouse],
 })
 laidOut.buildings = laidOut.buildings.map(b => ({ ...b, ...PEOPLE[b.id] }))
 

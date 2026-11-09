@@ -65,7 +65,7 @@ export function coverSheet(e: Estate, info: SheetInfo, index: { number: string; 
   let y = MARGIN + 1.5 * PT_PER_IN
   marks.push({ t: 'text', x, y, text: info.projectName.toUpperCase(), size: 40, bold: true })
   y += 34
-  marks.push({ t: 'text', x, y, text: 'SITE AND MAIN HOUSE · DRAFT DRAWING SET', size: 18, bold: true })
+  marks.push({ t: 'text', x, y, text: `SITE AND ${(e.buildings.find(b => b.id === e.house.buildingId)?.name ?? 'Main house').toUpperCase()} · DRAFT DRAWING SET`, size: 18, bold: true })
   y += 24
   marks.push({ t: 'text', x, y, text: 'Concept stage. Placeholder massing used to test the model, not a finished design.', size: 11 })
 

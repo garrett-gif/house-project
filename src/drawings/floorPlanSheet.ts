@@ -248,7 +248,7 @@ export function drawTitleBlock(marks: Mark[], e: Estate, sheet: { title: string;
 
   s = box(78)
   text(info.projectName.toUpperCase(), s + 20, 12, true)
-  text(sheet.subject ?? 'MAIN HOUSE', s + 36, 10, true)
+  text(sheet.subject ?? (e.buildings.find(b => b.id === e.house.buildingId)?.name ?? 'Main house').toUpperCase(), s + 36, 10, true)
   para('Concept. Placeholder massing used to test the model, not a finished design.', 7.5, s + 52)
 
   s = box(170)

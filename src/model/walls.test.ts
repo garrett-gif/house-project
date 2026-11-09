@@ -215,7 +215,7 @@ describe('wall and opening checks', () => {
   })
 
   it('names the exit door', () => {
-    expect(check(sampleEstate, 'egress-door').detail).toMatch(/^foyer-door/)
+    expect(check(sampleEstate, 'egress-door').detail).toMatch(/^Main house: foyer-door/)
   })
 })
 
