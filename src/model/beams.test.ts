@@ -33,7 +33,13 @@ describe('the first pass of beams', () => {
   })
 
   it('puts a post under long beams over rooms that can take one, and keeps every span within 32 ft', () => {
-    const posted = beams(sampleEstate).filter(bm => bm.posts?.length)
+    // A 60 ft upstairs wall over a garage, which can take a post; the sample's beams are all short enough to need none.
+    const r = (id: string, type: 'garage' | 'bedroom', y: number, d: number) => ({ id, name: id, type, rect: { x: 0, y: ft(y), w: ft(60), d: ft(d) } })
+    const shed = withHouseDefaults({ buildingId: 'shed', origin: { x: 0, y: 0 }, concept: true, levels: [
+      { id: 'g', name: 'Ground', elevation: 0, floorHeight: ft(10), rooms: [r('bays', 'garage', 0, 24)] },
+      { id: 'u', name: 'Upper', elevation: ft(10), floorHeight: ft(9), rooms: [r('a', 'bedroom', 0, 12), r('b', 'bedroom', 12, 12)] },
+    ] })
+    const posted = (shed.beams ?? []).filter(bm => bm.posts?.length)
     expect(posted.length).toBeGreaterThan(0)
     for (const bm of posted) expect(longestSpan(bm)).toBeLessThan(bm.to - bm.from)
     expect(Math.max(...beams(sampleEstate).map(longestSpan))).toBeLessThanOrEqual(ft(32))

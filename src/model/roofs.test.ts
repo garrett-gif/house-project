@@ -15,13 +15,17 @@ const ok = (r: ReturnType<typeof applyOperations>) => { if (!r.ok) throw new Err
 const rejected = (r: ReturnType<typeof applyOperations>) => { if (r.ok) throw new Error('expected a rejection'); return r.error }
 
 describe('roofs', () => {
-  it('puts 8:12 gables on the kids wing, great room, entry, hearth room, and primary wing at the expected heights', () => {
-    expect(house.roofs.map(r => [r.id, r.form, r.pitch, r.ridge])).toEqual([
-      ['roof-kids', 'gable', 8, 'ns'], ['roof-great', 'gable', 8, 'ns'], ['roof-entry', 'gable', 8, 'ew'], ['roof-hearth', 'gable', 8, 'ns'], ['roof-primary', 'gable', 8, 'ns'],
-    ])
-    // Kids wing: eave at 21 ft on the kids floor; half of a 66 ft span at 8:12 rises 22 ft.
-    expect(ridgeHeight(house, roof(sampleEstate, 'roof-kids'))).toBeCloseTo(ft(21) + ft(33) * 8 / 12)
-    expect(ridgeHeight(house, roof(sampleEstate, 'roof-primary'))).toBeCloseTo(ft(11) + ft(23) * 8 / 12)
+  it('mixes steep gables and low sheds, mountain modern, at the expected heights', () => {
+    const by = (id: string) => house.roofs.find(r => r.id === id)!
+    expect([by('roof-great').form, by('roof-great').pitch, by('roof-great').ridge]).toEqual(['gable', 10, 'ns'])
+    expect([by('roof-entry').form, by('roof-entry').pitch]).toEqual(['gable', 10])
+    expect([by('roof-porch').form, by('roof-screened').form]).toEqual(['shed', 'shed'])
+    expect(by('roof-primary').wingId).toBe('east-wing')
+    expect(by('roof-west-wing').wingId).toBe('west-wing')
+    // Kids block: eave at 21 ft on the kids floor; half of a 40 ft span at 8:12 rises about 13 ft.
+    expect(ridgeHeight(house, roof(sampleEstate, 'roof-kids'))).toBeCloseTo(ft(21) + ft(20) * 8 / 12)
+    // Great room: eave at 11 ft; half of a 46 ft span at 10:12 rises about 19 ft.
+    expect(ridgeHeight(house, roof(sampleEstate, 'roof-great'))).toBeCloseTo(ft(11) + ft(23) * 10 / 12)
     expect(houseHeight(house)).toBeCloseTo(ridgeHeight(house, roof(sampleEstate, 'roof-kids')))
     expect(sampleEstate.buildings.find(b => b.id === 'main-house')!.height).toBe(Math.round(houseHeight(house)))
   })
@@ -41,7 +45,7 @@ describe('roofs', () => {
   it('fails coverage when a roof is missing', () => {
     const e = structuredClone(sampleEstate)
     e.house.roofs = e.house.roofs.filter(r => r.id !== 'roof-hearth')
-    expect(check(e, 'roof-coverage')).toMatchObject({ status: 'fail', elements: ['hearth', 'lounge'] })
+    expect(check(e, 'roof-coverage')).toMatchObject({ status: 'fail', elements: ['primary-hall', 'hearth', 'e-hall'] })
   })
 
   it('first pass roofs cover a house saved without them', () => {

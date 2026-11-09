@@ -20,10 +20,10 @@ describe('elevation projection', () => {
 
 describe('assumed grade', () => {
   const h = sampleEstate.house
-  it('is at the main floor beside and north of the house, and dug down to the walkout along the south', () => {
+  it('is at the main floor north of the courtyard face, and dug down to the walkout in the courtyard', () => {
     expect(gradeAt(h, ft(100), ft(50))).toBe(0)
-    expect(gradeAt(h, ft(100), ft(10))).toBe(ft(-11))
-    expect(gradeAt(h, ft(-10), ft(0))).toBeCloseTo(ft(-11))
+    expect(gradeAt(h, ft(70), ft(-10))).toBe(ft(-11))
+    expect(gradeAt(h, ft(-10), ft(-1))).toBeCloseTo(ft(-11))
     expect(gradeAt(h, ft(-10), ft(20))).toBeCloseTo(0)
   })
 })
@@ -38,7 +38,7 @@ describe('elevation sheets', () => {
     expect(t).toContain('SOUTH ELEVATION')
     expect(t).toContain(`MAIN FLOOR 0'-0"`)
     expect(t).toContain(`WALKOUT LEVEL -11'-0"`)
-    expect(t).toContain(`TOP OF HIGHEST RIDGE 43'-0"`)
+    expect(t).toContain(`TOP OF HIGHEST RIDGE 34'-4"`)
     expect(texts(ew.marks)).toEqual(expect.arrayContaining(['EAST ELEVATION', 'WEST ELEVATION']))
   })
 
@@ -60,7 +60,10 @@ describe('elevation sheets', () => {
   })
 
   it('labels pitch on the roof plan', () => {
-    expect(texts(roofPlan.marks).filter(t => t === '8:12').length).toBe(10)
+    // Steep gables at 8:12 and 10:12, low sheds over the porches.
+    expect(texts(roofPlan.marks).filter(t => t === '8:12').length).toBe(8)
+    expect(texts(roofPlan.marks).filter(t => t === '10:12').length).toBe(6)
+    expect(texts(roofPlan.marks)).toContain('3:12')
     expect(texts(roofPlan.marks)).toContain('ROOF PLAN')
   })
 })

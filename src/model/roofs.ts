@@ -100,19 +100,27 @@ export function houseHeight(house: HouseModel) {
  */
 export function firstPassRoofs(house: HouseModel): Roof[] {
   const levels = [...house.levels].sort((a, b) => a.elevation - b.elevation)
-  const footprint = (l: Level) => l.rooms.filter(r => r.type !== 'outdoor').map(r => r.rect)
+  // Each wing gets its own roofs, in its own frame.
+  const frames = [...new Set(house.levels.flatMap(l => l.rooms).map(r => r.wingId ?? ''))]
   const roofs: Roof[] = []
-  levels.forEach((level, i) => {
-    const above = levels.slice(i + 1)
-    const covered = [...above.flatMap(footprint), ...level.rooms.filter(r => r.twoStory).map(r => r.rect)]
-    const own = level.rooms.filter(r => r.type !== 'outdoor' && !r.twoStory).map(r => r.rect)
-    const twoStoryBelow = i > 0 ? levels[i - 1].rooms.filter(r => r.twoStory).map(r => r.rect) : []
-    const exposed = mergeRects([...own, ...twoStoryBelow]).flatMap(r => subtract(r, covered))
-    mergeRects(exposed).forEach((r, j) => roofs.push({
-      id: `roof-${level.id}-${j + 1}`, name: `${level.name} roof ${j + 1}`, rect: r, levelId: level.id,
-      form: 'gable', pitch: 8, ridge: r.w >= r.d ? 'ew' : 'ns', low: 's', overhang: 24,
-    }))
-  })
+  for (const f of frames) {
+    const inF = (r: { wingId?: string }) => (r.wingId ?? '') === f
+    const footprint = (l: Level) => l.rooms.filter(r => r.type !== 'outdoor' && inF(r)).map(r => r.rect)
+    levels.forEach((level, i) => {
+      const above = levels.slice(i + 1)
+      const covered = [...above.flatMap(footprint), ...level.rooms.filter(r => r.twoStory && inF(r)).map(r => r.rect)]
+      const own = level.rooms.filter(r => r.type !== 'outdoor' && !r.twoStory && inF(r)).map(r => r.rect)
+      const twoStoryBelow = i > 0 ? levels[i - 1].rooms.filter(r => r.twoStory && inF(r)).map(r => r.rect) : []
+      const exposed = mergeRects([...own, ...twoStoryBelow]).flatMap(r => subtract(r, covered))
+      mergeRects(exposed).forEach(r => {
+        const n = roofs.filter(x => x.levelId === level.id).length + 1
+        roofs.push({
+          id: `roof-${level.id}-${n}`, name: `${level.name} roof ${n}`, rect: r, levelId: level.id,
+          form: 'gable', pitch: 8, ridge: r.w >= r.d ? 'ew' : 'ns', low: 's', overhang: 24, ...(f ? { wingId: f } : {}),
+        })
+      })
+    })
+  }
   return roofs
 }
 

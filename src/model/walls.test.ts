@@ -20,12 +20,12 @@ const placed = (e: Estate) => placeOpenings(e.house)
 const wallBetween = (e: Estate, a: string, b: string) => allWalls(e.house).find(s => s.sides.includes(a) && s.sides.includes(b))
 /** Where an opening sits in plan, in house-local inches, so tests can tell whether it moved. */
 const where = (e: Estate, id: string) => { const o = placed(e).find(o => o.id === id)!; return { at: o.at, from: o.from, to: o.to } }
-const door = (over: Partial<Opening>): Opening => ({ id: 'new-door', kind: 'door', roomId: 'office', side: 's', offset: ft(6), width: 36, height: 80, sill: 0, ...over })
+const door = (over: Partial<Opening>): Opening => ({ id: 'new-door', kind: 'door', roomId: 'office', side: 's', offset: ft(4), width: 36, height: 80, sill: 0, ...over })
 
 describe('derived walls', () => {
   it('puts interior walls between rooms and exterior walls on the outside', () => {
-    expect(wallBetween(sampleEstate, 'kitchen', 'great')).toMatchObject({ kind: 'interior', thickness: 4.5, orientation: 'v', at: ft(66) })
-    const north = levelWalls(house, level('main')).filter(s => s.orientation === 'h' && s.at === ft(84))
+    expect(wallBetween(sampleEstate, 'kitchen', 'dining')).toMatchObject({ kind: 'interior', thickness: 4.5, orientation: 'v', at: ft(50) })
+    const north = levelWalls(house, level('main')).filter(s => !s.wingId && s.orientation === 'h' && s.at === ft(68))
     expect(north.length).toBeGreaterThan(0)
     expect(north.every(s => s.kind === 'exterior' && s.thickness === 8)).toBe(true)
   })
@@ -33,13 +33,13 @@ describe('derived walls', () => {
   it('makes buried walkout walls foundation walls, except the exposed south side', () => {
     const walkout = levelWalls(house, level('walkout')).filter(s => s.kind !== 'interior')
     expect(walkout.filter(s => s.kind === 'foundation').length).toBeGreaterThan(0)
-    const pool = walkout.find(s => s.sides.includes('indoor-pool') && s.orientation === 'h' && s.at === ft(16))!
+    const pool = walkout.find(s => s.sides.includes('indoor-pool') && s.orientation === 'h' && s.at === 0)!
     expect(pool).toMatchObject({ kind: 'exterior', thickness: 8 })
     expect(walkout.find(s => s.sides.includes('theater') && s.orientation === 'v' && s.at === 0)).toMatchObject({ kind: 'foundation', thickness: 10 })
   })
 
-  it('treats the terrace as outside, so the kitchen wall beside it is exterior', () => {
-    expect(levelWalls(house, level('main')).find(s => s.sides.includes('kitchen') && s.at === ft(16) && s.orientation === 'h')).toMatchObject({ kind: 'exterior' })
+  it('treats the porch as outside, so the kitchen wall beside it is exterior', () => {
+    expect(levelWalls(house, level('main')).find(s => s.sides.includes('kitchen') && s.at === 0 && s.orientation === 'h')).toMatchObject({ kind: 'exterior' })
   })
 })
 
@@ -72,16 +72,16 @@ describe('first pass of doors, windows, and stairs', () => {
 })
 
 describe('opening and wall operations', () => {
-  const kitchenHall = placed(sampleEstate).find(o => o.roomId === 'kitchen' && o.leadsTo === 'back-hall')!
+  const kitchenHall = placed(sampleEstate).find(o => o.roomId === 'kitchen' && o.leadsTo === 'family-hall')!
   const bedroomWindow = placed(sampleEstate).find(o => o.roomId === 'kid-1' && o.kind === 'window')!
 
   const VALID: EditOp[] = [
     { op: 'addDoor', opening: door({}) },
-    { op: 'addWindow', opening: { id: 'office-win-9', kind: 'window', roomId: 'office', side: 'n', offset: ft(14), width: ft(3), height: ft(4), sill: ft(3), operation: 'double-hung' } },
-    { op: 'moveOpening', openingId: kitchenHall.id, side: 'w', offset: ft(28) },
+    { op: 'addWindow', opening: { id: 'gear-win-9', kind: 'window', roomId: 'gear', side: 'n', offset: ft(20), width: ft(3), height: ft(4), sill: ft(3), operation: 'double-hung' } },
+    { op: 'moveOpening', openingId: kitchenHall.id, side: 'w', offset: ft(20) },
     { op: 'resizeOpening', openingId: bedroomWindow.id, width: ft(4), height: ft(5), sill: 20 },
     { op: 'removeOpening', openingId: bedroomWindow.id },
-    { op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(2) },
+    { op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(2) },
     { op: 'setWallThickness', kind: 'exterior', thickness: 12 },
   ]
 
@@ -94,13 +94,13 @@ describe('opening and wall operations', () => {
 
   it('addDoor connects the rooms on both sides of the wall', () => {
     const e = ok(applyOperations(sampleEstate, [VALID[0]]))
-    expect(placed(e).find(o => o.id === 'new-door')).toMatchObject({ leadsTo: 'dining' })
+    expect(placed(e).find(o => o.id === 'new-door')).toMatchObject({ leadsTo: 'scullery' })
   })
 
   it('rejects openings that do not fit, with the reason', () => {
     const add = (o: Partial<Opening>, op: 'addDoor' | 'addWindow' = 'addDoor') => applyOperations(sampleEstate, [{ op, opening: door(o) }])
-    expect(rejected(add({ offset: ft(52) }))).toMatch(/new-door would not fit because it runs past the end of the south side of Library and home office/)
-    expect(rejected(add({ roomId: 'great', side: 'n', offset: ft(20) }))).toMatch(/straddles a corner where walls meet on the north side of Great room, two story/)
+    expect(rejected(add({ offset: ft(40) }))).toMatch(/new-door would not fit because it runs past the end of the south side of Library and home office/)
+    expect(rejected(add({ roomId: 'great', side: 'n', offset: ft(20) }))).toMatch(/straddles a corner where walls meet on the north side of Great room, vaulted/)
     expect(rejected(add({ kind: 'window', sill: 30 }, 'addWindow'))).toMatch(/on an interior wall/)
     expect(rejected(add({ id: kitchenHall.id }))).toMatch(/already exists/)
     expect(rejected(add({ roomId: 'nope' }))).toMatch(/No room/)
@@ -118,20 +118,20 @@ describe('opening and wall operations', () => {
     expect(rejected(applyOperations(sampleEstate, [{ op: 'resizeOpening', openingId: kitchenHall.id, width: ft(30), height: 80, sill: 0 }]))).toMatch(/under 24 ft/)
   })
 
-  it('moveWall widens the kitchen 2 ft by taking it from the scullery and back hall, leaving doors where they were', () => {
+  it('moveWall widens the kitchen 2 ft by taking it from the dining room, leaving doors where they were', () => {
     const e = ok(applyOperations(sampleEstate, [VALID[5]]))
     const room = (id: string) => e.house.levels[1].rooms.find(r => r.id === id)!.rect
-    expect(room('kitchen')).toMatchObject({ x: ft(34), w: ft(32) })
-    expect(room('scullery')).toMatchObject({ x: ft(20), w: ft(14) })
-    expect(where(e, 'kitchen-great')).toEqual(where(sampleEstate, 'kitchen-great'))
-    expect(wallBetween(e, 'kitchen', 'scullery')).toMatchObject({ at: ft(34) })
+    expect(room('kitchen')).toMatchObject({ x: ft(17), w: ft(35) })
+    expect(room('dining')).toMatchObject({ x: ft(52), w: ft(16) })
+    expect(where(e, kitchenHall.id)).toEqual(where(sampleEstate, kitchenHall.id))
+    expect(wallBetween(e, 'kitchen', 'dining')).toMatchObject({ at: ft(52) })
   })
 
   it('moveWall rejects squeezing a neighbor to nothing, and walls that push a door off', () => {
-    expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(16) }]))).toMatch(/Scullery, full second kitchen would be less than 1 ft wide/)
-    // The opening from the great room to the foyer sits near the great room's west end; pushing that wall east breaks it.
-    const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(10) }])
-    expect(rejected(r)).toContain('great-foyer would not fit')
+    expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(17) }]))).toMatch(/Family hall, to the guest and kids wing would be less than 1 ft wide/)
+    // The opening from the kitchen to the scullery sits near the kitchen's east end; pulling that wall west breaks it.
+    const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(-10) }])
+    expect(rejected(r)).toContain('kitchen-scullery would not fit')
     expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'q' as never, distance: 12 }]))).toMatch(/Side must be/)
     expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: 0 }]))).toMatch(/other than 0/)
   })
@@ -165,7 +165,7 @@ describe('wall and opening checks', () => {
   })
 
   it('flags a window too small or too high to escape through', () => {
-    const win = placed(sampleEstate).filter(o => o.roomId === 'kid-2' && o.kind === 'window')
+    const win = placed(sampleEstate).filter(o => o.roomId === 'kid-1' && o.kind === 'window')
     expect(win).toHaveLength(1)
     const e = ok(applyOperations(sampleEstate, [{ op: 'resizeOpening', openingId: win[0].id, width: ft(2), height: ft(2), sill: ft(5) }]))
     expect(check(e, 'escape-windows').status).toBe('fail')
@@ -178,18 +178,21 @@ describe('wall and opening checks', () => {
   })
 
   it('warns when the only way to a room is through a bedroom', () => {
-    // Leave the primary sitting area reachable only through the primary bedroom.
-    const others = placed(sampleEstate).filter(o => o.kind !== 'window' && (o.roomId === 'primary-sitting' || o.leadsTo === 'primary-sitting') && o.roomId !== 'primary' && o.leadsTo !== 'primary')
+    // Leave the kids' living area reachable only through kid bedroom 1, beside it.
+    const others = placed(sampleEstate).filter(o => o.kind !== 'window' && (o.roomId === 'kids-living' || o.leadsTo === 'kids-living'))
     expect(others.length).toBeGreaterThan(0)
-    const e = ok(applyOperations(sampleEstate, others.map(o => ({ op: 'removeOpening', openingId: o.id }) as EditOp)))
+    const e = ok(applyOperations(sampleEstate, [
+      ...others.map(o => ({ op: 'removeOpening', openingId: o.id }) as EditOp),
+      { op: 'addDoor', opening: door({ id: 'kid-1-living', roomId: 'kid-1', side: 'e', offset: ft(16) }) },
+    ]))
     const c = check(e, 'circulation')
     expect(c.status).toBe('warn')
-    expect(c.elements).toContain('primary-sitting')
+    expect(c.elements).toContain('kids-living')
   })
 
   it('fails stairs that no longer fit their room', () => {
     // Doors on the stair's walls would be pushed off them, so they go in the same set or the edit is rejected.
-    const elevatorDoors = placed(sampleEstate).filter(o => o.kind !== 'window' && ['m-stair', 'm-elevator', 'coat', 'office'].some(id => o.roomId === id || o.leadsTo === id))
+    const elevatorDoors = placed(sampleEstate).filter(o => o.kind !== 'window' && ['m-stair', 'm-elevator', 'coat', 'office', 'bar'].some(id => o.roomId === id || o.leadsTo === id))
     expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'm-stair', side: 'n', distance: ft(-7) }]))).toMatch(/would not fit/)
     const e = ok(applyOperations(sampleEstate, [
       ...elevatorDoors.map(o => ({ op: 'removeOpening', openingId: o.id }) as EditOp),
@@ -200,9 +203,9 @@ describe('wall and opening checks', () => {
   })
 
   it('fails an outside wall that lands over the middle of a room below', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kid-7', side: 'n', distance: ft(-4) }]))
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kid-1', side: 'n', distance: ft(-4) }]))
     expect(check(e, 'stack-exterior')).toMatchObject({ status: 'fail' })
-    expect(check(e, 'stack-exterior').detail).toMatch(/Kids floor: outside wall of Kid bedroom 7, \d+ ft over 3-car garage/)
+    expect(check(e, 'stack-exterior').detail).toMatch(/Kids floor: outside wall of Kid bedroom 1, \d+ ft over 3-car garage/)
   })
 
   it('warns when an inside wall upstairs loses the beam under it', () => {
@@ -245,7 +248,7 @@ describe('model summary for chat', () => {
   it('lists openings under their rooms and explains offsets', () => {
     const text = summarizeEstate(sampleEstate)
     expect(text).toMatch(/offset from that side's west or south end/)
-    expect(text).toMatch(/kitchen-door-1: door, side w, offset [\d.]+, 3x6.67, to back-hall/)
+    expect(text).toMatch(/kitchen-door-1: door, side w, offset [\d.]+, 3x6.67, to family-hall/)
     expect(text).toMatch(/Stairs: stair-w-stair from w-stair up to m-stair/)
   })
 })

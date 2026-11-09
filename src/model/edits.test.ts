@@ -18,7 +18,7 @@ const VALID: EditOp[] = [
   { op: 'moveBuilding', buildingId: 'forestry-shop', dx: ft(100), dy: ft(-20) },
   { op: 'resizeBuilding', buildingId: 'fuel', w: ft(180), d: ft(120), anchor: 'w' },
   { op: 'moveRoom', roomId: 'primary-deck', dx: 0, dy: ft(-2) },
-  { op: 'resizeRoom', roomId: 'guest-bath', w: ft(10), d: ft(26), anchor: 's' },
+  { op: 'resizeRoom', roomId: 'gear', w: ft(24), d: ft(32), anchor: 's' },
   { op: 'addRoom', levelId: 'walkout', room: { id: 'root-cellar', name: 'Root cellar', type: 'service', rect: box(-38, 64, 20, 26) } },
   { op: 'removeRoom', roomId: 'w-storage-2' },
   { op: 'renameRoom', roomId: 'office', name: 'Reading room' },
@@ -108,38 +108,39 @@ describe('resizeRect', () => {
 describe('room operations', () => {
   it('resizeRoom grows the house outline when a room grows past it', () => {
     const e = ok(applyEdit(sampleEstate, VALID[3]))
-    expect(room(e, 'guest-bath')!.rect.d).toBe(ft(26))
+    expect(room(e, 'gear')!.rect.d).toBe(ft(32))
     expect(building(e, 'main-house').rect.d).toBe(building(sampleEstate, 'main-house').rect.d + ft(4))
   })
 
-  it('rejects "make the kitchen 10 feet wider" when it would overlap the great room', () => {
-    const error = rejected(applyEdit(sampleEstate, { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(30), anchor: 'w' }))
-    expect(error).toContain('Eat-in party kitchen, island and table (kitchen) and Great room, two story, fireplace (great) would overlap by 10 ft × 30 ft on the main floor')
+  it('rejects "make the kitchen 7 feet wider" when it would overlap the dining room', () => {
+    const error = rejected(applyEdit(sampleEstate, { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'w' }))
+    expect(error).toContain('Eat-in party kitchen, island, breakfast bay (kitchen) and Formal dining (dining) would overlap by 7 ft × 28 ft on the main floor')
   })
 
-  it('accepts the kitchen widening when the great room gives up the space, in either order', () => {
-    const grow: EditOp = { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(30), anchor: 'w' }
-    const shrink: EditOp = { op: 'resizeRoom', roomId: 'great', w: ft(34), d: ft(46), anchor: 'e' }
-    // The opening from the great room to the foyer would be left past the room's new west end, so it moves too.
-    const slide: EditOp = { op: 'moveOpening', openingId: 'great-foyer', side: 'n', offset: ft(5) }
-    for (const ops of [[grow, shrink, slide], [shrink, grow, slide]]) {
+  it('accepts the kitchen widening when the dining room gives up the space, in either order', () => {
+    const grow: EditOp = { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'w' }
+    const shrink: EditOp = { op: 'resizeRoom', roomId: 'dining', w: ft(11), d: ft(28), anchor: 'e' }
+    // The dining room's glass would be left past its new west end, so it narrows too.
+    const fit: EditOp = { op: 'resizeOpening', openingId: 'dining-glass', width: ft(8), height: ft(7), sill: ft(1.5) }
+    const slide: EditOp = { op: 'moveOpening', openingId: 'dining-glass', side: 's', offset: ft(5.5) }
+    for (const ops of [[grow, shrink, fit, slide], [shrink, grow, slide, fit]]) {
       const e = ok(applyOperations(sampleEstate, ops))
-      expect(room(e, 'kitchen')!.rect).toEqual(box(36, 16, 40, 30))
-      expect(room(e, 'great')!.rect).toEqual(box(76, 16, 34, 46))
+      expect(room(e, 'kitchen')!.rect).toEqual(box(17, 0, 40, 28))
+      expect(room(e, 'dining')!.rect).toEqual(box(57, 0, 11, 28))
     }
   })
 
   it('moveRoom moves within the level and rejects overlaps and unknown rooms', () => {
-    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-2))
-    expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: ft(10), dy: 0 }))).toMatch(/3-car garage, side entry \(garage\) and Formal dining \(dining\) would overlap by 10 ft × 8 ft/)
+    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-78))
+    expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: ft(10), dy: 0 }))).toMatch(/3-car garage \(garage\) and Library and home office, window seat \(office\) would overlap by 10 ft × 24 ft/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'nope', dx: 0, dy: 0 }))).toMatch(/No room with id "nope"/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: Number.POSITIVE_INFINITY, dy: 0 }))).toMatch(/numbers/)
   })
 
   it('addRoom adds a room on the walkout level by taking space from storage', () => {
     const e = ok(applyOperations(sampleEstate, [
-      { op: 'resizeRoom', roomId: 'w-storage-2', w: ft(14), d: ft(16), anchor: 's' },
-      { op: 'addRoom', levelId: 'walkout', room: { id: 'cellar-nook', name: 'Cellar nook', type: 'service', rect: box(110, 54, 14, 8) } },
+      { op: 'resizeRoom', roomId: 'w-storage-2', w: ft(12), d: ft(12), anchor: 's' },
+      { op: 'addRoom', levelId: 'walkout', room: { id: 'cellar-nook', name: 'Cellar nook', type: 'service', rect: box(124, 60, 12, 8) } },
     ]))
     expect(e.house.levels.find(l => l.id === 'walkout')!.rooms.find(r => r.id === 'cellar-nook')).toBeTruthy()
   })
@@ -152,15 +153,15 @@ describe('room operations', () => {
     expect(rejected(add('walkout', 'Bad Id', 'living'))).toMatch(/lowercase/)
     expect(rejected(add('walkout', 'new', 'ballroom'))).toMatch(/Unknown room type/)
     expect(rejected(add('walkout', 'new', 'living', box(-38, 64, 0.5, 26)))).toMatch(/at least 1 ft/)
-    expect(rejected(add('walkout', 'new', 'living', box(50, 70, 10, 10)))).toMatch(/would overlap/)
+    expect(rejected(add('walkout', 'new', 'living', box(50, 60, 10, 10)))).toMatch(/would overlap/)
   })
 
   it('rejects moving the main house into the outdoor pool house south of it', () => {
-    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'main-house', dx: 0, dy: ft(-30) }))).toMatch(/Outdoor pool and pool house/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'main-house', dx: 0, dy: ft(-60) }))).toMatch(/Outdoor pool and pool house/)
   })
 
   it('rejects a room that would push the house into the outdoor pool building', () => {
-    const r = applyEdit(sampleEstate, { op: 'addRoom', levelId: 'main', room: { id: 'cabana', name: 'Cabana', type: 'living', rect: box(60, -40, 20, 30) } })
+    const r = applyEdit(sampleEstate, { op: 'addRoom', levelId: 'main', room: { id: 'cabana', name: 'Cabana', type: 'living', rect: box(60, -75, 20, 20) } })
     expect(rejected(r)).toMatch(/Main house \(main-house\) and Outdoor pool and pool house \(outdoor-pool\) would overlap/)
   })
 
@@ -199,7 +200,7 @@ describe('checks and descriptions', () => {
       { op: 'removeRoom', roomId: 'office' },
     ], sampleEstate)).toEqual([
       'Move Forestry machine shop 100 ft east',
-      'Rename Library and home office to Reading room',
+      'Rename Library and home office, window seat to Reading room',
       'Make Reading room a service room',
       'Remove Reading room',
     ])

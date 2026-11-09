@@ -8,11 +8,13 @@ import { houseBounds } from '../model/derive'
 export interface SectionCut { id: string; axis: 'x' | 'y'; at: number }
 
 /**
- * Two cuts through the first two-story room, or through the middle of the house if there is none. Each cut moves
+ * Two cuts through the first two-story room, else the room with the tallest vault, else the middle of the house. Each cut moves
  * to the nearest spot at least 2 ft from any wall line on any floor, so it passes through rooms rather than along a wall.
  */
 export function sectionCuts(house: HouseModel): SectionCut[] {
-  const tall = house.levels.flatMap(l => l.rooms).find(r => r.twoStory && !r.wingId)
+  const own = house.levels.flatMap(l => l.rooms).filter(r => !r.wingId)
+  const vaulted = own.filter(r => r.ceiling?.form === 'vaulted').sort((a, b) => b.ceiling!.height - a.ceiling!.height)[0]
+  const tall = own.find(r => r.twoStory) ?? vaulted
   const b = houseBounds(house)
   const cx = tall ? tall.rect.x + tall.rect.w / 2 : b.x + b.w / 2
   const cy = tall ? tall.rect.y + tall.rect.d / 2 : b.y + b.d / 2

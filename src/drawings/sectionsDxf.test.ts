@@ -13,14 +13,14 @@ const info = { revision: 0, date: '2026-11-09', projectName: 'House Project' }
 const texts = (marks: Mark[]) => marks.flatMap(m => m.t === 'text' ? [m.text] : [])
 
 describe('building sections', () => {
-  it('cut north-south and east-west through the two-story great room, clear of wall lines', () => {
-    expect(sectionCuts(sampleEstate.house)).toEqual([{ id: 'A', axis: 'x', at: ft(88) }, { id: 'B', axis: 'y', at: ft(36) }])
+  it('cut north-south and east-west through the vaulted great room, clear of wall lines', () => {
+    expect(sectionCuts(sampleEstate.house)).toEqual([{ id: 'A', axis: 'x', at: ft(92) }, { id: 'B', axis: 'y', at: ft(22) }])
   })
 
   it('show cut walls, floors, the roof profile, and room names', () => {
     const a = sectionMarks(sampleEstate, sectionCuts(sampleEstate.house)[1], 0, 0)
     const t = texts(a.marks)
-    expect(t).toEqual(expect.arrayContaining(['GREAT ROOM', 'INDOOR POOL', 'EAT-IN PARTY KITCHEN', 'KIDS GALLERY', `MAIN FLOOR 0'-0"`]))
+    expect(t).toEqual(expect.arrayContaining(['GREAT ROOM', 'INDOOR POOL', 'EAT-IN PARTY KITCHEN', 'KIDS LANDING AND READING NOOK', `MAIN FLOOR 0'-0"`]))
     // The east-west cut crosses the gable roofs, each slope a heavy line.
     expect(a.marks.filter(m => m.t === 'line' && m.w === 3).length).toBeGreaterThanOrEqual(2)
     expect(a.marks.filter(m => m.t === 'path' && m.fill === '#000').length).toBeGreaterThan(3)
@@ -65,9 +65,10 @@ describe('DXF floor plans', () => {
   it('is in inches, at true size', () => {
     const lines = parsed.entities.filter(e => e.type === 'LINE' && e.layer === 'A-WALL-MAIN') as unknown as { vertices: { x: number }[] }[]
     const xs = lines.flatMap(l => l.vertices.map(v => v.x))
-    // The main floor's walls span 170 ft plus wall thickness.
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(ft(170))
-    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(ft(171))
+    // The main floor's walls span the bar's 136 ft plus each wing's turned corner: 136 + 44 sin 20 + 62 sin 20, and the walls.
+    const span = ft(136) + ft(106) * Math.sin(20 * Math.PI / 180)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(span)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(span + 12)
   })
 
   it('follows edits', () => {

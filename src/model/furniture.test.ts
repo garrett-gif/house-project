@@ -26,8 +26,10 @@ describe('the furniture first pass', () => {
   })
 
   it('puts the right pieces in the right rooms', () => {
-    expect(inRoom(sampleEstate, 'primary')).toEqual(expect.arrayContaining(['king-bed-set', 'dresser']))
+    expect(inRoom(sampleEstate, 'primary')).toEqual(expect.arrayContaining(['king-bed-set', 'fireplace-stone']))
     expect(inRoom(sampleEstate, 'kid-1')).toEqual(expect.arrayContaining(['twin-bed', 'desk']))
+    expect(inRoom(sampleEstate, 'kid-2')).toContain('bunk-nook')
+    expect(inRoom(sampleEstate, 'kid-7')).toContain('reading-nook')
     expect(inRoom(sampleEstate, 'kitchen')).toEqual(expect.arrayContaining(['counter-range', 'counter-sink', 'fridge', 'island-table']))
     expect(inRoom(sampleEstate, 'dining')).toContain('dining-12')
     expect(inRoom(sampleEstate, 'garage').filter(k => k === 'car')).toHaveLength(3)
@@ -126,9 +128,10 @@ describe('furniture edits', () => {
 describe('furniture elsewhere', () => {
   it('shows on the printed plans and is listed for Claude', () => {
     const set = drawingSet(sampleEstate, { revision: 0, date: '2026-11-09', projectName: 'House Project' })
-    const thin = set.find(s => s.number === 'A-102')!.marks.filter(m => m.t === 'rect' && m.stroke === '#6b6b6b')
+    // Furniture in turned wings is drawn as turned outlines (paths); the bar's as rectangles.
+    const thin = set.find(s => s.number === 'A-102')!.marks.filter(m => (m.t === 'rect' || m.t === 'path') && m.stroke === '#6b6b6b')
     expect(thin.length).toBeGreaterThan(100)
-    expect(summarizeEstate(sampleEstate)).toMatch(/furniture: f-primary-\d+ king-bed-set at [\d.]+,[\d.]+ rot \d+/)
+    expect(summarizeEstate(sampleEstate)).toMatch(/furniture: f-primary-\d+ king-bed-set at -?[\d.]+,-?[\d.]+ rot \d+/)
   })
 
   it('is the same every time for the same house', () => {

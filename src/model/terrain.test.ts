@@ -55,14 +55,14 @@ describe('terrain checks', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'setExcavated', buildingId: 'main-house', excavated: false }]))
     const c = check(e, 'walkout-grade')
     expect(c).toMatchObject({ status: 'warn', elements: ['main-house'] })
-    expect(c.detail).toMatch(/about 11 ft of cut along the south face\. The land falls most toward the east, 7\.4 ft/)
+    expect(c.detail).toMatch(/about 11 ft of cut along the south face\. The land falls most toward the east, 5\.7 ft/)
   })
 
   it('show how much cut an east-facing walkout would need instead', () => {
     const e = structuredClone(sampleEstate)
     e.house.levels.find(l => l.id === 'walkout')!.exposed = ['e']
     e.house.excavated = false
-    expect(check(e, 'walkout-grade').detail).toMatch(/falls 7\.4 ft toward the east side, .* about 3\.6 ft of cut along the east face/)
+    expect(check(e, 'walkout-grade').detail).toMatch(/falls 5\.7 ft toward the east side, .* about 5\.3 ft of cut along the east face/)
   })
 
   it('pass building sites on gentle ground, and flag them under a stricter rule', () => {

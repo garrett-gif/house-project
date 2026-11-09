@@ -289,12 +289,15 @@ function recipe(room: Room): string[] {
   const id = room.id.replace(/^g-/, ''), name = room.name.toLowerCase()
   const area = room.rect.w * room.rect.d / 144
   const byId: Record<string, string[]> = {
-    great: ['sectional-group', 'living-group', 'piano', 'armchair-pair'],
+    great: ['fireplace-stone-tall', 'sectional-group', 'living-group', 'piano'],
     kitchen: ['counter-range', 'counter-sink', 'fridge', 'island-table'],
     dining: ['dining-12', 'console-table'],
-    office: ['desk', 'bookshelf', 'bookshelf', 'armchair'],
+    office: ['desk', 'built-in-shelves', 'armchair'],
     den: ['living-group', 'window-seat'],
-    hearth: ['armchair-pair', 'window-seat'],
+    hearth: ['fireplace-stone', 'armchair-pair'],
+    bar: ['bar-counter', 'wine-wall'],
+    'game-room': ['game-table-4', 'armchair-pair'],
+    terrace: ['outdoor-kitchen', 'fireplace-outdoor', 'dining-8'],
     lounge: ['bar-counter', 'armchair-pair'],
     foyer: ['console-table', 'bench'],
     mudroom: ['cubbies', 'dog-wash', 'bench'],
@@ -302,7 +305,7 @@ function recipe(room: Room): string[] {
     pantry: ['pantry-shelves', 'pantry-shelves', 'fridge'],
     scullery: ['counter-sink', 'counter-range', 'fridge'],
     garage: ['car', 'car', 'car', 'workbench'],
-    primary: ['king-bed-set', 'dresser', 'bench'],
+    primary: ['king-bed-set', 'fireplace-stone', 'bench'],
     'primary-sitting': ['living-group', 'tv-console'],
     'guest-sitting': ['living-group', 'tv-console'],
     'kids-living': ['living-group', 'game-table-4', 'tv-console'],
@@ -324,6 +327,9 @@ function recipe(room: Room): string[] {
     'wine-cellar': ['wine-rack'], 'safe-room': ['spa-bench', 'shelving'],
     bunk: ['bunk-bed', 'bunk-bed', 'bunk-bed'],
   }
+  // Kids' rooms: a twin bed and desk, plus the built-in nook the name asks for.
+  // A bunk nook takes the bed's place and a reading nook the desk's; the homework room has desks for everyone.
+  if (/^kid bedroom/.test(name)) return [/bunk nook/.test(name) ? 'bunk-nook' : 'twin-bed', /reading nook/.test(name) ? 'reading-nook' : 'desk']
   if (/reception/.test(name)) return ['reception-desk', 'living-group']
   if (/arrival lobby/.test(name)) return ['console-table', 'bench', 'bench']
   if (/dispatch floor/.test(name)) return ['dispatch-row-4', 'dispatch-row-4', 'display-wall']

@@ -163,8 +163,8 @@ const laidOut: Estate = withDerivedGeometry({
   buildings: [
     // The U-shaped outline is derived from the house rooms and origin by withDerivedGeometry.
     { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
-    // South of the house, below the terraces.
-    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5370, 80, 40, 14),
+    // At the open south end of the main house's courtyard, between the wing ends, toward the view.
+    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1130, 5319, 80, 40, 14),
     // Outlines come from their rooms (src/model/amenities.ts).
     { id: 'car-building', name: 'Car collection building', use: 'accessory', access: 'private', height: ft(30), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     { id: 'entertainment', name: 'Entertainment shop', use: 'assembly', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },

@@ -75,19 +75,20 @@ describe('proposeEdits', () => {
 
   it('tells Claude what a widened kitchen collides with, then accepts a valid fix', async () => {
     const { create, calls } = scripted(
-      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 30, anchor: 'w' })], 'tool_use'),
+      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'w' })], 'tool_use'),
       reply([
-        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 30, anchor: 'w' }),
-        tool('c', 'resizeRoom', { roomId: 'great', widthFt: 34, depthFt: 46, anchor: 'e' }),
-        tool('d', 'moveOpening', { openingId: 'great-foyer', side: 'n', offsetFt: 5 }),
+        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'w' }),
+        tool('c', 'resizeRoom', { roomId: 'dining', widthFt: 11, depthFt: 28, anchor: 'e' }),
+        tool('d', 'resizeOpening', { openingId: 'dining-glass', widthFt: 8, heightFt: 7, sillFt: 1.5 }),
+        tool('e', 'moveOpening', { openingId: 'dining-glass', side: 's', offsetFt: 5.5 }),
       ], 'tool_use'),
-      reply([text('Widened the kitchen 10 ft east and took the space from the great room.')]),
+      reply([text('Widened the kitchen 7 ft east and took the space from the dining room.')]),
     )
-    const out = await proposeEdits(create, request('Make the kitchen 10 feet wider.'))
+    const out = await proposeEdits(create, request('Make the kitchen 7 feet wider.'))
     const first = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaToolResultBlockParam[]
     expect(first[0]).toMatchObject({ is_error: true })
-    expect(first[0].content).toContain('Great room, two story, fireplace (great) would overlap by 10 ft × 30 ft')
-    expect(out.ok && out.ops.map(o => o.op)).toEqual(['resizeRoom', 'resizeRoom', 'moveOpening'])
+    expect(first[0].content).toContain('Formal dining (dining) would overlap by 7 ft × 28 ft')
+    expect(out.ok && out.ops.map(o => o.op)).toEqual(['resizeRoom', 'resizeRoom', 'resizeOpening', 'moveOpening'])
   })
 
   it('gives the set-level error to every call when the set as a whole collides', async () => {

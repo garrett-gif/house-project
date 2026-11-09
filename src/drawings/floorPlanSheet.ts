@@ -144,9 +144,11 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     }
   }
 
-  // Dimension strings: a chain and an overall dimension on the north and west sides.
-  drawDimensions(marks, walls, 'n', X, Y)
-  drawDimensions(marks, walls, 'w', X, Y)
+  // Dimension strings: a chain and an overall dimension on the north and west sides, of the house's own frame; turned wings
+  // are dimensioned by their room sizes.
+  const own = walls.filter(s => !s.wingId)
+  drawDimensions(marks, own, 'n', X, Y)
+  drawDimensions(marks, own, 'w', X, Y)
 
   // Drawing title, north arrow, scale bar.
   const titleY = Y(b.y) + 1.1 * PT_PER_IN

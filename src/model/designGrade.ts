@@ -8,9 +8,10 @@ import { levelWalls, outwardSide } from './walls'
 export function gradeAt(house: HouseModel, x: number, y: number) {
   const walkout = [...house.levels].sort((a, b) => a.elevation - b.elevation).find(l => l.elevation < 0)
   if (!walkout) return 0
-  const exposed = levelWalls(house, walkout).filter(s => s.kind === 'exterior' && outwardSide(s) === 's')
+  // Measured in the house's own frame; turned wings sit on the slopes beside the courtyard.
+  const exposed = levelWalls(house, walkout).filter(s => !s.wingId && s.kind === 'exterior' && outwardSide(s) === 's')
   if (!exposed.length) return 0
-  const rooms = walkout.rooms.filter(r => r.type !== 'outdoor')
+  const rooms = walkout.rooms.filter(r => r.type !== 'outdoor' && !r.wingId)
   const west = Math.min(...rooms.map(r => r.rect.x)), east = Math.max(...rooms.map(r => r.rect.x + r.rect.w))
   const south = Math.min(...rooms.map(r => r.rect.y))
   // The highest exposed south face is where the ground steps up to the main floor: the north bar's courtyard wall.

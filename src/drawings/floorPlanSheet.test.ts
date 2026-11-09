@@ -33,23 +33,25 @@ describe('floor plan sheets', () => {
   it('draws walls at true 1/8" scale', () => {
     expect(SCALE.ptPerInch).toBe(0.75)
     const main = sampleEstate.house.levels.find(l => l.id === 'main')!
-    const wall = levelWalls(sampleEstate.house, main).find(s => s.sides.includes('kitchen') && s.sides.includes('great'))!
+    const wall = levelWalls(sampleEstate.house, main).find(s => s.sides.includes('kitchen') && s.sides.includes('dining'))!
     const rects = sheets[1].marks.filter((m): m is Extract<Mark, { t: 'rect' }> => m.t === 'rect' && m.fill === '#333')
     expect(rects.some(r => Math.abs(r.w - wall.thickness * 0.75) < 0.01 && Math.abs(r.h - (wall.to - wall.from + wall.thickness) * 0.75) < 0.01)).toBe(true)
   })
 
   it('dimensions the overall house on the main floor', () => {
+    // The center bar; the turned wings are dimensioned by their room sizes.
     const t = texts(sheets[1].marks)
-    expect(t).toContain(`170'-0"`)
-    expect(t).toContain(`68'-0"`)
+    expect(t).toContain(`136'-0"`)
+    // North to south, including the entry's 4 ft step out at the front door.
+    expect(t).toContain(`72'-0"`)
   })
 
   it('follows edits, because sheets are drawn from the model', () => {
     const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(2) }])
     if (!r.ok) throw new Error(r.error)
     const t = texts(floorPlanSheets(r.estate, info)[1].marks)
-    expect(t).toContain(`32'-0" × 30'-0"`)
-    expect(t).toContain(`14'-0" × 24'-0"`)
+    expect(t).toContain(`35'-0" × 28'-0"`)
+    expect(t).toContain(`15'-0" × 14'-0"`)
   })
 
   it('keeps the plan on the paper and clear of the title block', () => {
