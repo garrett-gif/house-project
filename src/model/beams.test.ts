@@ -101,7 +101,8 @@ describe('beams in drawings, views, and saves', () => {
     const set = drawingSet(sampleEstate, { revision: 0, date: '2026-11-09', projectName: 'House Project' })
     const texts = (n: string) => set.find(s => s.number === n)!.marks.flatMap(m => m.t === 'text' ? [m.text] : [])
     const walkoutPlan = texts('A-101')
-    expect(walkoutPlan.some(t => /^BM\d+ .+ ABOVE$/.test(t))).toBe(true)
+    // Only the mark goes on the plan; sizes live on the schedule.
+    expect(walkoutPlan.some(t => /^BM\d+$/.test(t))).toBe(true)
     const schedule = texts('A-602')
     expect(schedule).toContain('BEAM SCHEDULE')
     expect(schedule.filter(t => /^BM\d+$/.test(t)).length).toBe(beams(sampleEstate).length)

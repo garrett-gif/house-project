@@ -8,6 +8,7 @@ import type { RoomGrab } from '../ui/dragOps'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { beamMarks, beamSize, beamsAbove } from '../model/beams'
+import { planLabel } from './planLabel'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
@@ -37,6 +38,9 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
   const drag = useRef<{ start: [number, number]; what: Grabbed; op: EditOp | null } | null>(null)
   // The view frame stays put while dragging, so a room growing past the outline does not rescale under the pointer.
   const [frozen, setFrozen] = useState<ReturnType<typeof houseBounds> | null>(null)
+  // Beams are structure for the engineer; they stay hidden unless asked for, so the plan reads as rooms.
+  const [showBeams, setShowBeams] = useState(false)
+  const [hover, setHover] = useState<string | null>(null)
   const b = frozen ?? houseBounds(house)
   const x0 = toFt(b.x), x1 = toFt(b.x + b.w), y0 = toFt(b.y), y1 = toFt(b.y + b.d)
   const minX = x0 - 4, maxX = x1 + 4, top = y1 + 4, mid = (x0 + x1) / 2
@@ -131,14 +135,19 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
     )
   }
 
+  const beams = showBeams ? beamsAbove(house, level.id) : []
   return (
     <div className="plan">
+      <div className="plan-tools" role="group" aria-label="Plan layers">
+        <button className={showBeams ? 'active' : ''} onClick={() => setShowBeams(v => !v)} aria-pressed={showBeams} title="Beams in this floor's ceiling, carrying walls of the floor above">Beams</button>
+        <span className="hover">{hover ?? 'Hover a room for its full name'}</span>
+      </div>
       <svg ref={svg} viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}
         onPointerMove={move} onPointerUp={() => end(false)} onPointerCancel={() => end(true)} style={{ touchAction: editable ? 'none' : undefined }}>
         {level.rooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           return (
-            <g key={room.id}>
+            <g key={room.id} onMouseEnter={() => setHover(`${room.name}, ${w}′ × ${d}′`)} onMouseLeave={() => setHover(null)}>
               <rect x={x} y={y} width={w} height={d} fill={ROOM_COLOR[room.type]} stroke={room.type === 'outdoor' ? '#8c8473' : 'none'} strokeWidth={0.2} strokeDasharray={room.type === 'outdoor' ? '0.8 0.6' : undefined}
                 onPointerMove={editable && !drag.current ? e => { const [mx, my] = toModel(e); (e.currentTarget as SVGRectElement).style.cursor = cursorFor(grabRoom(room, mx, my)) } : undefined}
                 onPointerDown={editable ? e => { const [mx, my] = toModel(e); begin(e, { kind: 'room', room, grab: grabRoom(room, mx, my) }) } : undefined} />
@@ -148,26 +157,27 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
         })}
         {walls.map(wallRect)}
         {openings.map(opening)}
-        {beamsAbove(house, level.id).map(bm => {
+        {beams.map(bm => {
           const [a, c] = bm.orientation === 'h' ? [P(bm.from, bm.at), P(bm.to, bm.at)] : [P(bm.at, bm.from), P(bm.at, bm.to)]
           const color = flagged.has(bm.id) ? FLAG[flagged.get(bm.id)!] : '#7a3b1d'
           return (
             <g key={bm.id} pointerEvents="none">
               <line x1={a[0]} y1={a[1]} x2={c[0]} y2={c[1]} stroke={color} strokeWidth={0.45} strokeDasharray="1.6 0.5 0.3 0.5" />
               {(bm.posts ?? []).map(p => { const q = bm.orientation === 'h' ? P(p, bm.at) : P(bm.at, p); return <rect key={p} x={q[0] - 0.6} y={q[1] - 0.6} width={1.2} height={1.2} fill={color} /> })}
-              <text x={(a[0] + c[0]) / 2 + (bm.orientation === 'v' ? 0.6 : 0)} y={(a[1] + c[1]) / 2 - (bm.orientation === 'h' ? 0.6 : 0)} fontSize={1.3} fill={color} textAnchor={bm.orientation === 'h' ? 'middle' : 'start'}>{beamMarks(house).get(bm.id)} {beamSize(bm)} above</text>
+              <text x={(a[0] + c[0]) / 2 + (bm.orientation === 'v' ? 0.5 : 0)} y={(a[1] + c[1]) / 2 - (bm.orientation === 'h' ? 0.5 : 0)} fontSize={1.1} fill={color} textAnchor={bm.orientation === 'h' ? 'middle' : 'start'}><title>{beamSize(bm)} above</title>{beamMarks(house).get(bm.id)}</text>
             </g>
           )
         })}
         {level.rooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
-          const compact = w < 14 || d < 12
-          const words = room.name.split(' ')
-          const lines = w < 24 && words.length > 1 ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [room.name]
+          const label = planLabel(room.name, w, d)
+          if (!label) return null
+          const block = label.lines.length * label.size * 1.25 + (label.showSize ? label.size : 0)
+          const top0 = y + d / 2 - block / 2 + label.size
           return (
             <g key={`label-${room.id}`} pointerEvents="none">
-              {lines.map((t, i) => <text key={t} x={x + w / 2} y={y + d / 2 + (i - (lines.length - 1) / 2) * 2.5 - (compact ? 0 : 0.8)} fontSize={compact ? 1.45 : 1.9} textAnchor="middle" className="room-name">{t}</text>)}
-              {!compact && <text x={x + w / 2} y={y + d / 2 + lines.length * 1.9 + 0.5} fontSize={1.45} textAnchor="middle" className="room-size">{w}′ × {d}′</text>}
+              {label.lines.map((t, i) => <text key={t} x={x + w / 2} y={top0 + i * label.size * 1.25} fontSize={label.size} textAnchor="middle" className="room-name">{t}</text>)}
+              {label.showSize && <text x={x + w / 2} y={top0 + label.lines.length * label.size * 1.25} fontSize={label.size * 0.75} textAnchor="middle" className="room-size">{w}′ × {d}′</text>}
             </g>
           )
         })}
@@ -177,6 +187,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
       <div className="legend">
         <span>{level.name}</span>
         <span>Room sizes are to wall centerlines</span>
+        {showBeams && <span>BM: beam above, sizes on sheet A-602</span>}
         {editable && <span>Drag a room to move it, its edge to move a wall, or a door or window to slide it</span>}
         <span>Walls: exterior {house.wallThickness.exterior}″, interior {house.wallThickness.interior}″, foundation {house.wallThickness.foundation}″</span>
         <span style={{ color: FLAG.fail }}>Red: failing check</span>

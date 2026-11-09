@@ -43,3 +43,15 @@ describe('main house layout v2: open and homey', () => {
     expect(finished).toBeLessThan(26000)
   })
 })
+
+describe('plan labels', () => {
+  it('use the short name, wrap, and shrink to fit the room, or step aside in tiny rooms', async () => {
+    const { planLabel } = await import('../views/planLabel')
+    expect(planLabel('Mudroom, lockers, bench, and dog wash', 22, 14)!.lines).toEqual(['Mudroom'])
+    expect(planLabel('Great room, two story, fireplace', 44, 46)).toMatchObject({ lines: ['Great room'], size: 1.9, showSize: true })
+    const narrow = planLabel('Hot tub and cold plunge', 14, 22)!
+    expect(narrow.lines).toHaveLength(2)
+    expect(Math.max(...narrow.lines.map(l => l.length)) * 0.55 * narrow.size).toBeLessThanOrEqual(14 * 0.86 + 1e-9)
+    expect(planLabel('Elevator', 2, 2)).toBeNull()
+  })
+})

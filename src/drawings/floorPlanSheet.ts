@@ -5,7 +5,7 @@ import type { PlacedOpening, WallSegment } from '../model/walls'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
-import { beamMarks, beamSize, beamsAbove } from '../model/beams'
+import { beamMarks, beamsAbove } from '../model/beams'
 import type { Mark, Sheet } from './sheet'
 
 /** 1/8 inch on paper per foot: 9 points per foot, 0.75 points per model inch. */
@@ -76,7 +76,8 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     marks.push({ t: 'line', x1, y1, x2, y2, w: 1.6, dash: [9, 3, 2, 3] })
     for (const p of bm.posts ?? []) { const [px, py] = bm.orientation === 'h' ? [X(p), Y(bm.at)] : [X(bm.at), Y(p)]; marks.push({ t: 'rect', x: px - 3, y: py - 3, w: 6, h: 6, fill: '#000' }) }
     const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
-    marks.push({ t: 'text', x: mx + (bm.orientation === 'v' ? 4 : 0), y: my + (bm.orientation === 'h' ? -4 : 0), text: `${beamTags.get(bm.id)} ${beamSize(bm).toUpperCase()} ABOVE`, size: 5, anchor: bm.orientation === 'h' ? 'middle' : 'start', bold: true })
+    // Only the mark goes on the plan; the size and span are on the A-602 schedule.
+    marks.push({ t: 'text', x: mx + (bm.orientation === 'v' ? 3 : 0), y: my + (bm.orientation === 'h' ? -3 : 0), text: beamTags.get(bm.id)!, size: 4.5, anchor: bm.orientation === 'h' ? 'middle' : 'start', bold: true })
   }
 
   // Room names and centerline sizes.
