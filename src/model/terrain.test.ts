@@ -34,7 +34,10 @@ describe('terrain', () => {
     const drive = sampleEstate.roads.find(r => r.id === 'estate-drive')!
     expect(roadGrade(sampleEstate, drive).pct).toBeGreaterThan(1)
     expect(roadGrade(sampleEstate, drive).pct).toBeLessThan(10)
-    expect(check(sampleEstate, 'road-grade')).toMatchObject({ status: 'warn', elements: ['perimeter'] })
+    // The perimeter road's 10.2% stretch is within the 12% the owner allows for it, but not the 10% for other roads.
+    expect(check(sampleEstate, 'road-grade').status).toBe('pass')
+    const strict = ok(applyOperations(sampleEstate, [{ op: 'setUtilityRule', rule: 'maxPerimeterGradePct', value: 10 }]))
+    expect(check(strict, 'road-grade')).toMatchObject({ status: 'warn', elements: ['perimeter'] })
   })
 })
 

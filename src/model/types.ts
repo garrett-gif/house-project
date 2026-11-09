@@ -138,6 +138,8 @@ export interface UtilityRules {
   approachFt: number
   backupFeedFt: number
   maxRoadGradePct: number
+  /** The perimeter road is a forest road at the edge of the property, allowed to be a little steeper. */
+  maxPerimeterGradePct: number
   maxBuildingSlopePct: number
   maxDrainfieldSlopePct: number
   septicFallFt: number

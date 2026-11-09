@@ -20,9 +20,10 @@ export function terrainChecks(e: Estate): Check[] {
 
   // Roads: steepest 50 ft stretch.
   const grades = e.roads.map(r => ({ r, ...roadGrade(e, r) }))
-  const steep = grades.filter(g => g.pct > rules.maxRoadGradePct).map(g => ({ text: `${g.r.name}: ${n1(g.pct)}%`, ids: [g.r.id] }))
+  const limit = (r: Estate['roads'][number]) => r.kind === 'perimeter' ? rules.maxPerimeterGradePct : rules.maxRoadGradePct
+  const steep = grades.filter(g => g.pct > limit(g.r)).map(g => ({ text: `${g.r.name}: ${n1(g.pct)}%, over ${limit(g.r)}%`, ids: [g.r.id] }))
   const steepest = grades.reduce((a, b) => b.pct > a.pct ? b : a, grades[0])
-  checks.push(warn('road-grade', `Roads are no steeper than ${rules.maxRoadGradePct}%`, steep, steepest ? `Steepest: ${steepest.r.name} at ${n1(steepest.pct)}%` : 'No roads'))
+  checks.push(warn('road-grade', `Roads are no steeper than ${rules.maxRoadGradePct}%, the perimeter road ${rules.maxPerimeterGradePct}%`, steep, steepest ? `Steepest: ${steepest.r.name} at ${n1(steepest.pct)}%` : 'No roads'))
 
   // Building sites: how much the ground falls across each footprint before grading.
   const sloped = e.buildings.flatMap(b => {
