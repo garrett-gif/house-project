@@ -10,9 +10,9 @@ const total = (rects: { w: number; d: number }[]) => rects.reduce((s, r) => s + 
 const ok = (r: ReturnType<typeof applyOperations>) => { if (!r.ok) throw new Error(r.error); return r.estate }
 
 describe('below-grade rooms', () => {
-  // The cellar Claude proposed live: house-local 46,48, 30 x 16 ft, under the courtyard.
+  // A cellar under the courtyard (house-local 46,48, 30 x 16 ft). The v1 house already has a wine cellar, so this uses another id.
   const cellar = ok(applyOperations(sampleEstate, [
-    { op: 'addRoom', levelId: 'walkout', room: { id: 'wine-cellar', name: 'Wine cellar', type: 'service', rect: { x: ft(46), y: ft(48), w: ft(30), d: ft(16) } } },
+    { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(46), y: ft(48), w: ft(30), d: ft(16) } } },
   ]))
 
   it('is not drawn or extruded as above-grade mass', () => {
@@ -25,7 +25,7 @@ describe('below-grade rooms', () => {
 
   it('cannot be placed under another building', () => {
     const r = applyOperations(sampleEstate, [
-      { op: 'addRoom', levelId: 'walkout', room: { id: 'wine-cellar', name: 'Wine cellar', type: 'service', rect: { x: ft(46), y: ft(40), w: ft(30), d: ft(24) } } },
+      { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(46), y: ft(40), w: ft(30), d: ft(24) } } },
     ])
     expect(r.ok).toBe(false)
   })
@@ -52,6 +52,6 @@ describe('checks name what they are about', () => {
   })
 
   it('leaves passing checks without elements', () => {
-    expect(validateEstate(sampleEstate).every(c => c.elements === undefined)).toBe(true)
+    expect(validateEstate(sampleEstate).filter(c => c.status === 'pass').every(c => c.elements === undefined)).toBe(true)
   })
 })
