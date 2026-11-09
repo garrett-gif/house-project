@@ -1,5 +1,5 @@
 import type { Building, Check, CheckStatus, Estate } from './types'
-import { SQ_IN_PER_ACRE, area, center, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
+import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
 const ROAD_REACH = ft(350)
@@ -8,8 +8,8 @@ const OUTDOOR_POOL_GAP = ft(60)
 const MAX_WALKWAY = ft(300)
 
 const n = (v: number) => Math.round(v).toLocaleString('en-US')
-const check = (id: string, label: string, ok: boolean, detail: string, failAs: CheckStatus = 'fail'): Check =>
-  ({ id, label, status: ok ? 'pass' : failAs, detail })
+const check = (id: string, label: string, ok: boolean, detail: string, failAs: CheckStatus = 'fail', elements: string[] = []): Check =>
+  ok || elements.length === 0 ? { id, label, status: ok ? 'pass' : failAs, detail } : { id, label, status: failAs, detail, elements: [...new Set(elements)] }
 
 export function forestAcres(e: Estate) {
   // Zones nested inside a larger cleared zone are not counted twice.
@@ -32,31 +32,33 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(check('parcel-size', 'Parcel is at least 1,000 acres', acres >= 999.9, `${n(acres)} acres`))
 
   const outside = e.buildings.filter(b => b.rect.x < 0 || b.rect.y < 0 || b.rect.x + b.rect.w > e.parcel.size || b.rect.y + b.rect.d > e.parcel.size)
-  checks.push(check('inside-parcel', 'All buildings are inside the parcel', outside.length === 0, outside.length ? outside.map(b => b.name).join(', ') : `${e.buildings.length} buildings placed`))
+  checks.push(check('inside-parcel', 'All buildings are inside the parcel', outside.length === 0, outside.length ? outside.map(b => b.name).join(', ') : `${e.buildings.length} buildings placed`, 'fail', outside.map(b => b.id)))
 
-  const collisions: string[] = []
-  e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(c => { if (partsOf(a).some(x => partsOf(c).some(y => overlaps(x, y)))) collisions.push(`${a.name} and ${c.name}`) }))
-  checks.push(check('no-collisions', 'Buildings do not overlap', collisions.length === 0, collisions.join('; ') || 'No overlaps'))
+  const collisions: string[] = [], colliding: string[] = []
+  e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(c => {
+    if (footprintOf(a).some(x => footprintOf(c).some(y => overlaps(x, y)))) { collisions.push(`${a.name} and ${c.name}`); colliding.push(a.id, c.id) }
+  }))
+  checks.push(check('no-collisions', 'Buildings do not overlap', collisions.length === 0, collisions.join('; ') || 'No overlaps', 'fail', colliding))
 
   const privateBuildings = e.buildings.filter(b => b.access === 'private')
   const workBuildings = e.buildings.filter(b => b.access !== 'private')
-  let gap = Infinity, pair = ''
+  let gap = Infinity, pair = '', pairIds: string[] = []
   for (const a of privateBuildings) for (const c of workBuildings) {
     const d = rectDistance(a.rect, c.rect)
-    if (d < gap) { gap = d; pair = `${a.name} to ${c.name}` }
+    if (d < gap) { gap = d; pair = `${a.name} to ${c.name}`; pairIds = [a.id, c.id] }
   }
   const training = e.zones.find(z => z.kind === 'training')
   if (training) for (const a of privateBuildings) {
     const d = rectDistance(a.rect, training.rect)
-    if (d < gap) { gap = d; pair = `${a.name} to ${training.name}` }
+    if (d < gap) { gap = d; pair = `${a.name} to ${training.name}`; pairIds = [a.id, training.id] }
   }
-  checks.push(check('separation', 'Estate is at least 1/4 mile from work areas', gap >= QUARTER_MILE, `${n(toFt(gap))} ft closest, ${pair}`))
+  checks.push(check('separation', 'Estate is at least 1/4 mile from work areas', gap >= QUARTER_MILE, `${n(toFt(gap))} ft closest, ${pair}`, 'fail', pairIds))
 
   const gates = e.roads.filter(r => r.gate)
   checks.push(check('entrances', 'Separate estate and work entrances', gates.length === 2, gates.map(r => r.gate).join(', ')))
 
   const stranded = e.buildings.map(b => ({ b, d: nearestRoad(e, b) })).filter(x => x.d > ROAD_REACH)
-  checks.push(check('road-access', 'Every building is within 350 ft of a road', stranded.length === 0, stranded.map(x => `${x.b.name}: ${n(toFt(x.d))} ft`).join('; ') || 'All reachable'))
+  checks.push(check('road-access', 'Every building is within 350 ft of a road', stranded.length === 0, stranded.map(x => `${x.b.name}: ${n(toFt(x.d))} ft`).join('; ') || 'All reachable', 'fail', stranded.map(x => x.b.id)))
 
   const perimeter = e.roads.find(r => r.kind === 'perimeter')
   checks.push(check('perimeter', 'Full perimeter road', !!perimeter, perimeter ? `${(toFt(pathLength(perimeter.points)) / 5280).toFixed(1)} miles` : 'Missing'))
@@ -71,7 +73,7 @@ export function validateEstate(e: Estate): Check[] {
   const pool = e.buildings.find(b => b.id === 'outdoor-pool')
   if (house && pool) {
     const d = Math.min(...partsOf(house).map(part => rectDistance(part, pool.rect)))
-    checks.push(check('pool-link', 'Outdoor pool is next to the house', d <= OUTDOOR_POOL_GAP, `${n(toFt(d))} ft apart`))
+    checks.push(check('pool-link', 'Outdoor pool is next to the house', d <= OUTDOOR_POOL_GAP, `${n(toFt(d))} ft apart`, 'fail', [house.id, pool.id]))
   }
 
   const room = (id: string) => e.house.levels.flatMap(l => l.rooms).find(r => r.id === id)
@@ -79,23 +81,25 @@ export function validateEstate(e: Estate): Check[] {
   const allRooms = e.house.levels.flatMap(l => l.rooms)
   const midX = (Math.min(...allRooms.filter(r => r.type !== 'garage').map(r => r.rect.x)) + Math.max(...allRooms.map(r => r.rect.x + r.rect.w))) / 2
   const north = Math.max(...allRooms.map(r => r.rect.y + r.rect.d))
-  const misplaced = [
-    foyer && foyer.rect.y + foyer.rect.d === north ? '' : 'Formal door is not on the north side',
-    garage && center(garage.rect).x < midX ? '' : 'Garage is not on the west side',
-    primary && center(primary.rect).x > midX ? '' : 'Primary suite is not on the east side',
-    kitchen && terrace && rectDistance(kitchen.rect, terrace.rect) === 0 ? '' : 'Kitchen does not reach the terrace',
-  ].filter(Boolean)
-  checks.push(check('house-placement', 'North door, west garage, east primary, kitchen to terrace', misplaced.length === 0, misplaced.join('; ') || 'Rooms match the brief'))
+  const placement: [boolean | undefined, string, string[]][] = [
+    [foyer && foyer.rect.y + foyer.rect.d === north, 'Formal door is not on the north side', ['foyer']],
+    [garage && center(garage.rect).x < midX, 'Garage is not on the west side', ['garage']],
+    [primary && center(primary.rect).x > midX, 'Primary suite is not on the east side', ['primary']],
+    [kitchen && terrace && rectDistance(kitchen.rect, terrace.rect) === 0, 'Kitchen does not reach the terrace', ['kitchen', 'terrace']],
+  ]
+  const misplaced = placement.filter(([ok]) => !ok)
+  checks.push(check('house-placement', 'North door, west garage, east primary, kitchen to terrace', misplaced.length === 0,
+    misplaced.map(([, text]) => text).join('; ') || 'Rooms match the brief', 'fail', misplaced.flatMap(([, , ids]) => ids)))
 
   const longWalks = e.walkways.filter(w => pathLength(w.points) > MAX_WALKWAY)
   checks.push(check('walkways', 'Covered walkways are 300 ft or shorter', longWalks.length === 0,
-    e.walkways.map(w => `${n(toFt(pathLength(w.points)))} ft`).join(', ')))
+    e.walkways.map(w => `${n(toFt(pathLength(w.points)))} ft`).join(', '), 'fail', longWalks.map(w => w.id)))
 
-  const overlapsInHouse: string[] = []
+  const overlapsInHouse: string[] = [], overlappingRooms: string[] = []
   for (const level of e.house.levels) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {
-    if (overlaps(a.rect, c.rect)) overlapsInHouse.push(`${level.name}: ${a.name} and ${c.name}`)
+    if (overlaps(a.rect, c.rect)) { overlapsInHouse.push(`${level.name}: ${a.name} and ${c.name}`); overlappingRooms.push(a.id, c.id) }
   }))
-  checks.push(check('house-rooms', 'House rooms do not overlap', overlapsInHouse.length === 0, overlapsInHouse.join('; ') || 'No overlaps'))
+  checks.push(check('house-rooms', 'House rooms do not overlap', overlapsInHouse.length === 0, overlapsInHouse.join('; ') || 'No overlaps', 'fail', overlappingRooms))
 
   const rooms = e.house.levels.flatMap(l => l.rooms)
   const finished = rooms.filter(r => r.type !== 'garage' && r.type !== 'outdoor').reduce((sum, r) => sum + area(r.rect), 0) / 144
@@ -106,7 +110,7 @@ export function validateEstate(e: Estate): Check[] {
 
   const bedrooms = rooms.filter(r => r.type === 'bedroom')
   const noBath = bedrooms.filter(r => !rooms.some(o => o.id === r.bathId && o.type === 'bath'))
-  checks.push(check('baths', 'Every bedroom has its own bathroom', noBath.length === 0, noBath.map(r => r.name).join(', ') || `${bedrooms.length} bedrooms matched`))
+  checks.push(check('baths', 'Every bedroom has its own bathroom', noBath.length === 0, noBath.map(r => r.name).join(', ') || `${bedrooms.length} bedrooms matched`, 'fail', noBath.map(r => r.id)))
 
   return checks
 }

@@ -10,3 +10,7 @@ export interface ProposeRequest { estate: Estate; request: string; history: Chat
 export type ProposeResponse = { ok: true; ops: EditOp[]; reply: string } | { ok: false; error: string }
 
 export const PROPOSE_PATH = '/api/propose-edits'
+export const HEALTH_PATH = '/api/health'
+
+/** What the chat server reports about itself. Never includes the key. */
+export interface Health { ok: true; model: string; hasKey: boolean }

@@ -17,8 +17,10 @@ export interface Building {
   access: Access
   rect: Rect
   height: Inches
-  /** Actual masses when the building is not a plain rectangle. `rect` remains the overall bounds. */
+  /** Actual masses above grade when the building is not a plain rectangle. `rect` remains the overall bounds. */
   parts?: Rect[]
+  /** Footprint on every level, including rooms below grade. Collisions use this. Absent means the same as `parts`. */
+  footprint?: Rect[]
 }
 
 export interface Zone {
@@ -54,4 +56,5 @@ export interface Estate {
 }
 
 export type CheckStatus = 'pass' | 'warn' | 'fail'
-export interface Check { id: string; label: string; status: CheckStatus; detail: string }
+/** `elements` names the buildings, rooms, walkways, or zones a check is about when it does not pass, so views can mark them. */
+export interface Check { id: string; label: string; status: CheckStatus; detail: string; elements?: string[] }

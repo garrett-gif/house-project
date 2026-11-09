@@ -25,6 +25,14 @@ describe('browser project store', () => {
     expect(await store.load()).toBeNull()
   })
 
+  it('keeps the chat separately and clears both', async () => {
+    const store = browserProjectStore('c', memory())
+    await store.saveChat(Array.from({ length: 250 }, (_, i) => ({ id: i })))
+    expect((await store.loadChat() as unknown[]).length).toBe(200)
+    await store.clear()
+    expect(await store.loadChat()).toBeNull()
+  })
+
   it('treats unreadable data as empty', async () => {
     const m = memory()
     m.setItem('k', '{not json')

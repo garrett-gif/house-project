@@ -6,7 +6,8 @@ import { sampleEstate } from './model/sampleEstate'
 import { diffChecks, validateEstate } from './model/validate'
 import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
 import type { ChatTurn } from './chat/protocol'
-import { requestEdits } from './chat/client'
+import { checkServer, requestEdits } from './chat/client'
+import type { Health } from './chat/protocol'
 import { browserProjectStore } from './storage/projectStore'
 import { SitePlan } from './views/SitePlan'
 import { HousePlan } from './views/HousePlan'
@@ -20,6 +21,13 @@ const VIEWS: [View, string][] = [['site', 'Site plan'], ['house', 'House plan'],
 const MARK = { pass: '✓', warn: '!', fail: '✕' }
 
 interface Proposal { request: string; ops: EditOp[]; estate: Estate }
+
+/** Turns read back from storage. A proposal that was still open when the page closed is shown as discarded. */
+function restoreTurns(data: unknown): Turn[] {
+  if (!Array.isArray(data)) return []
+  return data.filter((t): t is Turn => !!t && typeof t === 'object' && typeof (t as Turn).id === 'number' && ((t as Turn).role === 'user' || (t as Turn).role === 'assistant') && typeof (t as Turn).text === 'string')
+    .map(t => t.status === 'pending' ? { ...t, status: 'discarded' } : t)
+}
 
 /** Earlier turns as text for Claude, including what happened to each proposal. */
 const chatHistory = (turns: Turn[]): ChatTurn[] => turns.flatMap(t => {
@@ -44,21 +52,32 @@ export function App() {
   const store = useMemo(() => browserProjectStore(), [])
   const [restored, setRestored] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [server, setServer] = useState<Health | null | undefined>(undefined)
+  useEffect(() => { void checkServer().then(setServer) }, [])
 
   // Restore the last session once, then save after every change. Storage sits behind ProjectStore so it can move to Supabase.
   useEffect(() => {
     let live = true
-    store.load().then(data => {
+    Promise.all([store.load(), store.loadChat()]).then(([data, chat]) => {
       if (!live) return
       if (data) {
         const r = loadProject(data)
         if (r.ok) setTimeline(r.timeline)
         else setNotice(`The saved project could not be restored (${r.error}). Starting from the sample estate.`)
       }
+      const restoredTurns = restoreTurns(chat)
+      if (restoredTurns.length) {
+        setTurns(restoredTurns)
+        nextId.current = Math.max(...restoredTurns.map(t => t.id)) + 1
+      }
     }).catch(() => setNotice('Browser storage is unavailable, so changes will not be kept after reload.'))
       .finally(() => { if (live) setRestored(true) })
     return () => { live = false }
   }, [store])
+  useEffect(() => {
+    if (!restored) return
+    store.saveChat(turns).catch(() => { /* the project save below reports storage problems */ })
+  }, [restored, store, turns])
   useEffect(() => {
     if (!restored) return
     store.save(saveProject(timeline)).catch(() => setNotice('Could not save in this browser. Use Save to download a copy.'))
@@ -68,6 +87,7 @@ export function App() {
   const estate = proposal?.estate ?? current
   const checks = useMemo(() => validateEstate(estate), [estate])
   const failing = checks.filter(c => c.status !== 'pass').length
+  const flagged = useMemo(() => new Set(checks.filter(c => c.status !== 'pass').flatMap(c => c.elements ?? [])), [checks])
   const passed = checks.length - failing
   const levels = estate.house.levels.slice().reverse()
   const showsHouse = view === 'house' || view === 'house3d'
@@ -148,8 +168,8 @@ export function App() {
     setConfirmReset(false)
     setTimeline(startTimeline(sampleEstate))
     setProposal(null)
-    settlePending('discarded')
-    setNotice('Reset to the sample estate. Use Open to bring back a saved copy.')
+    setTurns([])
+    setNotice('Reset to the sample estate and cleared the chat. Use Open to bring back a saved copy.')
   }
 
   const revisions = timeline.revisions
@@ -190,8 +210,8 @@ export function App() {
               {levels.map(l => <button key={l.id} className={level === l.id ? 'active' : ''} onClick={() => setLevel(l.id)}>{l.name}</button>)}
             </div>
           )}
-          {view === 'site' && <SitePlan estate={estate} />}
-          {view === 'house' && <HousePlan house={estate.house} levelId={level} />}
+          {view === 'site' && <SitePlan estate={estate} flagged={flagged} />}
+          {view === 'house' && <HousePlan house={estate.house} levelId={level} flagged={flagged} />}
           {view === 'site3d' && <Scene3D estate={estate} mode="site" levelId={level} />}
           {view === 'house3d' && <Scene3D estate={estate} mode="house" levelId={level} />}
         </section>
@@ -204,6 +224,8 @@ export function App() {
             <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>History</button>
           </div>
 
+          {tab === 'chat' && server === null && <p className="notice small">The chat server is not running. Start the app with npm run dev. If that says the port is in use, run npm run stop first.</p>}
+          {tab === 'chat' && server && !server.hasKey && <p className="notice small">The chat server has no Anthropic API key yet. Add it to server/.env (see server/.env.example).</p>}
           {tab === 'chat' && <ChatPanel turns={turns} busy={busy} onSend={send} onCancel={cancel} onApply={apply} onDiscard={discard} />}
 
           {tab === 'checks' && (

@@ -1,5 +1,5 @@
 import type { Estate, Inches, Rect, Room, RoomType } from './types'
-import { overlaps, partsOf, toFt, translate } from './geometry'
+import { footprintOf, overlaps, toFt, translate } from './geometry'
 import { withDerivedGeometry } from './derive'
 
 /** Which point of a rectangle stays fixed when it is resized. `n` keeps the north edge, `sw` the southwest corner. */
@@ -66,6 +66,7 @@ function run(e: Estate, op: EditOp): string {
       } else {
         b.rect = translate(b.rect, op.dx, op.dy)
         if (b.parts) b.parts = b.parts.map(p => translate(p, op.dx, op.dy))
+        if (b.footprint) b.footprint = b.footprint.map(p => translate(p, op.dx, op.dy))
       }
       for (const w of e.walkways) {
         const last = w.points.length - 1
@@ -154,7 +155,7 @@ function collisions(e: Estate): Map<string, string> {
     if (overlaps(a.rect, b.rect)) found.set(`room:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(a.rect, b.rect)} on the ${level.name.toLowerCase()}`)
   }))
   e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(b => {
-    for (const pa of partsOf(a)) for (const pb of partsOf(b)) {
+    for (const pa of footprintOf(a)) for (const pb of footprintOf(b)) {
       if (overlaps(pa, pb)) { found.set(`building:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(pa, pb)}`); return }
     }
   }))

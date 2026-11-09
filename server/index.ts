@@ -2,18 +2,26 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
-import { PROPOSE_PATH } from '../src/chat/protocol'
+import { HEALTH_PATH, PROPOSE_PATH } from '../src/chat/protocol'
+import type { Health } from '../src/chat/protocol'
 import { DEFAULT_MODEL, parseRequest, proposeEdits } from './proposeEdits'
 
 // The API key lives only here, in server/.env or the shell environment. Browser code never sees it.
-try { process.loadEnvFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '.env')) } catch { /* optional */ }
+const ENV_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '.env')
+const loadEnv = () => { try { process.loadEnvFile(ENV_FILE) } catch { /* optional */ } }
+loadEnv()
+const hasKey = () => !!process.env.ANTHROPIC_API_KEY?.trim()
 
 const PORT = Number(process.env.HOUSE_API_PORT ?? 8787)
 const MODEL = process.env.HOUSE_MODEL?.trim() || DEFAULT_MODEL
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
 
 let client: Anthropic | undefined
-const getClient = () => (client ??= new Anthropic())
+/** If the key was added after the server started, pick it up instead of needing a restart. */
+const getClient = () => {
+  if (!client && !hasKey()) loadEnv()
+  return (client ??= new Anthropic())
+}
 
 const app = express()
 app.disable('x-powered-by')
@@ -24,6 +32,12 @@ app.use((req, res, next) => {
   const origin = req.get('origin')
   if (origin && !LOCAL_ORIGIN.test(origin)) return void res.status(403).json({ ok: false, error: 'Requests are only accepted from this computer.' })
   next()
+})
+
+app.get(HEALTH_PATH, (_req, res) => {
+  if (!hasKey()) loadEnv()
+  const health: Health = { ok: true, model: MODEL, hasKey: hasKey() }
+  res.json(health)
 })
 
 app.post(PROPOSE_PATH, async (req, res) => {
@@ -44,4 +58,12 @@ app.post(PROPOSE_PATH, async (req, res) => {
   }
 })
 
-app.listen(PORT, '127.0.0.1', () => console.log(`House Project chat server on http://127.0.0.1:${PORT} using ${MODEL}`))
+const server = app.listen(PORT, '127.0.0.1', () => {
+  console.log(`House Project chat server on http://127.0.0.1:${PORT} using ${MODEL}`)
+  if (!hasKey()) console.log('No ANTHROPIC_API_KEY yet. Add it to server/.env; the server picks it up on the next request.')
+})
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') console.error(`Port ${PORT} is already in use, probably by an old chat server. Run npm run stop, then npm run dev.`)
+  else console.error('Chat server failed to start:', err.message)
+  process.exit(1)
+})

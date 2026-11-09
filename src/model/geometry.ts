@@ -10,7 +10,10 @@ export const box = (cx: number, cy: number, w: number, d: number): Rect => ({
 })
 export const p = (x: number, y: number): Pt => ({ x: ft(x), y: ft(y) })
 
+/** What stands above grade: drawn on the site plan and extruded in 3D. */
 export const partsOf = (b: { rect: Rect; parts?: Rect[] }) => b.parts ?? [b.rect]
+/** Everything the building occupies on any level, below grade included. Used for collisions. */
+export const footprintOf = (b: { rect: Rect; parts?: Rect[]; footprint?: Rect[] }) => b.footprint ?? partsOf(b)
 export const area = (r: Rect) => r.w * r.d
 export const center = (r: Rect): Pt => ({ x: r.x + r.w / 2, y: r.y + r.d / 2 })
 
