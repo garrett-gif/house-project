@@ -182,11 +182,12 @@ export const EDIT_TOOLS: EditToolSpec[] = [
       xFt: num('Site x of the southwest corner in feet.'), yFt: num('Site y of the southwest corner in feet.'),
       widthFt: num('East-west width in feet.'), depthFt: num('North-south depth in feet.'),
       capacity: num(CAPACITY), serves: ids('Ids of the buildings it serves. Empty for solar that feeds the grid service.'),
+      pumped: bool('Septic only: true if effluent is pumped to the drainfield, so it may sit uphill. False otherwise.'),
     }),
   },
   { name: 'moveUtility', description: 'Move a utility by an offset in feet.', input_schema: object({ utilityId: str('Utility id from the model summary.'), eastFt: num('Feet east. Negative is west.'), northFt: num('Feet north. Negative is south.') }) },
   { name: 'resizeUtility', description: 'Resize a utility\'s rectangle, such as a drainfield or solar array.', input_schema: object({ utilityId: str('Utility id from the model summary.'), widthFt: num('East-west width in feet.'), depthFt: num('North-south depth in feet.'), anchor }) },
-  { name: 'setUtility', description: 'Change a utility\'s capacity and the buildings it serves.', input_schema: object({ utilityId: str('Utility id from the model summary.'), capacity: num(CAPACITY), serves: ids('Ids of the buildings it serves.') }) },
+  { name: 'setUtility', description: 'Change a utility\'s capacity and the buildings it serves, and for septic whether it is pumped.', input_schema: object({ utilityId: str('Utility id from the model summary.'), capacity: num(CAPACITY), serves: ids('Ids of the buildings it serves.'), pumped: bool('Septic only: true if pumped to the drainfield. Ignored for other kinds.') }) },
   { name: 'removeUtility', description: 'Remove a utility.', input_schema: object({ utilityId: str('Utility id from the model summary.') }) },
   {
     name: 'addDevice',
@@ -213,6 +214,8 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     description: 'Replace one of the utility or security planning values with the owner\'s or county\'s standard. Distances in feet, flows in gallons a day, backupShare as a fraction.',
     input_schema: object({ rule: { type: 'string', enum: UTILITY_RULE_NAMES, description: 'Which rule.' }, value: num('New value.') }),
   },
+  { name: 'setExcavated', description: 'Set whether a house site is excavated down to its walkout, with retaining walls, instead of relying on the natural fall of the land.', input_schema: object({ buildingId: str('main-house or guest-house.'), excavated: bool('True to excavate.') }) },
+  { name: 'setSwale', description: 'Add or remove a graded drainage swale or curtain drain around a building that sits low.', input_schema: object({ buildingId: str('Building id from the model summary.'), swale: bool('True to add, false to remove.') }) },
   { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
 
@@ -294,10 +297,12 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeWaterSource': return { ok: true, op: { op: 'removeWaterSource', sourceId: s('sourceId') } }
     case 'setIgnition': return { ok: true, op: { op: 'setIgnition', buildingId: s('buildingId'), ignition: { roofClass: s('roofClass') as never, emberVents: v.emberVents as boolean, enclosedEaves: v.enclosedEaves as boolean, decks: s('decks') as never } } }
     case 'setFireRule': return { ok: true, op: { op: 'setFireRule', rule: s('rule') as never, value: n('value') } }
-    case 'addUtility': return { ok: true, op: { op: 'addUtility', utility: { id: s('id'), name: s('name'), kind: s('kind') as never, rect: { x: inches(n('xFt')), y: inches(n('yFt')), w: inches(n('widthFt')), d: inches(n('depthFt')) }, capacity: n('capacity'), serves: v.serves as string[] } } }
+    case 'addUtility': return { ok: true, op: { op: 'addUtility', utility: { id: s('id'), name: s('name'), kind: s('kind') as never, rect: { x: inches(n('xFt')), y: inches(n('yFt')), w: inches(n('widthFt')), d: inches(n('depthFt')) }, capacity: n('capacity'), serves: v.serves as string[], ...(v.pumped ? { pumped: true } : {}) } } }
     case 'moveUtility': return { ok: true, op: { op: 'moveUtility', utilityId: s('utilityId'), dx: inches(n('eastFt')), dy: inches(n('northFt')) } }
     case 'resizeUtility': return { ok: true, op: { op: 'resizeUtility', utilityId: s('utilityId'), w: inches(n('widthFt')), d: inches(n('depthFt')), anchor: s('anchor') as never } }
-    case 'setUtility': return { ok: true, op: { op: 'setUtility', utilityId: s('utilityId'), capacity: n('capacity'), serves: v.serves as string[] } }
+    case 'setUtility': return { ok: true, op: { op: 'setUtility', utilityId: s('utilityId'), capacity: n('capacity'), serves: v.serves as string[], pumped: v.pumped as boolean } }
+    case 'setExcavated': return { ok: true, op: { op: 'setExcavated', buildingId: s('buildingId'), excavated: v.excavated as boolean } }
+    case 'setSwale': return { ok: true, op: { op: 'setSwale', buildingId: s('buildingId'), swale: v.swale as boolean } }
     case 'removeUtility': return { ok: true, op: { op: 'removeUtility', utilityId: s('utilityId') } }
     case 'addDevice': return { ok: true, op: { op: 'addDevice', device: {
       id: s('id'), name: s('name'), kind: s('kind') as never, at: { x: inches(n('xFt')), y: inches(n('yFt')) }, range: inches(n('rangeFt')),

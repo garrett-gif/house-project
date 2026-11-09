@@ -6,6 +6,8 @@ import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
 import { UTILITY_UNIT, demand, occupancy, utilityRules } from './utilities'
+import { earthwork, groundAt, roadGrade, siteSlope } from './terrain'
+import { bounds, center, footprintOf } from './geometry'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -20,7 +22,7 @@ export function summarizeEstate(e: Estate): string {
   for (const b of e.buildings) {
     const o = occupancy(e, b)
     const people = [o.beds ? `sleeps ${o.beds}` : '', o.staff ? `${o.staff} by day` : ''].filter(Boolean).join(', ') || 'no one stays'
-    lines.push(`- ${b.id}: ${b.name}, ${b.use}, ${b.access}, ${box(b.rect)}, ${f(b.height)} ft tall, ${people}, ${Math.round(demand(e, b).kw)} kW${b.backupPower ? ', on backup power' : ''}${b.fuelStorage ? ', stores fuel' : ''}`)
+    lines.push(`- ${b.id}: ${b.name}, ${b.use}, ${b.access}, ${box(b.rect)}, ${f(b.height)} ft tall, ${people}, ${Math.round(demand(e, b).kw)} kW${b.backupPower ? ', on backup power' : ''}${b.fuelStorage ? ', stores fuel' : ''}, ground ${f(groundAt(e, center(bounds(footprintOf(b)))))} ft above sea level sloping ${Math.round(siteSlope(e, bounds(footprintOf(b))).pct * 10) / 10}%${b.swale ? ', drainage swale' : ''}`)
   }
 
   lines.push('', 'Covered walkways (id: name, from building to building, length):')
@@ -29,7 +31,8 @@ export function summarizeEstate(e: Estate): string {
   lines.push('', 'Zones (not editable yet; cleared means cleared or developed land):')
   for (const z of e.zones) lines.push(`- ${z.id}: ${z.name}, ${z.kind}, ${box(z.rect)}${z.cleared ? ', cleared' : ''}${z.hardstand ? ', hardstand' : ''}`)
   lines.push('', 'Roads (id: name, kind, width, points in site feet, turnaround at last point):')
-  for (const r of e.roads) lines.push(`- ${r.id}: ${r.name}, ${r.kind}, ${f(roadWidth(r))} ft wide, ${r.points.length > 6 ? `${r.points.length} points from ${f(r.points[0].x)},${f(r.points[0].y)} to ${f(r.points.at(-1)!.x)},${f(r.points.at(-1)!.y)}` : r.points.map(p => `${f(p.x)},${f(p.y)}`).join(' to ')}${r.gate ? `, ${r.gate}` : ''}${r.turnaround ? ', turnaround' : ''}`)
+  for (const r of e.roads) lines.push(`- ${r.id}: ${r.name}, ${r.kind}, ${f(roadWidth(r))} ft wide, ${r.points.length > 6 ? `${r.points.length} points from ${f(r.points[0].x)},${f(r.points[0].y)} to ${f(r.points.at(-1)!.x)},${f(r.points.at(-1)!.y)}` : r.points.map(p => `${f(p.x)},${f(p.y)}`).join(' to ')}${r.gate ? `, ${r.gate}` : ''}${r.turnaround ? ', turnaround' : ''}, steepest ${Math.round(roadGrade(e, r).pct * 10) / 10}%`)
+  lines.push('Terrain: generated sample land (not a survey). It rises toward the northwest; the estate grounds fall east about 4 to 5%. Ground elevations above are feet above sea level at each building.')
   lines.push(`Airstrip ${box(e.runway.rect)}. Hardstand an engine can drive on: ${e.zones.filter(z => z.hardstand).map(z => z.id).join(', ') || 'none'}.`)
   lines.push('', 'Fire water (id: name, kind, at site feet, gallons):')
   for (const w of e.waterSources ?? []) lines.push(`- ${w.id}: ${w.name}, ${w.kind}, at ${f(w.at.x)},${f(w.at.y)}, ${w.gallons.toLocaleString('en-US')} gallons`)
@@ -37,7 +40,7 @@ export function summarizeEstate(e: Estate): string {
   lines.push(`Fire rules (planning values): zones ${fr.zones.join(', ')} ft; roads ${fr.minRoadWidthFt} ft wide; hose pull ${fr.maxHosePullFt} ft; dead ends over ${fr.maxDeadEndFt} ft need a turnaround; ${fr.minWaterGallons.toLocaleString('en-US')} gallons within ${fr.maxWaterDistanceFt.toLocaleString('en-US')} ft.`)
 
   lines.push('', 'Utilities (id: name, kind, rectangle in site feet, capacity, buildings served). Septic rectangles are drainfields with a reserve:')
-  for (const u of e.utilities ?? []) lines.push(`- ${u.id}: ${u.name}, ${u.kind}, ${box(u.rect)}, ${u.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[u.kind]}, serves ${u.serves.join(', ') || 'none (feeds the grid service)'}`)
+  for (const u of e.utilities ?? []) lines.push(`- ${u.id}: ${u.name}, ${u.kind}, ${box(u.rect)}, ${u.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[u.kind]}, serves ${u.serves.join(', ') || 'none (feeds the grid service)'}${u.pumped ? ', pumped' : ''}`)
   const devices = e.security ?? []
   lines.push('', `Security: ${devices.filter(d => d.kind === 'camera').length} cameras and ${devices.filter(d => d.kind === 'light').length} lights (id: kind, at site feet, facing and view for cameras, range, power, mounted on):`)
   for (const d of devices) lines.push(`- ${d.id}: ${d.kind} at ${f(d.at.x)},${f(d.at.y)}${d.kind === 'camera' ? `, facing ${Math.round(d.facing ?? 0)} deg, ${d.fov ?? 360} deg view` : ''}, ${f(d.range)} ft, ${d.power}${d.on ? `, on ${d.on}` : ''}`)
@@ -46,7 +49,7 @@ export function summarizeEstate(e: Estate): string {
 
   for (const house of allHouses(e)) {
   const { origin } = house
-  lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
+  lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.${house.excavated ? ` Its site is excavated to the walkout by design, about ${Math.round(earthwork(e, house).cutCy / 100) * 100} cubic yards of cut.` : ''}`)
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)

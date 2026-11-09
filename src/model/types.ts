@@ -31,6 +31,8 @@ export interface Building {
   backupPower?: boolean
   /** Stores fuel, so wells keep their distance. */
   fuelStorage?: boolean
+  /** A graded swale or curtain drain carries runoff around the building. */
+  swale?: boolean
   /** Peak electrical demand in kW when the estimate from floor area does not fit, as for RV hookups or helipads. */
   loadKw?: number
 }
@@ -91,7 +93,11 @@ export type UtilityKind = 'well' | 'storage' | 'septic' | 'service' | 'solar' | 
  * `capacity` is in the unit of its kind: well gallons per minute, storage gallons, septic gallons per day of design
  * flow (`rect` is the drainfield, primary and reserve), service, solar, and generator kW, propane tank gallons.
  */
-export interface Utility { id: string; name: string; kind: UtilityKind; rect: Rect; capacity: number; serves: string[] }
+export interface Utility {
+  id: string; name: string; kind: UtilityKind; rect: Rect; capacity: number; serves: string[]
+  /** Septic: effluent is pumped to the drainfield, so it may sit uphill of the buildings. */
+  pumped?: boolean
+}
 
 /**
  * A camera or light. `range` is how far a camera sees or a light reaches. Cameras look toward `facing` (degrees,
@@ -131,6 +137,13 @@ export interface UtilityRules {
   cameraForestFt: number
   approachFt: number
   backupFeedFt: number
+  maxRoadGradePct: number
+  /** The perimeter road is a forest road at the edge of the property, allowed to be a little steeper. */
+  maxPerimeterGradePct: number
+  maxBuildingSlopePct: number
+  maxDrainfieldSlopePct: number
+  septicFallFt: number
+  wellUpgradientFt: number
 }
 
 /** `from` and `to` are building ids. Moving one of those buildings moves that end of the walkway with it. */
@@ -224,6 +237,11 @@ export interface HouseModel {
   roofs: Roof[]
   /** The brief as checkable requirements. Optional so older saves still load. */
   program?: ProgramItem[]
+  /**
+   * The site is excavated to the design: the ground is cut down to the walkout on its exposed sides, with retaining
+   * walls where the cut meets the existing slope, rather than relying on the land's natural fall.
+   */
+  excavated?: boolean
 }
 
 export interface Estate {

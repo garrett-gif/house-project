@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { EditOp } from '../model/edits'
 import { buildingDragOp, deviceDragOp, utilityDragOp } from '../ui/dragOps'
@@ -6,6 +6,7 @@ import type { Estate, RoadKind, SecurityDevice, UtilityKind, ZoneKind } from '..
 import { center, footprintOf, ft, partsOf, toFt } from '../model/geometry'
 import { fireRules, roadWidth } from '../model/fireChecks'
 import { UTILITY_UNIT } from '../model/utilities'
+import { contours } from '../model/terrain'
 
 const FOCUS = {
   'Whole property': [0, 0, 6600, 6600],
@@ -64,6 +65,9 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
   const [fire, setFire] = useState(false)
   const [utilities, setUtilities] = useState(false)
   const [security, setSecurity] = useState(false)
+  const [terrain, setTerrain] = useState(false)
+  // Contours depend only on the parcel's terrain, so they are traced once per parcel.
+  const lines = useMemo(() => terrain ? contours(estate, 10) : [], [terrain, estate.parcel.seed, estate.parcel.size, estate.parcel.gridSize]) // eslint-disable-line react-hooks/exhaustive-deps
   const rules = fireRules(estate)
   const [vx, vy, vw, vh] = FOCUS[focus]
   const S = 6600
@@ -80,6 +84,7 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
         <button className={fire ? 'active' : ''} onClick={() => setFire(v => !v)} aria-pressed={fire} title="Defensible space and fire water">Fire layer</button>
         <button className={utilities ? 'active' : ''} onClick={() => setUtilities(v => !v)} aria-pressed={utilities} title="Wells, septic, power, solar, generators, propane">Utilities</button>
         <button className={security ? 'active' : ''} onClick={() => setSecurity(v => !v)} aria-pressed={security} title="Cameras and lights">Security</button>
+        <button className={terrain ? 'active' : ''} onClick={() => setTerrain(v => !v)} aria-pressed={terrain} title="Contours every 10 ft, heavier every 50 ft">Terrain</button>
         <span className="hover">{hover ?? 'Hover a building for its name'}</span>
       </div>
       <svg ref={svg} viewBox={`${vx} ${S - vy - vh} ${vw} ${vh}`} role="img" aria-label="Site plan of the 1,000-acre estate and compound"
@@ -91,6 +96,14 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
           return z.round
             ? <ellipse key={z.id} cx={x + w / 2} cy={y + d / 2} rx={w / 2} ry={d / 2} fill={ZONE[z.kind]} stroke={flagged.has(z.id) ? flagColor(z.id) : '#7b7464'} strokeWidth={scale * (flagged.has(z.id) ? 3 : 1)} onMouseEnter={() => setHover(z.name)} />
             : <rect key={z.id} x={x} y={y} width={w} height={d} fill={ZONE[z.kind]} fillOpacity={dashed ? 0.55 : 0.9} stroke={flagged.has(z.id) ? flagColor(z.id) : dashed ? '#55702f' : '#8c8473'} strokeWidth={scale * (flagged.has(z.id) ? 3 : dashed ? 2 : 1)} strokeDasharray={dashed ? `${12 * scale} ${8 * scale}` : undefined} onMouseEnter={() => setHover(z.name)} />
+        })}
+        {lines.map(c => (
+          <path key={`c${c.level}`} d={c.segs.map(([a, b]) => `M${toFt(a.x).toFixed(1)} ${Y(a.y).toFixed(1)}L${toFt(b.x).toFixed(1)} ${Y(b.y).toFixed(1)}`).join('')}
+            fill="none" stroke="#6b5a3e" strokeOpacity={c.major ? 0.75 : 0.35} strokeWidth={(c.major ? 1.4 : 0.7) * scale} pointerEvents="none" />
+        ))}
+        {showLabels && lines.filter(c => c.major && c.segs.length).map(c => {
+          const [a, b] = c.segs[Math.floor(c.segs.length / 2)]
+          return <text key={`cl${c.level}`} x={toFt((a.x + b.x) / 2)} y={Y((a.y + b.y) / 2)} fontSize={label * 0.7} fill="#5a4a30" textAnchor="middle" pointerEvents="none">{c.level}′</text>
         })}
         {estate.walkways.map(w => <polyline key={w.id} points={pts(w.points)} fill="none" stroke={flagged.has(w.id) ? flagColor(w.id) : '#2f6f62'} strokeWidth={Math.max(flagged.has(w.id) ? 14 : 8, (flagged.has(w.id) ? 4 : 2) * scale)} onMouseEnter={() => setHover(w.name)} />)}
         {estate.roads.map(r => {
@@ -164,6 +177,7 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
         {utilities && (Object.keys(UTILITY) as UtilityKind[]).map(k => <span key={k}><i style={{ background: UTILITY[k] }} />{k === 'service' ? 'Power service' : k[0].toUpperCase() + k.slice(1)}</span>)}
         {security && <span><i style={{ background: 'rgba(192,38,45,0.25)', outline: '1px solid #c0262d', outlineOffset: -1 }} />Camera view</span>}
         {security && <span><i style={{ background: 'rgba(240,200,60,0.35)', borderRadius: '50%' }} />Light</span>}
+        {terrain && <span><i style={{ background: 'none', borderTop: '2px solid #6b5a3e', height: 0, marginTop: 6 }} />Contours every 10 ft, sample terrain</span>}
         <span>North is up · building sizes are placeholders{editable ? ` · drag a building${utilities ? ', utility' : ''}${security ? ', camera, or light' : ''} to move it` : ''}</span>
       </div>
     </div>

@@ -45,7 +45,7 @@ describe('the sample utilities and security', () => {
 
 describe('utility checks', () => {
   it('flag a well too close to a drainfield', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'moveUtility', utilityId: 'estate-well', dx: ft(80), dy: ft(-760) }]))
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveUtility', utilityId: 'estate-well', dx: ft(1080), dy: ft(-1010) }]))
     const c = check(e, 'utility-separation')
     expect(c.status).toBe('warn')
     expect(c.elements).toEqual(expect.arrayContaining(['estate-well', 'estate-septic']))
@@ -63,7 +63,7 @@ describe('utility checks', () => {
   })
 
   it('flag a drainfield under a road', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'moveUtility', utilityId: 'estate-septic', dx: ft(850), dy: 0 }]))
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveUtility', utilityId: 'estate-septic', dx: ft(-100), dy: 0 }]))
     expect(check(e, 'utility-separation').detail).toMatch(/runs under Guest and transporter road/)
   })
 
@@ -148,7 +148,7 @@ describe('utility edits', () => {
   })
 
   it('convert chat tools in feet, including lists of building ids', () => {
-    const r = toEditOp('addUtility', { id: 'barn-well', name: 'Barn well', kind: 'well', xFt: 100, yFt: 200, widthFt: 20, depthFt: 20, capacity: 10, serves: ['main-house'] })
+    const r = toEditOp('addUtility', { id: 'barn-well', name: 'Barn well', kind: 'well', xFt: 100, yFt: 200, widthFt: 20, depthFt: 20, capacity: 10, serves: ['main-house'], pumped: false })
     expect(r).toEqual({ ok: true, op: { op: 'addUtility', utility: { id: 'barn-well', name: 'Barn well', kind: 'well', rect: { x: 1200, y: 2400, w: 240, d: 240 }, capacity: 10, serves: ['main-house'] } } })
     expect(toEditOp('setUtility', { utilityId: 'estate-well', capacity: 10, serves: [1, 2] })).toMatchObject({ ok: false, error: 'Field "serves" must be array.' })
     const cam = toEditOp('addDevice', { id: 'c1', name: 'Cam', kind: 'camera', xFt: 10, yFt: 20, rangeFt: 100, facingDeg: 90, fovDeg: 60, power: 'solar', onBuilding: null })
@@ -218,7 +218,7 @@ describe('older saves', () => {
     const old = structuredClone(sampleEstate)
     delete old.utilities
     // The pool house was moved onto ground the sample uses for the estate drainfield.
-    old.buildings.find(b => b.id === 'outdoor-pool')!.rect = { x: ft(920), y: ft(4720), w: ft(70), d: ft(45) }
+    old.buildings.find(b => b.id === 'outdoor-pool')!.rect = { x: ft(1920), y: ft(4470), w: ft(70), d: ft(45) }
     expect(withUtilityDefaults(old).utilities!.some(u => u.id === 'estate-septic')).toBe(false)
   })
 })
@@ -226,7 +226,7 @@ describe('older saves', () => {
 describe('the chat summary', () => {
   it('lists utilities, devices, occupancy, and the safe room', () => {
     const text = summarizeEstate(sampleEstate)
-    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 900,4700 size 100x100, 3,000 gallons a day, serves main-house/)
+    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 1900,4450 size 100x100, 3,000 gallons a day, serves main-house/)
     expect(text).toMatch(/- lodge-1: Lodge 1, .* sleeps 22, 72 kW, on backup power/)
     expect(text).toMatch(/- cam-estate-gate: camera at 1000,0, facing \d+ deg, 60 deg view, 400 ft, solar/)
     expect(text).toMatch(/- safe-room: Safe room, service, .*, safe room/)

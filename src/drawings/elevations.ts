@@ -1,4 +1,5 @@
 import type { Estate, HouseModel } from '../model/types'
+import { existingGrade } from '../model/terrain'
 import { levelWalls, outwardSide, placeOpenings } from '../model/walls'
 import { eaveHeight, ridgeHeight, roofPolygons } from '../model/roofs'
 import type { P3 } from '../model/roofs'
@@ -24,24 +25,8 @@ export function project(view: ElevationView, [x, y, z]: P3) {
   }
 }
 
-/**
- * Assumed grade, as the brief describes: the land falls south. North of the house is at the main floor; the courtyard
- * and the ground south of the wings are at the walkout floor; the sides of the wings slope between the two.
- */
-export function gradeAt(house: HouseModel, x: number, y: number) {
-  const walkout = [...house.levels].sort((a, b) => a.elevation - b.elevation).find(l => l.elevation < 0)
-  if (!walkout) return 0
-  const exposed = levelWalls(house, walkout).filter(s => s.kind === 'exterior' && outwardSide(s) === 's')
-  if (!exposed.length) return 0
-  const rooms = walkout.rooms.filter(r => r.type !== 'outdoor')
-  const west = Math.min(...rooms.map(r => r.rect.x)), east = Math.max(...rooms.map(r => r.rect.x + r.rect.w))
-  const south = Math.min(...rooms.map(r => r.rect.y))
-  // The highest exposed south face is where the ground steps up to the main floor: the north bar's courtyard wall.
-  const step = Math.max(...exposed.map(s => s.at))
-  if (y >= step) return 0
-  if (x > west && x < east) return walkout.elevation
-  return walkout.elevation * (1 - Math.max(0, Math.min(1, (y - south) / Math.max(1, step - south))))
-}
+import { gradeAt } from '../model/designGrade'
+export { gradeAt }
 
 /** Extent of the walkout level east to west, where the courtyard sits at walkout grade. */
 function walkoutSpan(house: HouseModel) {
@@ -150,6 +135,19 @@ export function elevationMarks(e: Estate, view: ElevationView, sx: number, sy: n
   const earth = `M ${tx(hMin)} ${tz(zBottom)} ` + steps.map(([h, z]) => `L ${tx(h)} ${tz(z)}`).join(' ') + ` L ${tx(hMax)} ${tz(zBottom)} Z`
   placedMarks.push({ t: 'path', d: earth, fill: '#fff' })
   placedMarks.push({ t: 'path', d: 'M ' + steps.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 2.2 })
+  const solid = house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor').map(r => r.rect)
+  const face = { s: Math.min(...solid.map(r => r.y)), n: Math.max(...solid.map(r => r.y + r.d)), w: Math.min(...solid.map(r => r.x)), e: Math.max(...solid.map(r => r.x + r.w)) }
+  const existingAt = (h: number) => view === 'south' ? existingGrade(e, house, h, face.s) : view === 'north' ? existingGrade(e, house, -h, face.n)
+    : view === 'east' ? existingGrade(e, house, face.e, h) : existingGrade(e, house, face.w, -h)
+
+  // Existing ground from the terrain, dashed, so the cut and fill the design asks for is visible.
+  {
+    const clamp = (z: number) => Math.max(zBottom, Math.min(zTop, z))
+    const existing: [number, number][] = []
+    for (let h = hMin; h <= hMax; h += 12) existing.push([h, clamp(existingAt(h))])
+    placedMarks.push({ t: 'path', d: 'M ' + existing.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 0.8, dash: [6, 3] })
+    placedMarks.push({ t: 'text', x: tx(hMin) + 2, y: tz(existing[0][1]) - 3, text: 'EXISTING GRADE, SAMPLE TERRAIN', size: 5.5 })
+  }
 
   // Level lines and heights at the right.
   const labelX = tx(hMax) + 6

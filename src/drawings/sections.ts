@@ -3,6 +3,7 @@ import { levelWalls } from '../model/walls'
 import { eaveHeight, roofPolygons } from '../model/roofs'
 import type { P3 } from '../model/roofs'
 import { gradeAt } from './elevations'
+import { existingGrade } from '../model/terrain'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import type { Mark, Sheet } from './sheet'
 import { MARGIN, SCALE, drawTitleBlock } from './floorPlanSheet'
@@ -99,6 +100,15 @@ export function sectionMarks(e: Estate, cut: SectionCut, sx: number, sy: number)
   for (let h = hMin; h <= hMax; h += 12) ground.push([h, cut.axis === 'x' ? gradeAt(house, cut.at, h) : gradeAt(house, h, cut.at)])
   marks.unshift({ t: 'path', d: `M ${tx(hMin)} ${tz(zBottom)} ` + ground.map(([h, z]) => `L ${tx(h)} ${tz(z)}`).join(' ') + ` L ${tx(hMax)} ${tz(zBottom)} Z`, fill: '#efefef' })
   marks.push({ t: 'path', d: 'M ' + ground.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 1.8 })
+
+  // Existing ground from the terrain, dashed, so the cut and fill the design asks for is visible.
+  {
+    const clamp = (z: number) => Math.max(zBottom, Math.min(zTop, z))
+    const existing: [number, number][] = []
+    for (let h = hMin; h <= hMax; h += 12) existing.push([h, clamp(cut.axis === 'x' ? existingGrade(e, house, cut.at, h) : existingGrade(e, house, h, cut.at))])
+    marks.push({ t: 'path', d: 'M ' + existing.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 0.8, dash: [6, 3] })
+    marks.push({ t: 'text', x: tx(hMin) + 2, y: tz(existing[0][1]) - 3, text: 'EXISTING GRADE, SAMPLE TERRAIN', size: 5.5 })
+  }
 
   // Level lines and heights.
   const labelX = tx(hMax) + 6
