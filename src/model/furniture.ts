@@ -150,6 +150,10 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'display-wall': { name: 'Display wall and screens', w: 240, d: 12, h: 96, category: 'fixture', place: 'wall', front: 48, kw: 2, shortWall: true },
   'class-seating-50': { name: 'Training tables, 5 rows of 10', w: 432, d: 312, h: 30, category: 'table', place: 'center', around: 24, seats: 50,
     parts: [0, 66, 132, 198, 264].flatMap(y => [...row('Table', 5, 72, 24, 30, 18, 0, y), ...row('Chair', 10, 20, 20, 36, 25.5, 6, y + 26)]) },
+  'class-seating-30': { name: 'Training tables, 5 rows of 6', w: 204, d: 312, h: 30, category: 'table', place: 'center', around: 24, seats: 30,
+    parts: [0, 66, 132, 198, 264].flatMap(y => [...row('Table', 3, 60, 24, 30, 12, 0, y), ...row('Chair', 6, 20, 20, 36, 16.8, 5, y + 26)]) },
+  'walk-in-cooler': { name: 'Walk-in cooler and freezer', w: 96, d: 120, h: 96, category: 'kitchen', place: 'wall', front: 42, kw: 4 },
+  'prep-table': { name: 'Stainless prep table', w: 96, d: 30, h: 36, category: 'kitchen', place: 'center', around: 36 },
   'eoc-seating-40': { name: 'Operations tables, 4 rows of 10', w: 432, d: 246, h: 30, category: 'table', place: 'center', around: 24, seats: 40, kw: 2,
     parts: [0, 66, 132, 198].flatMap(y => [...row('Table', 5, 72, 24, 30, 18, 0, y), ...row('Chair', 10, 20, 20, 36, 25.5, 6, y + 26)]) },
   'conference-16': { name: 'Conference table for 16', w: 264, d: 108, h: 30, category: 'table', place: 'center', around: 30, seats: 16,
@@ -306,7 +310,9 @@ function recipe(room: Room): string[] {
   if (/arrival lobby/.test(name)) return ['console-table', 'bench', 'bench']
   if (/dispatch floor/.test(name)) return ['dispatch-row-4', 'dispatch-row-4', 'display-wall']
   if (/emergency operations/.test(name)) return ['display-wall', 'eoc-seating-40']
+  if (/training room [ab]/.test(name)) return ['display-wall', 'class-seating-30']
   if (/training room/.test(name)) return ['display-wall', 'class-seating-50']
+  if (/commercial kitchen/.test(name)) return ['walk-in-cooler', 'counter-range', 'counter-range', 'counter-sink', 'fridge', 'prep-table']
   if (/executive conference/.test(name)) return ['conference-8']
   if (/executive office/.test(name)) return ['exec-desk', 'bookshelf', 'bookshelf', 'armchair-pair']
   if (/executive lounge/.test(name)) return ['living-group', 'bar-counter']

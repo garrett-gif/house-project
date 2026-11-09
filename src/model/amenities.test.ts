@@ -13,13 +13,14 @@ const seats = (id: string, roomId: string) => (h(id).furniture ?? []).filter(i =
 describe('office and dispatch building', () => {
   it('has every room Garrett asked for, on one floor', () => {
     expect(h('offices').levels).toHaveLength(1)
-    for (const n of ['Reception lobby, fireplace', 'Conference room, 16 seats', 'Executive office', 'Executive bath', 'Executive conference room', 'Executive lounge and bar',
-      'Dispatch floor, 8 positions', 'Emergency operations room, 40 seats', 'Break room', 'Training room, 50 seats', 'Radio and server room', 'Records and plans room',
+    for (const n of ['Training room A, operable wall to B', 'Training room B, operable wall to A', 'Reception lobby, fireplace', 'Conference room, 16 seats', 'Executive office', 'Executive bath', 'Executive conference room', 'Executive lounge and bar',
+      'Dispatch floor, 8 positions', 'Emergency operations room, 40 seats', 'Break room', 'Radio and server room', 'Records and plans room',
       'Staff showers and lockers', 'Mail, print, and supply', 'Open office']) expect(names('offices')).toContain(n)
   })
 
   it('seats the training room, conference room, and operations room, with 8 dispatch positions', () => {
-    expect(seats('offices', 'of-training')).toBeGreaterThanOrEqual(50)
+    expect(seats('offices', 'of-training-a') + seats('offices', 'of-training-b')).toBeGreaterThanOrEqual(50)
+    expect(houseByBuilding(sampleEstate, 'offices')!.openings.find(o => o.id === 'of-operable-wall')).toMatchObject({ kind: 'opening', width: 12 * 24 })
     expect(seats('offices', 'of-conference')).toBeGreaterThanOrEqual(16)
     expect(seats('offices', 'of-eoc')).toBeGreaterThanOrEqual(40)
     expect(seats('offices', 'of-dispatch')).toBe(8)
@@ -80,5 +81,17 @@ describe('all three', () => {
   it('use only catalog pieces and pass every check', () => {
     expect(amenityKinds()).toEqual([])
     expect(validateEstate(sampleEstate).filter(c => c.status !== 'pass').map(c => c.id)).toEqual([])
+  })
+})
+
+describe('Garrett’s follow-ups', () => {
+  it('makes every overhead door 16 ft tall except the main house garage', () => {
+    for (const house of [...(sampleEstate.houses ?? [])]) for (const o of house.openings.filter(o => o.kind === 'garage-door')) expect(o.height, o.id).toBe(12 * 16)
+    expect(sampleEstate.house.openings.filter(o => o.kind === 'garage-door').every(o => o.height < 12 * 16)).toBe(true)
+  })
+
+  it('gives the entertainment shop a commercial kitchen beside the snack bar and party room', () => {
+    expect(kinds('entertainment', 'en-kitchen')).toEqual(expect.arrayContaining(['walk-in-cooler', 'counter-range', 'prep-table']))
+    expect(kinds('entertainment', 'en-snack')).toContain('bar-counter')
   })
 })

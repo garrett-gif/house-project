@@ -2,6 +2,10 @@ import type { FurnitureItem, HouseModel, Opening, ProgramItem, Room, RoomType } 
 import { ft, p } from './geometry'
 import { withHouseDefaults } from './firstPass'
 import { CATALOG, firstPassFurniture } from './furniture'
+import { placeOpenings } from './walls'
+
+/** Overhead doors on every building but the main house are 16 ft tall, per Garrett. */
+export const OVERHEAD_DOOR_HEIGHT = 16
 
 /**
  * The office and dispatch building, the car collection building, and the entertainment shop, from Garrett's
@@ -19,7 +23,12 @@ function build(house: Parameters<typeof withHouseDefaults>[0], extraDoors: Openi
   const first = withHouseDefaults({ ...house, furniture: [] })
   // Big flat-ish gables suit these long spans better than the house's 8:12.
   const roofs = first.roofs.map(r => ({ ...r, pitch: 4 }))
-  const withDoors: HouseModel = { ...first, roofs, openings: [...first.openings, ...extraDoors] }
+  // Hand-placed doors win: drop any first-pass opening on the same wall that they overlap. Overhead doors are 16 ft.
+  const extraIds = new Set(extraDoors.map(o => o.id))
+  const trial = placeOpenings({ ...first, openings: [...extraDoors, ...first.openings] })
+  const clash = new Set(trial.filter(o => !extraIds.has(o.id) && /overlaps/.test(o.problem ?? '') && extraDoors.some(x => o.problem!.includes(x.id))).map(o => o.id))
+  const openings = [...first.openings.filter(o => !clash.has(o.id)), ...extraDoors].map(o => o.kind === 'garage-door' ? { ...o, height: ft(OVERHEAD_DOOR_HEIGHT) } : o)
+  const withDoors: HouseModel = { ...first, roofs, openings }
   const done = new Set(placed.map(i => i.roomId))
   const furnished = firstPassFurniture(withDoors).filter(i => !done.has(i.roomId))
   return { ...withDoors, furniture: [...placed, ...furnished] }
@@ -28,7 +37,8 @@ function build(house: Parameters<typeof withHouseDefaults>[0], extraDoors: Openi
 // ---------------------------------------------------------------------------------------------------------------
 // Office and dispatch: one story, lodge-style, at the compound entrance. Entry from the south, by the office lane.
 const OFFICE: R[] = [
-  ['training', 'Training room, 50 seats', 'living', 0, 0, 48, 44],
+  ['training-a', 'Training room A, operable wall to B', 'living', 0, 0, 24, 44],
+  ['training-b', 'Training room B, operable wall to A', 'living', 24, 0, 24, 44],
   ['reception', 'Reception lobby, fireplace', 'circulation', 48, 0, 40, 44],
   ['exec-lounge', 'Executive lounge and bar', 'living', 88, 0, 20, 24],
   ['exec-office', 'Executive office', 'living', 108, 0, 28, 24],
@@ -52,7 +62,8 @@ const OFFICE: R[] = [
   ...[0, 1, 2, 3, 4, 5].map((i): R => [`office-${i + 1}`, `Private office ${i + 1}`, 'living', 186, i * 16 + (i === 5 ? 0 : 0), 14, i === 5 ? 20 : 16]),
 ]
 const officeProgram: ProgramItem[] = [
-  { roomId: 'of-training', need: 'Training room for 50', seats: 50 },
+  { roomId: 'of-training-a', need: 'Training room for 25, opening to B for 50', seats: 25, near: ['of-training-b'] },
+  { roomId: 'of-training-b', need: 'Training room for 25, opening to A for 50', seats: 25 },
   { roomId: 'of-conference', need: 'Conference room for 16', seats: 16 },
   { roomId: 'of-eoc', need: 'Emergency operations room for 40, beside dispatch', seats: 40, near: ['of-dispatch'] },
   { roomId: 'of-dispatch', need: 'Dispatch floor with 8 positions', holds: { 'dispatch-row-4': 2 }, near: ['of-radio'] },
@@ -64,7 +75,11 @@ const officeProgram: ProgramItem[] = [
 export const officeBuilding: HouseModel = build({
   buildingId: 'offices', origin: p(3360, 440), concept: true, program: officeProgram,
   levels: [{ id: 'of-floor', name: 'Office floor', elevation: 0, floorHeight: ft(12), rooms: rooms('of', OFFICE) }],
-}, [door('of-entry', 'of-reception', 's', 20, 6), door('of-exec-entry', 'of-exec-lounge', 's', 3, 3.5)])
+}, [
+  door('of-entry', 'of-reception', 's', 20, 6), door('of-exec-entry', 'of-exec-lounge', 's', 3, 3.5),
+  // A 24 ft operable wall: open, the two training rooms are one room for 50.
+  door('of-operable-wall', 'of-training-a', 'e', 22, 24, 'opening', 9),
+])
 
 // ---------------------------------------------------------------------------------------------------------------
 // Car collection: a two-story showroom for 20, a storage hall for 35, toys, the car shop, and a mezzanine lounge
@@ -122,8 +137,8 @@ const carProgram: ProgramItem[] = [
 export const carBuilding: HouseModel = build({
   buildingId: 'car-building', origin: p(1170, 4320), concept: true, program: carProgram,
   levels: [
-    { id: 'cb-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(14), rooms: rooms('cb', CAR_GROUND, ['showroom']) },
-    { id: 'cb-mezz', name: 'Mezzanine', elevation: ft(14), floorHeight: ft(12), rooms: rooms('cb', CAR_MEZZ) },
+    { id: 'cb-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(18), rooms: rooms('cb', CAR_GROUND, ['showroom']) },
+    { id: 'cb-mezz', name: 'Mezzanine', elevation: ft(18), floorHeight: ft(12), rooms: rooms('cb', CAR_MEZZ) },
   ],
 }, [door('cb-entry', 'cb-showroom', 'w', 48, 6)], carPlacements())
 
@@ -142,10 +157,11 @@ const ENT_GROUND: R[] = [
   ['concourse-mid', 'Concourse', 'circulation', 240, 140, 90, 16],
   ['concourse-east', 'Concourse', 'circulation', 330, 140, 80, 16],
   ['bowling', 'Bowling, 4 lanes', 'living', 0, 156, 100, 44],
-  ['arcade', 'Arcade', 'living', 100, 156, 50, 44],
-  ['golf', 'Golf simulators', 'living', 150, 156, 40, 44],
-  ['gaming', 'Gaming lounge', 'living', 190, 156, 20, 44],
-  ['snack', 'Snack bar', 'living', 210, 156, 30, 44],
+  ['arcade', 'Arcade', 'living', 100, 156, 40, 44],
+  ['golf', 'Golf simulators', 'living', 140, 156, 40, 44],
+  ['gaming', 'Gaming lounge', 'living', 180, 156, 20, 44],
+  ['snack', 'Snack bar', 'living', 200, 156, 20, 44],
+  ['kitchen', 'Commercial kitchen', 'service', 220, 156, 20, 44],
   ['party', 'Party room', 'living', 240, 156, 30, 44],
   ['restrooms', 'Restrooms', 'bath', 270, 156, 20, 44],
   ['lobby', 'Arrival lobby', 'circulation', 290, 156, 40, 44],
@@ -165,18 +181,19 @@ const entProgram: ProgramItem[] = [
   { roomId: 'en-trampoline', need: 'Trampoline park with a foam pit', holds: { 'trampoline-court': 1, 'foam-pit': 1 } },
   { roomId: 'en-bowling', need: 'Four-lane bowling alley', holds: { 'bowling-lanes-4': 1 } },
   { roomId: 'en-golf', need: 'Two golf simulator bays', holds: { 'golf-sim-bay': 2 } },
+  { roomId: 'en-kitchen', need: 'Commercial kitchen serving the party room and events', near: ['en-party', 'en-snack'] },
   { roomId: 'en-viewing', need: 'Viewing mezzanine looking over the trampolines', minArea: 4000 },
 ]
 export const entertainmentBuilding: HouseModel = build({
   buildingId: 'entertainment', origin: p(700, 4320), concept: true, program: entProgram,
   levels: [
-    { id: 'en-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(14), rooms: rooms('en', ENT_GROUND, ['trampoline', 'climbing', 'court']) },
-    { id: 'en-mezz', name: 'Mezzanine', elevation: ft(14), floorHeight: ft(14), rooms: rooms('en', ENT_MEZZ) },
+    { id: 'en-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(18), rooms: rooms('en', ENT_GROUND, ['trampoline', 'climbing', 'court']) },
+    { id: 'en-mezz', name: 'Mezzanine', elevation: ft(18), floorHeight: ft(14), rooms: rooms('en', ENT_MEZZ) },
   ],
 }, [
   // Two wide doors from the indoor track out to the outdoor track.
-  door('en-track-out-1', 'en-track', 's', 60, 16, 'garage-door', 10),
-  door('en-track-out-2', 'en-track', 's', 170, 16, 'garage-door', 10),
+  door('en-track-out-1', 'en-track', 's', 60, 16, 'garage-door', 16),
+  door('en-track-out-2', 'en-track', 's', 170, 16, 'garage-door', 16),
 ])
 
 export const AMENITY_IDS = ['offices', 'car-building', 'entertainment'] as const

@@ -117,7 +117,7 @@ export const SHOP_SPECS: ShopSpec[] = [
   {
     buildingId: 'wildland-shop', prefix: 'wl', name: 'Wildland fire station', at: [3290, 1400], depthFt: 110, bayName: 'Apparatus bays',
     groups: [{ kind: 'engine-t3', count: 25, laneFt: 16 }, { kind: 'engine-t6', count: 25, laneFt: 16 }, { kind: 'water-tender', count: 25, laneFt: 16 }, { kind: 'crew-carrier', count: 3, laneFt: 16 }],
-    wing: WILDLAND_WING, door: { widthFt: 14, heightFt: 14 },
+    wing: WILDLAND_WING, door: { widthFt: 14, heightFt: 16 },
     needs: [
       { roomId: 'wl-lockers', need: 'Gear lockers by the apparatus floor', minArea: 800, near: ['wl-bays'] },
       { roomId: 'wl-hose', need: 'Hose wash and drying', minArea: 800, near: ['wl-bays'] },
@@ -138,18 +138,18 @@ export const SHOP_SPECS: ShopSpec[] = [
   {
     buildingId: 'forestry-shop', prefix: 'fs', name: 'Forestry machine shop', at: [4500, 1385], depthFt: 130, bayName: 'Harvest machine bays',
     groups: [{ kind: 'feller-buncher', count: 25, laneFt: 14 }, { kind: 'harvester', count: 25, laneFt: 14 }, { kind: 'skidder', count: 25, laneFt: 14 }, { kind: 'forwarder', count: 25, laneFt: 14 }],
-    wing: FORESTRY_WING, door: { widthFt: 12, heightFt: 14 },
+    wing: FORESTRY_WING, door: { widthFt: 12, heightFt: 16 },
     needs: [{ roomId: 'fs-gear', need: 'Gear lockers', minArea: 800 }, { roomId: 'fs-offices', need: 'Forestry offices', minArea: 600 }],
   },
   {
     buildingId: 'forestry-barn', prefix: 'fb', name: 'Forestry machine barn', at: [3290, 880], depthFt: 130, bayName: 'Loader, excavator, masticator, and chipper bays',
     groups: [{ kind: 'log-loader', count: 25, laneFt: 14 }, { kind: 'excavator', count: 25, laneFt: 14 }, { kind: 'masticator', count: 25, laneFt: 14 }, { kind: 'chipper', count: 25, laneFt: 14 }],
-    door: { widthFt: 12, heightFt: 14 },
+    door: { widthFt: 12, heightFt: 16 },
   },
   {
     buildingId: 'forestry-fleet', prefix: 'ff', name: 'Forestry fleet barn', at: [3830, 880], depthFt: 130, bayName: 'Log truck, pickup, and UTV bays',
     groups: [{ kind: 'log-truck', count: 25, laneFt: 14 }, { kind: 'pickup', count: 25, laneFt: 12 }, { kind: 'utv', count: 25, laneFt: 10 }],
-    door: { widthFt: 12, heightFt: 14 },
+    door: { widthFt: 12, heightFt: 16 },
   },
 ]
 
