@@ -159,6 +159,20 @@ export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation'
 export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean; safeRoom?: boolean
   /** The wing the room belongs to; its rect is then in the wing's own coordinates. */
   wingId?: string
+  /** The ceiling's shape. Absent means flat under the floor above. See src/model/ceilings.ts. */
+  ceiling?: Ceiling
+}
+
+export type CeilingForm = 'flat' | 'vaulted' | 'beamed' | 'tray'
+/** A room's ceiling. Heights are above the room's floor. */
+export interface Ceiling {
+  form: CeilingForm
+  /** Flat and beamed: the ceiling. Vaulted and tray: the peak or raised center. */
+  height: Inches
+  /** Vaulted: the way the peak runs. Absent means the room's long way. */
+  ridge?: 'ew' | 'ns'
+  /** Vaulted: timber trusses this far apart (0 for none). Beamed: beams this far apart. */
+  spacing?: Inches
 }
 
 /** A wing of a house, turned `angle` degrees counterclockwise about `pivot` (house-local inches). See src/model/wings.ts. */

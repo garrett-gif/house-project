@@ -10,6 +10,7 @@ import { fireRules, roadWidth } from './fireChecks'
 import { UTILITY_UNIT, demand, occupancy, utilityRules } from './utilities'
 import { earthwork, groundAt, roadGrade, siteSlope } from './terrain'
 import { bounds, center, footprintOf } from './geometry'
+import { ceilingNote } from './ceilings'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -63,7 +64,7 @@ export function summarizeEstate(e: Estate): string {
   for (const level of house.levels) {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
-      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}${r.wingId ? `, in wing ${r.wingId}` : ''}`)
+      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}${r.wingId ? `, in wing ${r.wingId}` : ''}${r.ceiling ? `, ceiling ${ceilingNote(house, r)}` : ''}`)
       const furniture = furnitureLine(house, r)
       if (furniture) lines.push(furniture)
       // Rows of overhead doors in a shop's bays read as one line.

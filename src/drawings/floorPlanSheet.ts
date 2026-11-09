@@ -4,6 +4,7 @@ import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 import { ARCH_D, PT_PER_IN, ftIn, turnMarks } from './sheet'
 import { toHouse } from '../model/wings'
+import { ceilingNote } from '../model/ceilings'
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
 import { beamMarks, beamsAbove } from '../model/beams'
@@ -114,6 +115,8 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
       const small = r.rect.w < 14 * 12 || r.rect.d < 10 * 12
       out.push({ t: 'text', x: cx, y: cy - (small ? 0 : 2), text: r.name.toUpperCase(), size: small ? 5 : 7, anchor: 'middle', bold: true })
       if (!small) out.push({ t: 'text', x: cx, y: cy + 8, text: `${ftIn(r.rect.w)} × ${ftIn(r.rect.d)}`, size: 6, anchor: 'middle' })
+      const note = ceilingNote(e.house, r)
+      if (note && !small) out.push({ t: 'text', x: cx, y: cy + 16, text: note.split(',')[0].toUpperCase(), size: 5, anchor: 'middle' })
     }
 
     if (f) {

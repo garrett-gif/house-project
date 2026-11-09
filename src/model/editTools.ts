@@ -248,6 +248,17 @@ export const EDIT_TOOLS: EditToolSpec[] = [
   { name: 'removeFurniture', description: 'Remove a piece.', input_schema: object({ itemId: str('Furniture id from the model summary.') }) },
   { name: 'furnishRoom', description: 'Replace the furniture of a room with the automatic first pass for its current size and doors.', input_schema: object({ roomId: str('Room id from the model summary.') }) },
   { name: 'setSwale', description: 'Add or remove a graded drainage swale or curtain drain around a building that sits low.', input_schema: object({ buildingId: str('Building id from the model summary.'), swale: bool('True to add, false to remove.') }) },
+  {
+    name: 'setCeiling',
+    description: 'Shape a room ceiling: flat, vaulted (rising from the long walls to a peak, with exposed timber trusses), beamed (flat with exposed beams), or tray (raised center). Vaults and trays need nothing built above them, or a two-story room. Heights are above the room floor.',
+    input_schema: object({
+      roomId: str('Room id from the model summary.'),
+      form: { type: 'string', enum: ['flat', 'vaulted', 'beamed', 'tray'], description: 'Ceiling form.' },
+      heightFt: num('Flat or beamed: the ceiling height. Vaulted or tray: the peak or raised center. Feet above the room floor.'),
+      ridge: { type: ['string', 'null'], enum: ['ew', 'ns', null], description: 'Vaulted: which way the peak runs, ew or ns. Null for the room long way.' },
+      spacingFt: { type: ['number', 'null'], description: 'Vaulted: timber truss spacing in feet, 0 for none. Beamed: beam spacing. Null for the default (12 ft trusses, 6 ft beams).' },
+    }),
+  },
   { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
 
@@ -355,6 +366,7 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeDevice': return { ok: true, op: { op: 'removeDevice', deviceId: s('deviceId') } }
     case 'setOccupancy': return { ok: true, op: { op: 'setOccupancy', buildingId: s('buildingId'), beds: n('beds'), staff: n('staff'), backupPower: v.backupPower as boolean } }
     case 'setUtilityRule': return { ok: true, op: { op: 'setUtilityRule', rule: s('rule') as never, value: n('value') } }
+    case 'setCeiling': return { ok: true, op: { op: 'setCeiling', roomId: s('roomId'), ceiling: { form: s('form') as never, height: inches(n('heightFt')), ...(v.ridge ? { ridge: s('ridge') as never } : {}), ...(typeof v.spacingFt === 'number' ? { spacing: inches(n('spacingFt')) } : {}) } } }
     case 'setSafeRoom': return { ok: true, op: { op: 'setSafeRoom', roomId: s('roomId'), safeRoom: v.safeRoom as boolean } }
     case 'setRoof': return { ok: true, op: { op: 'setRoof', roofId: s('roofId'), form: s('form') as never, pitch: n('pitch'), ridge: s('ridge') as never, low: s('low') as never, overhang: inches(n('overhangFt')) } }
   }

@@ -1,5 +1,6 @@
 import type { Estate } from '../model/types'
 import { levelWalls } from '../model/walls'
+import { ceilingOf, plateHeight } from '../model/ceilings'
 import { eaveHeight, roofPolygons } from '../model/roofs'
 import type { P3 } from '../model/roofs'
 import { gradeAt } from './elevations'
@@ -56,9 +57,26 @@ export function sectionMarks(e: Estate, cut: SectionCut, sx: number, sy: number)
       const [a, b] = span(r)
       // Floor structure: a 12 in slab or framed floor under each room on the cut.
       box(a, b, level.elevation - 12, level.elevation, r.type === 'outdoor' ? '#bbb' : '#8c8c8c')
-      // Ceiling line, unless the room rises through the floor above.
-      const top = eaveHeight(level) + (r.twoStory && levels[i + 1] ? levels[i + 1].floorHeight : 0)
-      if (r.type !== 'outdoor') raw.push({ t: 'line', x1: a, y1: top, x2: b, y2: top, w: 0.4 })
+      // The ceiling as cut: flat, a tray's step, or a vault's profile (a peak across the span, a level line along it).
+      if (r.type !== 'outdoor') {
+        const c = ceilingOf(house, r), z0 = level.elevation, plate = z0 + plateHeight(house, r), top = z0 + c.height
+        const line = (x1: number, y1: number, x2: number, y2: number) => raw.push({ t: 'line', x1, y1, x2, y2, w: 0.6 })
+        if (c.form === 'vaulted' && top > plate) {
+          const across = (cut.axis === 'x') === (c.ridge === 'ew'), m = (a + b) / 2
+          if (across) { line(a, plate, m, top); line(m, top, b, plate); hs.push(m); zs.push(top) }
+          else {
+            const pos = cut.axis === 'x' ? cut.at - r.rect.x : cut.at - r.rect.y, len = cut.axis === 'x' ? r.rect.w : r.rect.d
+            const z = plate + (top - plate) * (1 - Math.abs(pos - len / 2) / (len / 2))
+            line(a, z, b, z); zs.push(z)
+          }
+        } else if (c.form === 'tray' && top > plate && b - a > 48) {
+          line(a, plate, a + 24, plate); line(a + 24, plate, a + 24, top); line(a + 24, top, b - 24, top); line(b - 24, top, b - 24, plate); line(b - 24, plate, b, plate); zs.push(top)
+        } else {
+          // Rooms without a set ceiling keep the line at the top of the walls, as before.
+          const z = r.ceiling ? top : eaveHeight(level) + (r.twoStory && levels[i + 1] ? levels[i + 1].floorHeight : 0)
+          line(a, z, b, z)
+        }
+      }
       if (r.type !== 'outdoor' && b - a > 8 * 12) {
         raw.push({ t: 'text', x: (a + b) / 2, y: level.elevation + 48, text: r.name.split(/[,(]/)[0].trim().toUpperCase(), size: 5.5, anchor: 'middle' })
       }

@@ -10,6 +10,8 @@ import { CATALOG, parts } from '../model/furniture'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
 import { wingById } from '../model/wings'
+import { ceilingPolygons, ceilingTimber } from '../model/ceilings'
+import type { P3, Poly3 } from '../model/roofs'
 import { flyoverKeyframes, step, walkStart } from '../ui/tour'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
@@ -29,6 +31,39 @@ function addBox(group: THREE.Object3D, x: number, y: number, z: number, w: numbe
   mesh.position.set(x, y, z)
   group.add(mesh)
   return mesh
+}
+
+/** A straight timber from a to b (scene feet), w wide and d deep, its depth kept in the vertical plane through it. */
+function addTimber(group: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, w: number, d: number, color: number) {
+  const dir = b.clone().sub(a), len = dir.length()
+  if (len < 0.05) return
+  dir.normalize()
+  const up = new THREE.Vector3(0, 1, 0)
+  const across = Math.abs(dir.dot(up)) > 0.99 ? new THREE.Vector3(1, 0, 0) : dir.clone().cross(up).normalize()
+  const depth = across.clone().cross(dir).normalize()
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, len), new THREE.MeshLambertMaterial({ color }))
+  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, depth, dir))
+  mesh.position.copy(a.clone().add(b).multiplyScalar(0.5))
+  group.add(mesh)
+}
+
+/** Flat polygons as one mesh. With `facing` 'down', each is wound to face down, so a ceiling shows from inside only. */
+function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => number[], color: number, facing: 'down' | 'both') {
+  const verts: number[] = []
+  for (const poly of polys) {
+    let v = poly.pts.map(toScene)
+    if (facing === 'down') {
+      const [a, b, c] = v, ux = b[0] - a[0], uz = b[2] - a[2], vx = c[0] - a[0], vz = c[2] - a[2]
+      // Scene y is up; the normal's y is uz*vx - ux*vz.
+      if (uz * vx - ux * vz > 0) v = [...v].reverse()
+    }
+    for (let i = 1; i < v.length - 1; i++) verts.push(...v[0], ...v[i], ...v[i + 1])
+  }
+  if (!verts.length) return
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+  g.computeVertexNormals()
+  group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: facing === 'down' ? THREE.FrontSide : THREE.DoubleSide })))
 }
 
 function buildSite(scene: THREE.Scene, estate: Estate) {
@@ -189,6 +224,17 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
         const h = Math.max(0.1, toFt(q.h))
         addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
       }
+    }
+  }
+  // Ceilings, seen from inside only so the plan from above stays open, and their timber trusses and beams.
+  const toScene = (p: P3) => [toFt(p[0]) - cx, toFt(p[2]), cy - toFt(p[1])]
+  for (const level of visible) for (const room of level.rooms.filter(r => r.ceiling)) {
+    const g = frame(room.wingId), polys = ceilingPolygons(estate.house, room)
+    addPolys(g, polys.filter(p => p.kind === 'roof'), toScene, 0xf3eee4, 'down')
+    addPolys(g, polys.filter(p => p.kind === 'gable'), toScene, 0xf6f2ea, 'both')
+    for (const t of ceilingTimber(estate.house, room)) {
+      const [a, b] = [t.a, t.b].map(p => new THREE.Vector3(...toScene(p)))
+      addTimber(g, a, b, toFt(t.w), toFt(t.d), 0x7a5634)
     }
   }
   if (showRoofs) addRoofs(scene, estate, cx, cy)
