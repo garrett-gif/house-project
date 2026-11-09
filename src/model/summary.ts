@@ -2,6 +2,7 @@ import type { Estate, Rect } from './types'
 import { pathLength, toFt } from './geometry'
 import { validateEstate } from './validate'
 import { allHouses, houseName } from './houses'
+import { beamSize } from './beams'
 import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
@@ -67,6 +68,7 @@ export function summarizeEstate(e: Estate): string {
   }
 
   if (house.roofs.length) lines.push('', `Roofs (id: name, over, form, pitch, ridge or low side, overhang; heights above the main floor): ${house.roofs.map(r => `${r.id}: ${r.name}, over ${box(r.rect)} on ${r.levelId}, ${r.form} ${r.pitch}:12, ${r.form === 'shed' ? `low side ${r.low}` : `ridge ${r.ridge}`}, ${f(r.overhang)} ft overhang, top at ${f(ridgeHeight(house, r))} ft`).join('; ')}.`)
+  if (house.beams?.length) lines.push('', `Beams (id: carries walls of level, line, from, to, material, posts, planning size; house-local feet): ${house.beams.map(b => `${b.id}: ${b.levelId}, ${b.orientation === 'h' ? 'east-west at y' : 'north-south at x'} ${f(b.at)}, ${f(b.from)} to ${f(b.to)}, ${b.material}${b.posts?.length ? `, posts at ${b.posts.map(f).join(' and ')}` : ''}, ${beamSize(b)}`).join('; ')}.`)
   if (house.stairs.length) lines.push('', `Stairs: ${house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
   }
   lines.push('', "This app's planning checks right now (these are planning aids, not code compliance):")

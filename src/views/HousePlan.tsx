@@ -7,6 +7,7 @@ import { cursorFor, grabRoom, openingDragOp, roomDragOp } from '../ui/dragOps'
 import type { RoomGrab } from '../ui/dragOps'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
+import { beamMarks, beamSize, beamsAbove } from '../model/beams'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
@@ -147,6 +148,17 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
         })}
         {walls.map(wallRect)}
         {openings.map(opening)}
+        {beamsAbove(house, level.id).map(bm => {
+          const [a, c] = bm.orientation === 'h' ? [P(bm.from, bm.at), P(bm.to, bm.at)] : [P(bm.at, bm.from), P(bm.at, bm.to)]
+          const color = flagged.has(bm.id) ? FLAG[flagged.get(bm.id)!] : '#7a3b1d'
+          return (
+            <g key={bm.id} pointerEvents="none">
+              <line x1={a[0]} y1={a[1]} x2={c[0]} y2={c[1]} stroke={color} strokeWidth={0.45} strokeDasharray="1.6 0.5 0.3 0.5" />
+              {(bm.posts ?? []).map(p => { const q = bm.orientation === 'h' ? P(p, bm.at) : P(bm.at, p); return <rect key={p} x={q[0] - 0.6} y={q[1] - 0.6} width={1.2} height={1.2} fill={color} /> })}
+              <text x={(a[0] + c[0]) / 2 + (bm.orientation === 'v' ? 0.6 : 0)} y={(a[1] + c[1]) / 2 - (bm.orientation === 'h' ? 0.6 : 0)} fontSize={1.3} fill={color} textAnchor={bm.orientation === 'h' ? 'middle' : 'start'}>{beamMarks(house).get(bm.id)} {beamSize(bm)} above</text>
+            </g>
+          )
+        })}
         {level.rooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           const compact = w < 14 || d < 12

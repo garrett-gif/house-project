@@ -144,6 +144,8 @@ export interface UtilityRules {
   maxDrainfieldSlopePct: number
   septicFallFt: number
   wellUpgradientFt: number
+  /** Longest beam span between supports before the check asks for a post, a wall below, or a transfer structure. */
+  maxBeamSpanFt: number
 }
 
 /** `from` and `to` are building ids. Moving one of those buildings moves that end of the walkway with it. */
@@ -210,6 +212,19 @@ export interface Roof {
   overhang: Inches
 }
 
+export type BeamMaterial = 'lvl' | 'glulam' | 'steel'
+
+/**
+ * A beam in the floor framing under `levelId`, carrying a wall of that level across open floor below. It runs along
+ * a line in house-local inches: east-west (`h`) at y = `at`, or north-south (`v`) at x = `at`, from `from` to `to`.
+ * Its size is a planning estimate from the span; an engineer sizes the real member.
+ */
+export interface Beam {
+  id: string; levelId: string; orientation: 'h' | 'v'; at: Inches; from: Inches; to: Inches; material: BeamMaterial
+  /** Posts under the beam, as positions along its line between `from` and `to`. They shorten its spans. */
+  posts?: Inches[]
+}
+
 /** A stair from a stair room on one level up to a stair room on the next. */
 export interface Stair { id: string; roomId: string; toRoomId: string; shape: 'straight' | 'u-shaped'; width: Inches; tread: Inches }
 
@@ -235,6 +250,8 @@ export interface HouseModel {
   openings: Opening[]
   stairs: Stair[]
   roofs: Roof[]
+  /** Beams carrying upper walls over open floor. Optional so older saves still load; they get the first pass. */
+  beams?: Beam[]
   /** The brief as checkable requirements. Optional so older saves still load. */
   program?: ProgramItem[]
   /**

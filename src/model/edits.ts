@@ -1,4 +1,4 @@
-import type { Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
+import type { Beam, BeamMaterial, Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
 import { DEFAULT_FIRE_RULES } from './fireChecks'
 import { UTILITY_KINDS, UTILITY_RULE_NAMES, UTILITY_UNIT } from './utilities'
 import { ROOF_FORMS } from './roofs'
@@ -6,6 +6,8 @@ import { SIDE_WORD, placeOpenings, sideLine } from './walls'
 import { footprintOf, overlaps, toFt, translate } from './geometry'
 import { withDerivedGeometry } from './derive'
 import { allHouses, houseByBuilding, houseOfRoom } from './houses'
+import { BEAM_MATERIALS, firstPassBeams } from './beams'
+const allHousesOf = allHouses
 
 /** Which point of a rectangle stays fixed when it is resized. `n` keeps the north edge, `sw` the southwest corner. */
 export type Anchor = 'sw' | 's' | 'se' | 'w' | 'center' | 'e' | 'nw' | 'n' | 'ne'
@@ -60,6 +62,12 @@ export type EditOp =
   | { op: 'setSafeRoom'; roomId: string; safeRoom: boolean }
   /** A graded swale or curtain drain around a building. */
   | { op: 'setSwale'; buildingId: string; swale: boolean }
+  /** Beams in house-local inches; see Beam. */
+  | { op: 'addBeam'; beam: Beam }
+  | { op: 'removeBeam'; beamId: string }
+  | { op: 'setBeam'; beamId: string; material: BeamMaterial; posts: Inches[] }
+  /** Replaces a house's beams with the rule-based first pass for its current walls. */
+  | { op: 'fitBeams'; buildingId: string }
   /** Whether a house's site is excavated to its walkout, rather than relying on the land's natural fall. */
   | { op: 'setExcavated'; buildingId: string; excavated: boolean }
 
@@ -165,6 +173,9 @@ function targetHouse(e: Estate, op: EditOp): string | undefined {
     case 'addDoor': case 'addWindow': return houseOfRoom(e, op.opening.roomId)?.buildingId
     case 'moveOpening': case 'resizeOpening': case 'removeOpening': return opening(op.openingId)
     case 'setRoof': return allHouses(e).find(h => h.roofs.some(r => r.id === op.roofId))?.buildingId
+    case 'addBeam': return allHouses(e).find(h => h.levels.some(l => l.id === op.beam.levelId))?.buildingId
+    case 'removeBeam': case 'setBeam': return allHouses(e).find(h => (h.beams ?? []).some(b => b.id === op.beamId))?.buildingId
+    case 'fitBeams': return houseByBuilding(e, op.buildingId)?.buildingId
     default: return undefined
   }
 }
@@ -513,6 +524,39 @@ function runInHouse(e: Estate, op: EditOp): string {
       e.utilityRules = { ...e.utilityRules, [op.rule]: op.value }
       return ''
     }
+    case 'addBeam': {
+      const b = op.beam
+      if (!ID.test(b.id)) return 'Beam ids use lowercase letters, numbers, and hyphens.'
+      if (allHousesOf(e).some(h => (h.beams ?? []).some(x => x.id === b.id))) return `A beam with id "${b.id}" already exists.`
+      if (!e.house.levels.some(l => l.id === b.levelId)) return `No level with id "${b.levelId}".`
+      if (b.orientation !== 'h' && b.orientation !== 'v') return 'Orientation must be h (east-west) or v (north-south).'
+      if (!BEAM_MATERIALS.includes(b.material)) return `Material must be one of: ${BEAM_MATERIALS.join(', ')}.`
+      if (!finite(b.at, b.from, b.to) || b.to - b.from < 12 || b.to - b.from > 12 * 120) return 'A beam runs from 1 to 120 ft, with to after from.'
+      const posts = (b.posts ?? []).filter(p => p > b.from && p < b.to)
+      e.house.beams = [...(e.house.beams ?? []), { id: b.id, levelId: b.levelId, orientation: b.orientation, at: b.at, from: b.from, to: b.to, material: b.material, ...(posts.length ? { posts } : {}) }]
+      return ''
+    }
+    case 'removeBeam': {
+      if (!(e.house.beams ?? []).some(b => b.id === op.beamId)) return `No beam with id "${op.beamId}".`
+      e.house.beams = (e.house.beams ?? []).filter(b => b.id !== op.beamId)
+      return ''
+    }
+    case 'setBeam': {
+      const b = (e.house.beams ?? []).find(x => x.id === op.beamId)
+      if (!b) return `No beam with id "${op.beamId}".`
+      if (!BEAM_MATERIALS.includes(op.material)) return `Material must be one of: ${BEAM_MATERIALS.join(', ')}.`
+      if (!Array.isArray(op.posts) || !op.posts.every(p => finite(p))) return 'Posts must be positions along the beam.'
+      const outside = op.posts.filter(p => p <= b.from || p >= b.to)
+      if (outside.length) return `Posts must sit between the beam's ends, ${feet(b.from)} and ${feet(b.to)}.`
+      b.material = op.material
+      if (op.posts.length) b.posts = [...op.posts].sort((x, y) => x - y); else delete b.posts
+      return ''
+    }
+    case 'fitBeams': {
+      if (e.house.buildingId !== op.buildingId) return `No house with id "${op.buildingId}".`
+      e.house.beams = firstPassBeams({ ...e.house, beams: undefined })
+      return ''
+    }
     case 'setExcavated': {
       if (e.house.buildingId !== op.buildingId) return `No house with id "${op.buildingId}".`
       e.house.excavated = !!op.excavated
@@ -655,6 +699,10 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeDevice': return `Remove ${device(op.deviceId)}`
     case 'setOccupancy': return `Set ${building(op.buildingId)} to ${op.beds} sleeping and ${op.staff} by day${op.backupPower ? ', on backup power' : ', no backup power'}`
     case 'setUtilityRule': return `Set utility rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
+    case 'addBeam': return `Add a ${feet(op.beam.to - op.beam.from)} ${op.beam.material} beam (${op.beam.id}) under the ${allHouses(e).flatMap(h => h.levels).find(l => l.id === op.beam.levelId)?.name.toLowerCase() ?? op.beam.levelId}`
+    case 'removeBeam': return `Remove beam ${op.beamId}`
+    case 'setBeam': return `Make beam ${op.beamId} ${op.material}${op.posts.length ? ` with ${op.posts.length} post${op.posts.length === 1 ? '' : 's'} at ${op.posts.map(p => feet(p)).join(', ')}` : ', no posts'}`
+    case 'fitBeams': return `Redo the beams of the ${building(op.buildingId).toLowerCase()} from its walls`
     case 'setExcavated': return op.excavated ? `Excavate the ${building(op.buildingId).toLowerCase()} site to its walkout, with retaining walls` : `Rely on the natural fall of the land at the ${building(op.buildingId).toLowerCase()}`
     case 'setSwale': return `${op.swale ? 'Add' : 'Remove'} a drainage swale around ${building(op.buildingId)}`
     case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`

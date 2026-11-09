@@ -2,6 +2,7 @@ import type { EditOp } from './edits'
 import { ANCHORS, DOOR_KINDS, FIRE_RULE_NAMES, ROAD_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
 import { ROOF_FORMS } from './roofs'
 import { UTILITY_KINDS, UTILITY_RULE_NAMES } from './utilities'
+import { BEAM_MATERIALS } from './beams'
 
 /**
  * Tool definitions for the chat editor. Claude works in feet, which it handles more reliably;
@@ -215,6 +216,20 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     input_schema: object({ rule: { type: 'string', enum: UTILITY_RULE_NAMES, description: 'Which rule.' }, value: num('New value.') }),
   },
   { name: 'setExcavated', description: 'Set whether a house site is excavated down to its walkout, with retaining walls, instead of relying on the natural fall of the land.', input_schema: object({ buildingId: str('main-house or guest-house.'), excavated: bool('True to excavate.') }) },
+  {
+    name: 'addBeam',
+    description: 'Add a beam in the floor framing under a level, carrying a wall of that level over open floor below. House-local feet: an east-west beam (h) runs along y = atFt from fromFt to toFt in x; a north-south beam (v) runs along x = atFt from fromFt to toFt in y.',
+    input_schema: object({
+      id: str('New unique id: lowercase letters, numbers, and hyphens.'), levelId: str('Level whose walls it carries, from the model summary.'),
+      orientation: { type: 'string', enum: ['h', 'v'], description: 'h runs east-west, v runs north-south.' },
+      atFt: num('The line it runs on, in house-local feet.'), fromFt: num('Start along the line, in feet.'), toFt: num('End along the line, in feet.'),
+      material: { type: 'string', enum: BEAM_MATERIALS, description: 'lvl, glulam, or steel.' },
+      postsFt: { type: 'array', items: { type: 'number' }, description: 'Post positions along the line, in feet, between from and to. Empty for none.' },
+    }),
+  },
+  { name: 'removeBeam', description: 'Remove a beam.', input_schema: object({ beamId: str('Beam id from the model summary.') }) },
+  { name: 'setBeam', description: 'Change a beam\'s material and its posts. Posts shorten its spans.', input_schema: object({ beamId: str('Beam id from the model summary.'), material: { type: 'string', enum: BEAM_MATERIALS, description: 'lvl, glulam, or steel.' }, postsFt: { type: 'array', items: { type: 'number' }, description: 'Post positions along its line, in house-local feet. Empty for none.' } }) },
+  { name: 'fitBeams', description: 'Replace a house\'s beams with the rule-based first pass for its current walls, for example after moving walls.', input_schema: object({ buildingId: str('main-house or guest-house.') }) },
   { name: 'setSwale', description: 'Add or remove a graded drainage swale or curtain drain around a building that sits low.', input_schema: object({ buildingId: str('Building id from the model summary.'), swale: bool('True to add, false to remove.') }) },
   { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
@@ -302,6 +317,10 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'resizeUtility': return { ok: true, op: { op: 'resizeUtility', utilityId: s('utilityId'), w: inches(n('widthFt')), d: inches(n('depthFt')), anchor: s('anchor') as never } }
     case 'setUtility': return { ok: true, op: { op: 'setUtility', utilityId: s('utilityId'), capacity: n('capacity'), serves: v.serves as string[], pumped: v.pumped as boolean } }
     case 'setExcavated': return { ok: true, op: { op: 'setExcavated', buildingId: s('buildingId'), excavated: v.excavated as boolean } }
+    case 'addBeam': return { ok: true, op: { op: 'addBeam', beam: { id: s('id'), levelId: s('levelId'), orientation: s('orientation') as never, at: inches(n('atFt')), from: inches(n('fromFt')), to: inches(n('toFt')), material: s('material') as never, posts: (v.postsFt as number[]).map(inches) } } }
+    case 'removeBeam': return { ok: true, op: { op: 'removeBeam', beamId: s('beamId') } }
+    case 'setBeam': return { ok: true, op: { op: 'setBeam', beamId: s('beamId'), material: s('material') as never, posts: (v.postsFt as number[]).map(inches) } }
+    case 'fitBeams': return { ok: true, op: { op: 'fitBeams', buildingId: s('buildingId') } }
     case 'setSwale': return { ok: true, op: { op: 'setSwale', buildingId: s('buildingId'), swale: v.swale as boolean } }
     case 'removeUtility': return { ok: true, op: { op: 'removeUtility', utilityId: s('utilityId') } }
     case 'addDevice': return { ok: true, op: { op: 'addDevice', device: {

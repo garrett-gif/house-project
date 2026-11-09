@@ -86,7 +86,7 @@ describe('focusing on a house', () => {
 
   it('draws a set for the guest house', () => {
     const set = drawingSet(focusHouse(sampleEstate, 'guest-house'), { revision: 0, date: '2026-11-09', projectName: 'House Project' })
-    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
+    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601', 'A-602'])
     const texts = set.flatMap(s => s.marks.flatMap(m => m.t === 'text' ? [m.text] : []))
     expect(texts).toContain('GUEST HOUSE')
     expect(texts).toContain('SITE AND GUEST HOUSE · DRAFT DRAWING SET')

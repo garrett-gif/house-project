@@ -69,6 +69,9 @@ export function loadProject(data: unknown): CommitResult {
     return { ok: false, error: 'This file is not a saved House Project.' }
   }
   // Projects saved before walls and openings existed get the rule-based first pass.
+  // Each detailed house gets anything newer than its save, such as beams.
+  const houses = (p.base as { houses?: unknown }).houses
+  if (Array.isArray(houses)) p.base = { ...p.base, houses: houses.map(h => withHouseDefaults(h)) }
   let t = startTimeline(withDerivedGeometry(withExcavationDefault(withGuestHouseDefaults(withUtilityDefaults(withFireDefaults({ ...p.base, house: withHouseDefaults(p.base.house) }))))))
   for (const r of p.revisions) {
     const next = commit(t, r.ops, r.author, r.request, new Date(r.timestamp))

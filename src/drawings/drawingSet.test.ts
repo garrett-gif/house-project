@@ -16,8 +16,8 @@ const sheet = (n: string) => set.find(s => s.number === n)!
 
 describe('drawing set', () => {
   it('has a cover, plans, elevations, a roof plan, and schedules, numbered in order', () => {
-    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
-    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 10`))
+    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601', 'A-602'])
+    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 11`))
   })
 
   it('lists every sheet on the cover, with floor areas and the draft statement', () => {

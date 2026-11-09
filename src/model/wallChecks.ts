@@ -1,4 +1,4 @@
-import type { Check, CheckStatus, Estate, HouseModel, Opening, Room } from './types'
+import type { Check, CheckStatus, Estate, HouseModel, Opening, Room, Beam } from './types'
 import { toFt } from './geometry'
 import { SIDE_WORD, allWalls, doorGraph, enclosedRooms, levelOf, levelWalls, mustAvoidBedrooms, placeOpenings, reachableFromOutside, roomById } from './walls'
 import type { PlacedOpening, WallSegment } from './walls'
@@ -41,13 +41,14 @@ function wallName(house: HouseModel, s: WallSegment) {
 }
 
 /** Length of a wall on `upper` that is not over a wall on `lower` but is over a room there. */
-function unsupported(upper: WallSegment, lowerWalls: WallSegment[], lowerRooms: Room[]) {
+function unsupported(upper: WallSegment, lowerWalls: WallSegment[], lowerRooms: Room[], beams: Beam[] = []) {
   const step = 6
   let length = 0
   const under = new Set<string>()
   for (let p = upper.from + step / 2; p < upper.to; p += step) {
     const onWall = lowerWalls.some(w => w.orientation === upper.orientation && Math.abs(w.at - upper.at) <= 1 && w.from - 1 <= p && p <= w.to + 1)
     if (onWall) continue
+    if (beams.some(b => b.orientation === upper.orientation && Math.abs(b.at - upper.at) <= 1 && b.from - 1 <= p && p <= b.to + 1)) continue
     const [x, y] = upper.orientation === 'h' ? [p, upper.at] : [upper.at, p]
     const room = lowerRooms.find(r => x > r.rect.x + 1 && x < r.rect.x + r.rect.w - 1 && y > r.rect.y + 1 && y < r.rect.y + r.rect.d - 1)
     if (room) { length += step; under.add(room.name) }
@@ -146,7 +147,7 @@ export function wallChecks(e: Estate): Check[] {
     const lower = levels[i - 1], upper = levels[i]
     const lowerWalls = levelWalls(house, lower), lowerRooms = enclosedRooms(lower)
     for (const s of levelWalls(house, upper)) {
-      const u = unsupported(s, lowerWalls, lowerRooms)
+      const u = unsupported(s, lowerWalls, lowerRooms, (house.beams ?? []).filter(b => b.levelId === upper.id))
       if (u.length < 12) continue
       const item = { text: `${upper.name}: ${wallName(house, s)}, ${n(toFt(u.length))} ft over ${u.under.join(' and ')}`, ids: s.sides.filter((x): x is string => !!x), length: u.length }
       if (s.kind === 'interior') inner.push(item); else exterior.push(item)
@@ -156,7 +157,7 @@ export function wallChecks(e: Estate): Check[] {
     exterior.length ? list(exterior.map(x => x.text)) : 'Every outside wall is over a wall or on grade', 'fail', exterior.flatMap(x => x.ids)))
   inner.sort((a, b) => b.length - a.length)
   checks.push(make('stack-interior', 'Inside walls sit on walls below', inner.length === 0,
-    inner.length ? `${inner.length} inside wall${inner.length === 1 ? '' : 's'} need a beam or bearing wall below, ${n(toFt(inner.reduce((s, x) => s + x.length, 0)))} ft in all. Longest: ${list(inner.map(x => x.text), 3)}` : 'Every inside wall is over a wall or on grade',
+    inner.length ? `${inner.length} inside wall${inner.length === 1 ? '' : 's'} need a beam or bearing wall below, ${n(toFt(inner.reduce((s, x) => s + x.length, 0)))} ft in all. Longest: ${list(inner.map(x => x.text), 3)}` : `Every inside wall is over a wall, a beam, or on grade${house.beams?.length ? `; ${house.beams.length} beams` : ''}`,
     'warn', inner.flatMap(x => x.ids)))
 
   return checks

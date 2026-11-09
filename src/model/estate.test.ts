@@ -8,7 +8,8 @@ describe('approved layout version 3', () => {
   const checks = validateEstate(sampleEstate)
 
   // Some inside walls need beams over the big walkout rooms, so that warns.
-  const EXPECTED_WARNINGS = new Set(['stack-interior'])
+  // Open for Garrett: the primary suite over the indoor pool needs 46 to 64 ft beams.
+  const EXPECTED_WARNINGS = new Set(['beam-span'])
   it.each(checks.map(c => [c.label, c] as const))('%s', (_label, c) => {
     expect(c.status, c.detail).toBe(EXPECTED_WARNINGS.has(c.id) ? 'warn' : 'pass')
   })

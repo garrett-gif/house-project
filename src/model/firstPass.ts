@@ -1,4 +1,5 @@
 import type { HouseModel, Inches, Opening, Room, Side, Stair } from './types'
+import { firstPassBeams } from './beams'
 import { ft } from './geometry'
 import { DEFAULT_WALL_THICKNESS, doorGraph, enclosedRooms, levelWalls, mustAvoidBedrooms, outwardSide, reachableFromOutside, sideLine } from './walls'
 import type { WallSegment } from './walls'
@@ -154,5 +155,6 @@ export function withHouseDefaults(house: Omit<HouseModel, 'wallThickness' | 'ope
   const base: HouseModel = { ...house, wallThickness: house.wallThickness ?? { ...DEFAULT_WALL_THICKNESS }, openings: [], stairs: [], roofs: [] }
   const stairs = house.stairs ?? firstPassStairs(base)
   const roofs = house.roofs ?? firstPassRoofs(base)
-  return { ...base, stairs, roofs, openings: house.openings ?? firstPassOpenings({ ...base, stairs, roofs }) }
+  const withOpenings = { ...base, stairs, roofs, openings: house.openings ?? firstPassOpenings({ ...base, stairs, roofs }) }
+  return { ...withOpenings, beams: house.beams ?? firstPassBeams(withOpenings) }
 }

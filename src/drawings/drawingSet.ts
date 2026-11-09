@@ -10,11 +10,13 @@ import { openingMarks } from './marks'
 import { elevationSheet, roofPlanSheet } from './elevations'
 import { sectionSheet } from './sections'
 import { sitePlanSheet } from './sitePlanSheet'
+import { beamBearing, beamMarks, beamSize, longestSpan, BEAM_WORD } from '../model/beams'
+import { utilityRules } from '../model/utilities'
 
-/** The full draft set: cover and index, the site plan, one plan per level, elevations, roof plan, sections, then door and window schedules. */
+/** The full draft set: cover and index, the site plan, one plan per level, elevations, roof plan, sections, door and window schedules, then beams. */
 export function drawingSet(e: Estate, info: SheetInfo): Sheet[] {
   const levels = e.house.levels.length
-  const count = levels + 7
+  const count = levels + 8
   const site = sitePlanSheet(e, info, { index: 2, count })
   const plans = floorPlanSheets(e, info, 3, count)
   let n = levels + 3
@@ -22,8 +24,9 @@ export function drawingSet(e: Estate, info: SheetInfo): Sheet[] {
   const ew = elevationSheet(e, ['east', 'west'], 'A-202', 'East and west elevations', info, { index: n++, count })
   const roof = roofPlanSheet(e, info, { index: n++, count })
   const sections = sectionSheet(e, info, { index: n++, count })
-  const schedules = scheduleSheet(e, info, { index: n, count })
-  const rest = [site, ...plans, ns, ew, roof, sections, schedules]
+  const schedules = scheduleSheet(e, info, { index: n++, count })
+  const beams = beamSheet(e, info, { index: n, count })
+  const rest = [site, ...plans, ns, ew, roof, sections, schedules, beams]
   const index = [{ number: 'G-001', title: 'Cover and sheet index' }, ...rest].map(s => ({ number: s.number, title: s.title }))
   return [coverSheet(e, info, index, { index: 1, count }), ...rest]
 }
@@ -143,3 +146,43 @@ export function scheduleSheet(e: Estate, info: SheetInfo, position: SetPosition)
 }
 
 export { TITLE_W }
+
+/** A-602: beams for the engineer, with planning sizes from their spans. */
+export function beamSheet(e: Estate, info: SheetInfo, position: SetPosition): Sheet {
+  const marks: Mark[] = []
+  frame(marks)
+  const house = e.house
+  const tags = beamMarks(house)
+  const rules = utilityRules(e)
+  const levelName = (id: string) => house.levels.find(l => l.id === id)?.name ?? id
+  const below = (levelId: string) => {
+    const levels = [...house.levels].sort((a, b) => a.elevation - b.elevation)
+    return levels[levels.findIndex(l => l.id === levelId) - 1]
+  }
+  const roomUnder = (b: typeof rows[number]) => {
+    const lower = below(b.levelId)
+    const mid = (b.from + b.to) / 2, [x, y] = b.orientation === 'h' ? [mid, b.at] : [b.at, mid]
+    return lower?.rooms.find(r => x > r.rect.x && x < r.rect.x + r.rect.w && y > r.rect.y && y < r.rect.y + r.rect.d)?.name ?? ''
+  }
+  const rows = house.beams ?? []
+  const x = MARGIN + 0.5 * PT_PER_IN, y = MARGIN + 0.9 * PT_PER_IN
+  const bottom = table(marks, x, y, 'BEAM SCHEDULE', [
+    { label: 'MARK', w: 44, align: 'middle' }, { label: 'CARRIES WALLS OF', w: 110 }, { label: 'OVER', w: 210 }, { label: 'RUNS', w: 70 },
+    { label: 'LINE', w: 60, align: 'middle' }, { label: 'FROM', w: 56, align: 'middle' }, { label: 'TO', w: 56, align: 'middle' },
+    { label: 'POSTS', w: 40, align: 'middle' }, { label: 'LONGEST SPAN', w: 74, align: 'middle' }, { label: 'MATERIAL', w: 60 }, { label: 'PLANNING SIZE*', w: 150 }, { label: 'ENDS', w: 90 },
+  ], rows.map(b => {
+    const br = beamBearing(house, b)
+    const span = longestSpan(b)
+    return [tags.get(b.id)!, levelName(b.levelId), roomUnder(b), b.orientation === 'h' ? 'East-west' : 'North-south', ftIn(b.at), ftIn(b.from), ftIn(b.to),
+      String((b.posts ?? []).length || ''), `${ftIn(span)}${span > rules.maxBeamSpanFt * 12 ? ' LONG' : ''}`, BEAM_WORD[b.material], beamSize(b), br.start && br.end ? 'On walls' : 'Needs post']
+  }), 12)
+  const notes = [
+    '* Planning sizes come from rules of thumb (depth about span/20 for LVL and glulam, span/24 for steel). They are for budgeting and coordination only.',
+    'An engineer designs every beam, post, connection, and footing. Positions are house-local, in feet and inches from the southwest corner, to wall centerlines.',
+    `Spans over ${rules.maxBeamSpanFt} ft are marked LONG: a post, a wall below, or a transfer truss would shorten them.`,
+    "Passing this app's planning checks does not mean the structure meets code.",
+  ]
+  notes.forEach((t, i) => marks.push({ t: 'text', x, y: bottom + 20 + i * 11, text: t, size: 7 }))
+  drawTitleBlock(marks, e, { title: 'BEAM SCHEDULE', scale: 'None', number: 'A-602' }, info, position)
+  return { number: 'A-602', title: 'Beam schedule', width: ARCH_D.width, height: ARCH_D.height, marks }
+}
