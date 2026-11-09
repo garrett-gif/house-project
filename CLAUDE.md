@@ -33,6 +33,7 @@ npm run build   # type-check src and server, vite build, then scan dist/ for cre
 - `src/model/editTools.ts`: the tool definitions Claude sees (in feet) and the converter to edit operations (in inches).
 - `src/model/history.ts`: revisions, undo and redo, saved-project format.
 - `src/storage/projectStore.ts`: `ProjectStore` interface for the project and the chat transcript; the browser (localStorage) implementation is used today. Replace it with a Supabase store later without touching callers.
+- `src/drawings`: draft drawing sheets derived from the model as simple marks in sheet points: G-001 cover and index, A-101+ floor plans at 1/8" = 1'-0" on ARCH D, A-601 door and window schedules. Marks (D01, W01) come from `marks.ts`. The same marks render to SVG in the Drawings view and to PDF on the server (`server/pdf.ts`, POST /api/sheets.pdf). Every sheet carries the draft, not-for-construction stamp.
 - `src/views`: SVG site and house plans, Three.js scenes.
 - `src/ui`, `src/App.tsx`: chat panel, proposal preview, checks, history.
 - `server/`: local Express server. Calls Claude (model from `HOUSE_MODEL`, default `claude-sonnet-5-5`), dry-runs the proposed edits, returns them. It never saves anything.

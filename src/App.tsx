@@ -7,7 +7,7 @@ import { diffChecks, validateEstate } from './model/validate'
 import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
 import type { ChatTurn } from './chat/protocol'
 import { checkServer, requestEdits, requestSheetsPdf } from './chat/client'
-import { floorPlanSheets } from './drawings/floorPlanSheet'
+import { drawingSet } from './drawings/drawingSet'
 import { SheetView } from './views/SheetView'
 import type { Health } from './chat/protocol'
 import { browserProjectStore } from './storage/projectStore'
@@ -97,15 +97,13 @@ export function App() {
   }, [checks])
   const passed = checks.length - failing
   const levels = estate.house.levels.slice().reverse()
-  const showsHouse = view === 'house' || view === 'house3d' || view === 'sheets'
+  const showsHouse = view === 'house' || view === 'house3d'
   const revisionNumber = appliedRevisions(timeline).length
   const sheets = useMemo(() => view === 'sheets'
-    ? floorPlanSheets(estate, { revision: revisionNumber, date: new Date().toISOString().slice(0, 10), projectName: estate.name })
+    ? drawingSet(estate, { revision: revisionNumber, date: new Date().toISOString().slice(0, 10), projectName: estate.name })
     : [], [view, estate, revisionNumber])
-  const sheetFor = (levelId: string) => {
-    const order = [...estate.house.levels].sort((a, b) => a.elevation - b.elevation).findIndex(l => l.id === levelId)
-    return sheets[order] ?? sheets[0]
-  }
+  const [sheetNumber, setSheetNumber] = useState('A-102')
+  const shownSheet = sheets.find(s => s.number === sheetNumber) ?? sheets[0]
   const [downloading, setDownloading] = useState(false)
   const downloadPdf = async () => {
     setDownloading(true)
@@ -243,13 +241,14 @@ export function App() {
           {view === 'house3d' && <Scene3D estate={estate} mode="house" levelId={level} />}
           {view === 'sheets' && sheets.length > 0 && (
             <>
-              <div className="plan-tools">
-                <span className="muted small">Sheet {sheetFor(level).number}: {sheetFor(level).title}, ARCH D 36 × 24 in at 1/8″ = 1′-0″. Draft, not for construction.</span>
+              <div className="plan-tools" role="group" aria-label="Sheet">
+                {sheets.map(s => <button key={s.number} className={s.number === shownSheet.number ? 'active' : ''} onClick={() => setSheetNumber(s.number)} title={s.title}>{s.number}</button>)}
+                <span className="muted small">{shownSheet.title}. ARCH D 36 × 24 in. Draft, not for construction.</span>
                 <button className="primary" onClick={() => void downloadPdf()} disabled={downloading || !!proposal} title={proposal ? 'Apply or discard the proposal first' : 'Download all floor plan sheets as one PDF'}>
-                  {downloading ? 'Drawing PDF…' : 'Download PDF'}
+                  {downloading ? 'Drawing PDF…' : 'Download PDF set'}
                 </button>
               </div>
-              <SheetView sheet={sheetFor(level)} />
+              <SheetView sheet={shownSheet} />
             </>
           )}
         </section>

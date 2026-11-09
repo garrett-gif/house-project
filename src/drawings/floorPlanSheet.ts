@@ -3,13 +3,14 @@ import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
+import { openingMarks } from './marks'
 import type { Mark, Sheet } from './sheet'
 
 /** 1/8 inch on paper per foot: 9 points per foot, 0.75 points per model inch. */
 export const SCALE = { label: '1/8" = 1\'-0"', ptPerInch: (PT_PER_IN / 8) / 12 }
 
-const MARGIN = 0.5 * PT_PER_IN
-const TITLE_W = 3.5 * PT_PER_IN
+export const MARGIN = 0.5 * PT_PER_IN
+export const TITLE_W = 3.5 * PT_PER_IN
 const INWARD: Record<Side, [number, number]> = { n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0] }
 
 export interface SheetInfo {
@@ -20,13 +21,17 @@ export interface SheetInfo {
   projectName: string
 }
 
+/** Where a sheet sits in its set, for "Sheet 2 of 5". */
+export interface SetPosition { index: number; count: number }
+
+export const levelsInOrder = (e: Estate) => [...e.house.levels].sort((a, b) => a.elevation - b.elevation)
+
 /** Sheet numbers follow level order from the lowest: A-101, A-102, ... */
-export function floorPlanSheets(e: Estate, info: SheetInfo): Sheet[] {
-  const levels = [...e.house.levels].sort((a, b) => a.elevation - b.elevation)
-  return levels.map((level, i) => floorPlanSheet(e, level, `A-${101 + i}`, info, levels.length))
+export function floorPlanSheets(e: Estate, info: SheetInfo, firstIndex = 1, count = e.house.levels.length): Sheet[] {
+  return levelsInOrder(e).map((level, i) => floorPlanSheet(e, level, `A-${101 + i}`, info, { index: firstIndex + i, count }))
 }
 
-export function floorPlanSheet(e: Estate, level: Level, number: string, info: SheetInfo, count = 1): Sheet {
+export function floorPlanSheet(e: Estate, level: Level, number: string, info: SheetInfo, position: SetPosition = { index: 1, count: 1 }): Sheet {
   const { width: W, height: H } = ARCH_D
   const marks: Mark[] = []
   const k = SCALE.ptPerInch
@@ -57,8 +62,10 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
   }
   for (const s of walls) marks.push({ t: 'rect', ...wallBox(s), fill: s.kind === 'foundation' ? '#555' : s.kind === 'exterior' ? '#000' : '#333' })
 
-  // Openings cut through the walls, then their symbols.
+  // Openings cut through the walls, then their symbols and the marks that key them to the schedule.
+  const tags = openingMarks(e.house)
   for (const o of openings) drawOpening(marks, o, X, Y, k)
+  for (const o of openings) drawTag(marks, o, tags.get(o.id), X, Y)
 
   // Room names and centerline sizes.
   for (const r of level.rooms) {
@@ -81,8 +88,23 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
   drawNorthArrow(marks, titleX + 4.4 * PT_PER_IN, titleY - 6)
   drawScaleBar(marks, titleX + 5.4 * PT_PER_IN, titleY + 2, k)
 
-  drawTitleBlock(marks, e, level, number, info, count)
+  drawTitleBlock(marks, e, { title: `${level.name.toUpperCase()} PLAN`, scale: SCALE.label, number }, info, position)
   return { number, title: `${level.name} plan`, width: W, height: H, marks }
+}
+
+/** A small tag beside each opening, inside its room: a circle for doors, a box for windows. */
+function drawTag(marks: Mark[], o: PlacedOpening, tag: string | undefined, X: (x: number) => number, Y: (y: number) => number) {
+  if (!tag) return
+  const [ix, iy] = INWARD[o.side]
+  const mid = (o.from + o.to) / 2, off = o.wall!.thickness / 2 + (o.kind === 'window' ? 14 : 8)
+  const px = o.orientation === 'h' ? mid : o.at + ix * off
+  const py = o.orientation === 'h' ? o.at + iy * off : mid
+  // Doors put their tag past the swing, so it does not sit on the arc.
+  const push = o.kind === 'door' ? o.width * 0.15 : 0
+  const x = X(px + (o.orientation === 'v' ? ix * push : 0)), y = Y(py + (o.orientation === 'h' ? iy * push : 0))
+  if (o.kind === 'window') marks.push({ t: 'rect', x: x - 7, y: y - 4.5, w: 14, h: 9, fill: '#fff', stroke: '#000', sw: 0.4 })
+  else marks.push({ t: 'path', d: `M ${x - 6} ${y} A 6 6 0 1 0 ${x + 6} ${y} A 6 6 0 1 0 ${x - 6} ${y} Z`, fill: '#fff', stroke: '#000', sw: 0.4 })
+  marks.push({ t: 'text', x, y: y + 1.8, text: tag, size: 4.6, anchor: 'middle', bold: true })
 }
 
 function drawOpening(marks: Mark[], o: PlacedOpening, X: (x: number) => number, Y: (y: number) => number, k: number) {
@@ -179,7 +201,8 @@ function drawScaleBar(marks: Mark[], x: number, y: number, k: number) {
   marks.push({ t: 'text', x: x + 16 * ft + 6, y: y + 9, text: 'FEET', size: 6 })
 }
 
-function drawTitleBlock(marks: Mark[], e: Estate, level: Level, number: string, info: SheetInfo, count: number) {
+/** The title block every sheet shares, down the right edge. */
+export function drawTitleBlock(marks: Mark[], e: Estate, sheet: { title: string; scale: string; number: string }, info: SheetInfo, position: SetPosition) {
   const { width: W, height: H } = ARCH_D
   const x = W - MARGIN / 2 - TITLE_W, top = MARGIN / 2, bottom = H - MARGIN / 2, pad = 10
   const textW = TITLE_W - 2 * pad
@@ -222,8 +245,8 @@ function drawTitleBlock(marks: Mark[], e: Estate, level: Level, number: string, 
 
   s = box(64)
   text('SHEET', s + 14, 7)
-  text(`${level.name.toUpperCase()} PLAN`, s + 32, 11, true)
-  text(`Scale ${SCALE.label}`, s + 48, 8)
+  text(sheet.title, s + 32, 11, true)
+  text(`Scale ${sheet.scale}`, s + 48, 8)
 
   s = box(54)
   text(`Drawn from model revision ${info.revision}`, s + 16, 8)
@@ -233,6 +256,6 @@ function drawTitleBlock(marks: Mark[], e: Estate, level: Level, number: string, 
   // Sheet number sits at the bottom right, where people look for it.
   y = bottom - 96
   marks.push({ t: 'line', x1: x, y1: y, x2: x + TITLE_W, y2: y, w: 1.5 })
-  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 56, text: number, size: 40, anchor: 'middle', bold: true })
-  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 80, text: `Sheet ${Number(number.slice(-2))} of ${count}`, size: 8, anchor: 'middle' })
+  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 56, text: sheet.number, size: 40, anchor: 'middle', bold: true })
+  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 80, text: `Sheet ${position.index} of ${position.count}`, size: 8, anchor: 'middle' })
 }
