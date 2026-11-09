@@ -1,6 +1,7 @@
 import type { HouseModel, ProgramItem, Roof, Room, RoomType } from './types'
 import { ft, p } from './geometry'
 import { withHouseDefaults } from './firstPass'
+import { firstPassFurniture } from './furniture'
 
 const r = (id: string, name: string, type: RoomType, x: number, y: number, w: number, d: number, bathId?: string): Room => ({
   id, name, type, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, bathId,
@@ -84,7 +85,7 @@ const firstPass: HouseModel = withHouseDefaults({
  * The rule-based first pass puts the outside door on the stair hall. The front door belongs on the foyer's north
  * wall, with a second door into the mudroom from the parking side.
  */
-export const guestHouse: HouseModel = {
+const finished: HouseModel = {
   ...firstPass,
   openings: [
     ...firstPass.openings.filter(o => !(o.roomId === 'g-stair' && o.side === 'n')),
@@ -96,3 +97,6 @@ export const guestHouse: HouseModel = {
     { id: 'g-kitchen-view', kind: 'window', roomId: 'g-kitchen', side: 's', offset: ft(18), width: 72, height: 48, sill: 42, operation: 'slider' },
   ],
 }
+
+/** Furnished after the openings are final, so pieces keep clear of the real doors. */
+export const guestHouse: HouseModel = { ...finished, furniture: firstPassFurniture(finished) }

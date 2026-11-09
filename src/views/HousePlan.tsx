@@ -3,12 +3,14 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { HouseModel, Room, RoomType, Side } from '../model/types'
 import type { EditOp } from '../model/edits'
 import { ft, toFt } from '../model/geometry'
-import { cursorFor, grabRoom, openingDragOp, roomDragOp } from '../ui/dragOps'
+import { cursorFor, furnitureDragOp, grabRoom, openingDragOp, roomDragOp } from '../ui/dragOps'
 import type { RoomGrab } from '../ui/dragOps'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { beamMarks, beamSize, beamsAbove } from '../model/beams'
 import { planLabel } from './planLabel'
+import { CATALOG, parts as furnitureParts } from '../model/furniture'
+import type { FurnitureItem } from '../model/types'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
@@ -20,7 +22,7 @@ const FLAG = { fail: '#c0262d', warn: '#c98a14' }
 /** Direction into the host room from each of its sides, in plan coordinates (y north). */
 const INWARD: Record<Side, [number, number]> = { n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0] }
 
-type Grabbed = { kind: 'room'; room: Room; grab: RoomGrab } | { kind: 'opening'; opening: PlacedOpening }
+type Grabbed = { kind: 'room'; room: Room; grab: RoomGrab } | { kind: 'opening'; opening: PlacedOpening } | { kind: 'furniture'; item: FurnitureItem }
 
 interface Props {
   house: HouseModel
@@ -40,6 +42,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
   const [frozen, setFrozen] = useState<ReturnType<typeof houseBounds> | null>(null)
   // Beams are structure for the engineer; they stay hidden unless asked for, so the plan reads as rooms.
   const [showBeams, setShowBeams] = useState(false)
+  const [showFurniture, setShowFurniture] = useState(true)
   const [hover, setHover] = useState<string | null>(null)
   const b = frozen ?? houseBounds(house)
   const x0 = toFt(b.x), x1 = toFt(b.x + b.w), y0 = toFt(b.y), y1 = toFt(b.y + b.d)
@@ -68,7 +71,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
     const d = drag.current
     if (!d) return
     const [x, y] = toModel(e), dx = x - d.start[0], dy = y - d.start[1]
-    d.op = d.what.kind === 'room' ? roomDragOp(d.what.room, d.what.grab, dx, dy) : openingDragOp(d.what.opening, dx, dy)
+    d.op = d.what.kind === 'room' ? roomDragOp(d.what.room, d.what.grab, dx, dy) : d.what.kind === 'furniture' ? furnitureDragOp(d.what.item, dx, dy) : openingDragOp(d.what.opening, dx, dy)
     onDrag!(d.op)
   }
   const end = (cancel: boolean) => {
@@ -139,6 +142,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
   return (
     <div className="plan">
       <div className="plan-tools" role="group" aria-label="Plan layers">
+        <button className={showFurniture ? 'active' : ''} onClick={() => setShowFurniture(v => !v)} aria-pressed={showFurniture} title="Furniture, fixtures, appliances, and machines">Furniture</button>
         <button className={showBeams ? 'active' : ''} onClick={() => setShowBeams(v => !v)} aria-pressed={showBeams} title="Beams in this floor's ceiling, carrying walls of the floor above">Beams</button>
         <span className="hover">{hover ?? 'Hover a room for its full name'}</span>
       </div>
@@ -157,6 +161,15 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
         })}
         {walls.map(wallRect)}
         {openings.map(opening)}
+        {showFurniture && (house.furniture ?? []).filter(i => level.rooms.some(r => r.id === i.roomId) && CATALOG[i.kind]).map(item => (
+          <g key={item.id} onMouseEnter={() => setHover(`${CATALOG[item.kind].name} (${item.id})`)} onMouseLeave={() => setHover(null)}
+            onPointerDown={editable ? e => begin(e, { kind: 'furniture', item }) : undefined} style={editable ? { cursor: 'move' } : undefined}>
+            {furnitureParts(item).map((q, i) => (
+              <rect key={i} x={toFt(q.x)} y={top - toFt(q.y) - toFt(q.d)} width={toFt(q.w)} height={toFt(q.d)} rx={0.25}
+                fill={item.kind === 'pool-basin' ? '#7fc0dd' : '#fbfaf7'} fillOpacity={0.92} stroke={flagged.has(item.id) ? FLAG[flagged.get(item.id)!] : '#8a7a66'} strokeWidth={flagged.has(item.id) ? 0.35 : 0.12} />
+            ))}
+          </g>
+        ))}
         {beams.map(bm => {
           const [a, c] = bm.orientation === 'h' ? [P(bm.from, bm.at), P(bm.to, bm.at)] : [P(bm.at, bm.from), P(bm.at, bm.to)]
           const color = flagged.has(bm.id) ? FLAG[flagged.get(bm.id)!] : '#7a3b1d'

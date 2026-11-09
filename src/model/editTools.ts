@@ -3,6 +3,10 @@ import { ANCHORS, DOOR_KINDS, FIRE_RULE_NAMES, ROAD_KINDS, ROOM_TYPES, SIDES, WA
 import { ROOF_FORMS } from './roofs'
 import { UTILITY_KINDS, UTILITY_RULE_NAMES } from './utilities'
 import { BEAM_MATERIALS } from './beams'
+import { CATALOG } from './furniture'
+
+const FACING = { north: 0, west: 90, south: 180, east: 270 } as const
+const facing = { type: 'string', enum: Object.keys(FACING), description: 'Which way the front of the piece faces; its back goes to the opposite side.' }
 
 /**
  * Tool definitions for the chat editor. Claude works in feet, which it handles more reliably;
@@ -230,6 +234,18 @@ export const EDIT_TOOLS: EditToolSpec[] = [
   { name: 'removeBeam', description: 'Remove a beam.', input_schema: object({ beamId: str('Beam id from the model summary.') }) },
   { name: 'setBeam', description: 'Change a beam\'s material and its posts. Posts shorten its spans.', input_schema: object({ beamId: str('Beam id from the model summary.'), material: { type: 'string', enum: BEAM_MATERIALS, description: 'lvl, glulam, or steel.' }, postsFt: { type: 'array', items: { type: 'number' }, description: 'Post positions along its line, in house-local feet. Empty for none.' } }) },
   { name: 'fitBeams', description: 'Replace a house\'s beams with the rule-based first pass for its current walls, for example after moving walls.', input_schema: object({ buildingId: str('main-house or guest-house.') }) },
+  {
+    name: 'addFurniture',
+    description: 'Place a piece of furniture, a fixture, an appliance, or a machine from the catalog in a room. Position is its center in house-local feet.',
+    input_schema: object({
+      id: str('New unique id: lowercase letters, numbers, and hyphens.'), kind: { type: 'string', enum: Object.keys(CATALOG), description: 'Catalog piece.' },
+      roomId: str('Room id from the model summary.'), xFt: num('Center x, house-local feet.'), yFt: num('Center y, house-local feet.'), facing,
+    }),
+  },
+  { name: 'moveFurniture', description: 'Move a piece by an offset in feet.', input_schema: object({ itemId: str('Furniture id from the model summary.'), eastFt: num('Feet east. Negative is west.'), northFt: num('Feet north. Negative is south.') }) },
+  { name: 'rotateFurniture', description: 'Turn a piece to face another way.', input_schema: object({ itemId: str('Furniture id from the model summary.'), facing }) },
+  { name: 'removeFurniture', description: 'Remove a piece.', input_schema: object({ itemId: str('Furniture id from the model summary.') }) },
+  { name: 'furnishRoom', description: 'Replace the furniture of a room with the automatic first pass for its current size and doors.', input_schema: object({ roomId: str('Room id from the model summary.') }) },
   { name: 'setSwale', description: 'Add or remove a graded drainage swale or curtain drain around a building that sits low.', input_schema: object({ buildingId: str('Building id from the model summary.'), swale: bool('True to add, false to remove.') }) },
   { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
@@ -321,6 +337,11 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeBeam': return { ok: true, op: { op: 'removeBeam', beamId: s('beamId') } }
     case 'setBeam': return { ok: true, op: { op: 'setBeam', beamId: s('beamId'), material: s('material') as never, posts: (v.postsFt as number[]).map(inches) } }
     case 'fitBeams': return { ok: true, op: { op: 'fitBeams', buildingId: s('buildingId') } }
+    case 'addFurniture': return { ok: true, op: { op: 'addFurniture', item: { id: s('id'), kind: s('kind'), roomId: s('roomId'), x: inches(n('xFt')), y: inches(n('yFt')), rotation: FACING[s('facing') as keyof typeof FACING] } } }
+    case 'moveFurniture': return { ok: true, op: { op: 'moveFurniture', itemId: s('itemId'), dx: inches(n('eastFt')), dy: inches(n('northFt')) } }
+    case 'rotateFurniture': return { ok: true, op: { op: 'rotateFurniture', itemId: s('itemId'), rotation: FACING[s('facing') as keyof typeof FACING] } }
+    case 'removeFurniture': return { ok: true, op: { op: 'removeFurniture', itemId: s('itemId') } }
+    case 'furnishRoom': return { ok: true, op: { op: 'furnishRoom', roomId: s('roomId') } }
     case 'setSwale': return { ok: true, op: { op: 'setSwale', buildingId: s('buildingId'), swale: v.swale as boolean } }
     case 'removeUtility': return { ok: true, op: { op: 'removeUtility', utilityId: s('utilityId') } }
     case 'addDevice': return { ok: true, op: { op: 'addDevice', device: {

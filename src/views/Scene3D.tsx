@@ -6,6 +6,7 @@ import { Terrain } from '../model/parcel'
 import { ft, partsOf, samplePath, toFt } from '../model/geometry'
 import { ROOM_COLOR } from './HousePlan'
 import { houseBounds } from '../model/derive'
+import { CATALOG, parts } from '../model/furniture'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
 import { flyoverKeyframes, step, walkStart } from '../ui/tour'
@@ -160,6 +161,19 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
         cursor = o.to
       }
       piece(cursor, seg.to, 0, wall)
+    }
+  }
+  // Furniture and machines as plain blocks at their real heights.
+  const FURNITURE_COLOR: Record<string, number> = { seating: 0x8d7b68, bed: 0xd8d2c4, table: 0x9c7b55, storage: 0xb59a78, kitchen: 0xd9d6cf, bath: 0xf4f4f2, equipment: 0x55595e, fixture: 0x6f8fa3, vehicle: 0x3d4a5c, outdoor: 0x8d7b68 }
+  for (const level of visible) {
+    const base = toFt(level.elevation) + 0.2
+    const ids = new Set(level.rooms.map(r => r.id))
+    for (const item of (estate.house.furniture ?? []).filter(i => ids.has(i.roomId) && CATALOG[i.kind])) {
+      const c = CATALOG[item.kind]
+      for (const q of parts(item)) {
+        const h = Math.max(0.1, toFt(q.h))
+        addBox(scene, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
+      }
     }
   }
   if (showRoofs) addRoofs(scene, estate, cx, cy)

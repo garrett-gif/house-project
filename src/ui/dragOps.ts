@@ -1,4 +1,4 @@
-import type { Building, Room, SecurityDevice, Side, Utility } from '../model/types'
+import type { Building, FurnitureItem, Room, SecurityDevice, Side, Utility } from '../model/types'
 import type { EditOp } from '../model/edits'
 import type { PlacedOpening } from '../model/walls'
 
@@ -56,6 +56,12 @@ export function utilityDragOp(u: Utility, dx: number, dy: number, step = 12): Ed
 export function deviceDragOp(d: SecurityDevice, dx: number, dy: number, step = 12): EditOp | null {
   const sx = snap(dx, step), sy = snap(dy, step)
   return sx || sy ? { op: 'moveDevice', deviceId: d.id, dx: sx, dy: sy } : null
+}
+
+/** The edit for dragging a piece of furniture, snapped to 3 in. */
+export function furnitureDragOp(item: FurnitureItem, dx: number, dy: number, step = 3): EditOp | null {
+  const sx = snap(dx, step), sy = snap(dy, step)
+  return sx || sy ? { op: 'moveFurniture', itemId: item.id, dx: sx || 0, dy: sy || 0 } : null
 }
 
 export const cursorFor = (grab: RoomGrab) => grab.kind === 'room' ? 'move' : grab.side === 'e' || grab.side === 'w' ? 'ew-resize' : 'ns-resize'

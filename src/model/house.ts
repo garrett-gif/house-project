@@ -1,6 +1,7 @@
 import type { HouseModel, Opening, ProgramItem, Roof, Room, RoomType } from './types'
 import { ft, p } from './geometry'
 import { withHouseDefaults } from './firstPass'
+import { firstPassFurniture } from './furniture'
 
 const r = (id: string, name: string, type: RoomType, x: number, y: number, w: number, d: number, bathId?: string): Room => ({
   id, name, type, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, bathId,
@@ -147,7 +148,7 @@ const program: ProgramItem[] = [
   { roomId: 'extra-bed', need: 'One to two additional bedrooms', minArea: 200 },
   { roomId: 'craft', need: 'Walkout craft room for paper, 3D printing, and sewing', levelId: 'walkout', minArea: 450 },
   { roomId: 'woodshop', need: 'Separate dust-controlled woodshop on the walkout level', levelId: 'walkout', minArea: 450 },
-  { roomId: 'theater', need: '20-seat theater', minArea: 750, minWidth: 20, near: ['theater-lobby'] },
+  { roomId: 'theater', need: '20-seat theater', minArea: 750, minWidth: 20, near: ['theater-lobby'], seats: 20 },
   { roomId: 'theater-lobby', need: 'Candy wall, popcorn, and soda by the theater', minArea: 200 },
   { roomId: 'gym', need: 'Walkout gym with free weights, machines, mats, and Pilates', levelId: 'walkout', minArea: 900 },
   { roomId: 'steam', need: 'Steam room', levelId: 'walkout', minArea: 60 },
@@ -201,7 +202,7 @@ const door = (id: string, roomId: string, side: Opening['side'], offsetFt: numbe
   ({ id, kind: 'door', roomId, side, offset: ft(offsetFt), width, height: 80, sill: 0, swing: 'in' })
 const REPLACED = new Set(['bath-his-door-1', 'closet-his-door-1', 'den-door-3', 'great-door-1', 'hearth-door-1', 'lounge-door-2'])
 
-export const mainHouse: HouseModel = {
+const finished: HouseModel = {
   ...firstPass,
   openings: [
     ...firstPass.openings.filter(o => !REPLACED.has(o.id)),
@@ -217,3 +218,6 @@ export const mainHouse: HouseModel = {
     door('guest-bed-door', 'guest-bed', 'w', 6, 36),
   ],
 }
+
+/** Furnished after the openings are final, so pieces keep clear of the real doors. */
+export const mainHouse: HouseModel = { ...finished, furniture: firstPassFurniture(finished) }

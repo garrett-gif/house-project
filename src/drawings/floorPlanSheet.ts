@@ -6,6 +6,7 @@ import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
 import { beamMarks, beamsAbove } from '../model/beams'
+import { CATALOG, parts as furnitureParts } from '../model/furniture'
 import type { Mark, Sheet } from './sheet'
 
 /** 1/8 inch on paper per foot: 9 points per foot, 0.75 points per model inch. */
@@ -68,6 +69,12 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
   const tags = openingMarks(e.house)
   for (const o of openings) drawOpening(marks, o, X, Y, k)
   for (const o of openings) drawTag(marks, o, tags.get(o.id), X, Y)
+
+  // Furniture and fixtures in thin outline, as plans show them.
+  const here = new Set(level.rooms.map(r => r.id))
+  for (const item of (e.house.furniture ?? []).filter(i => here.has(i.roomId) && CATALOG[i.kind])) {
+    for (const q of furnitureParts(item)) marks.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#6b6b6b', sw: 0.35 })
+  }
 
   // Beams in this level's ceiling, dashed as "above", with posts as small squares and a schedule mark.
   const beamTags = beamMarks(e.house)

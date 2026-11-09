@@ -3,6 +3,7 @@ import { pathLength, toFt } from './geometry'
 import { validateEstate } from './validate'
 import { allHouses, houseName } from './houses'
 import { beamSize } from './beams'
+import { furnitureLine } from './furniture'
 import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
@@ -54,6 +55,7 @@ export function summarizeEstate(e: Estate): string {
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
+  lines.push('Furniture is listed under its room as id, catalog kind, center in house-local feet, and rotation (0 faces north, 90 west, 180 south, 270 east).')
   lines.push('Openings are listed under their host room as id: kind, side, offset from that side\'s west or south end to the center, width x height, sill, and what is on the other side.')
   const placed = placeOpenings(house)
   const ft1 = (inches: number) => String(Math.round(inches / 12 * 100) / 100)
@@ -61,6 +63,8 @@ export function summarizeEstate(e: Estate): string {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
       lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}`)
+      const furniture = furnitureLine(house, r)
+      if (furniture) lines.push(furniture)
       for (const o of placed.filter(o => o.roomId === r.id)) {
         lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
       }

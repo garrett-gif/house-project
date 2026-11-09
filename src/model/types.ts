@@ -225,6 +225,13 @@ export interface Beam {
   posts?: Inches[]
 }
 
+/**
+ * A piece of furniture, a fixture, an appliance, or a machine from the catalog (`src/model/furniture.ts`), placed in a
+ * room. `x` and `y` are its center in house-local inches; `rotation` is which way it faces (0 north, 90 west,
+ * 180 south, 270 east), with its back to the opposite side.
+ */
+export interface FurnitureItem { id: string; kind: string; roomId: string; x: Inches; y: Inches; rotation: 0 | 90 | 180 | 270 }
+
 /** A stair from a stair room on one level up to a stair room on the next. */
 export interface Stair { id: string; roomId: string; toRoomId: string; shape: 'straight' | 'u-shaped'; width: Inches; tread: Inches }
 
@@ -239,6 +246,8 @@ export interface ProgramItem {
   minArea?: number
   minWidth?: number
   near?: string[]
+  /** Seats the room's furniture must provide, such as a 20-seat theater. */
+  seats?: number
 }
 
 export interface HouseModel {
@@ -252,6 +261,8 @@ export interface HouseModel {
   roofs: Roof[]
   /** Beams carrying upper walls over open floor. Optional so older saves still load; they get the first pass. */
   beams?: Beam[]
+  /** Furniture, fixtures, appliances, and machines. Optional so older saves still load; they get the first pass. */
+  furniture?: FurnitureItem[]
   /** The brief as checkable requirements. Optional so older saves still load. */
   program?: ProgramItem[]
   /**

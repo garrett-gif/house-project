@@ -1,4 +1,4 @@
-import type { Beam, BeamMaterial, Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
+import type { Beam, BeamMaterial, Estate, FireRules, FurnitureItem, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
 import { DEFAULT_FIRE_RULES } from './fireChecks'
 import { UTILITY_KINDS, UTILITY_RULE_NAMES, UTILITY_UNIT } from './utilities'
 import { ROOF_FORMS } from './roofs'
@@ -7,6 +7,7 @@ import { footprintOf, overlaps, toFt, translate } from './geometry'
 import { withDerivedGeometry } from './derive'
 import { allHouses, houseByBuilding, houseOfRoom } from './houses'
 import { BEAM_MATERIALS, firstPassBeams } from './beams'
+import { CATALOG, furnishRoom } from './furniture'
 const allHousesOf = allHouses
 
 /** Which point of a rectangle stays fixed when it is resized. `n` keeps the north edge, `sw` the southwest corner. */
@@ -68,6 +69,13 @@ export type EditOp =
   | { op: 'setBeam'; beamId: string; material: BeamMaterial; posts: Inches[] }
   /** Replaces a house's beams with the rule-based first pass for its current walls. */
   | { op: 'fitBeams'; buildingId: string }
+  /** Furniture centers are house-local inches; rotation is which way the piece faces. */
+  | { op: 'addFurniture'; item: FurnitureItem }
+  | { op: 'moveFurniture'; itemId: string; dx: Inches; dy: Inches }
+  | { op: 'rotateFurniture'; itemId: string; rotation: FurnitureItem['rotation'] }
+  | { op: 'removeFurniture'; itemId: string }
+  /** Replaces a room's furniture with the first pass for it. */
+  | { op: 'furnishRoom'; roomId: string }
   /** Whether a house's site is excavated to its walkout, rather than relying on the land's natural fall. */
   | { op: 'setExcavated'; buildingId: string; excavated: boolean }
 
@@ -176,6 +184,9 @@ function targetHouse(e: Estate, op: EditOp): string | undefined {
     case 'addBeam': return allHouses(e).find(h => h.levels.some(l => l.id === op.beam.levelId))?.buildingId
     case 'removeBeam': case 'setBeam': return allHouses(e).find(h => (h.beams ?? []).some(b => b.id === op.beamId))?.buildingId
     case 'fitBeams': return houseByBuilding(e, op.buildingId)?.buildingId
+    case 'addFurniture': return houseOfRoom(e, op.item.roomId)?.buildingId
+    case 'moveFurniture': case 'rotateFurniture': case 'removeFurniture': return allHouses(e).find(h => (h.furniture ?? []).some(i => i.id === op.itemId))?.buildingId
+    case 'furnishRoom': return houseOfRoom(e, op.roomId)?.buildingId
     default: return undefined
   }
 }
@@ -237,6 +248,8 @@ function runInHouse(e: Estate, op: EditOp): string {
       if (!found) return `No room with id "${op.roomId}".`
       if (!finite(op.dx, op.dy)) return 'Move distances must be numbers.'
       found.room.rect = translate(found.room.rect, op.dx, op.dy)
+      // Its furniture moves with it.
+      for (const it of e.house.furniture ?? []) if (it.roomId === op.roomId) { it.x += op.dx; it.y += op.dy }
       return ''
     }
     case 'resizeRoom': {
@@ -271,6 +284,7 @@ function runInHouse(e: Estate, op: EditOp): string {
       e.house.openings = e.house.openings.filter(o => !gone.has(o.id))
       e.house.stairs = e.house.stairs.filter(s => s.roomId !== op.roomId && s.toRoomId !== op.roomId)
       found.level.rooms = found.level.rooms.filter(r => r !== found.room)
+      if (e.house.furniture) e.house.furniture = e.house.furniture.filter(it => it.roomId !== op.roomId)
       return ''
     }
     case 'renameRoom': {
@@ -557,6 +571,49 @@ function runInHouse(e: Estate, op: EditOp): string {
       e.house.beams = firstPassBeams({ ...e.house, beams: undefined })
       return ''
     }
+    case 'addFurniture': {
+      const it = op.item
+      if (!ID.test(it.id)) return 'Furniture ids use lowercase letters, numbers, and hyphens.'
+      if (allHousesOf(e).some(h => (h.furniture ?? []).some(x => x.id === it.id))) return `A piece with id "${it.id}" already exists.`
+      if (!CATALOG[it.kind]) return `Unknown piece "${it.kind}". Kinds: ${Object.keys(CATALOG).join(', ')}.`
+      if (!findRoom(e, it.roomId)) return `No room with id "${it.roomId}".`
+      if (!finite(it.x, it.y)) return 'Position must be numbers.'
+      if (![0, 90, 180, 270].includes(it.rotation)) return 'Rotation must be 0, 90, 180, or 270.'
+      e.house.furniture = [...(e.house.furniture ?? []), { id: it.id, kind: it.kind, roomId: it.roomId, x: it.x, y: it.y, rotation: it.rotation }]
+      return ''
+    }
+    case 'moveFurniture': {
+      const it = (e.house.furniture ?? []).find(x => x.id === op.itemId)
+      if (!it) return `No piece with id "${op.itemId}".`
+      if (!finite(op.dx, op.dy)) return 'Move distances must be numbers.'
+      it.x += op.dx
+      it.y += op.dy
+      return ''
+    }
+    case 'rotateFurniture': {
+      const it = (e.house.furniture ?? []).find(x => x.id === op.itemId)
+      if (!it) return `No piece with id "${op.itemId}".`
+      if (![0, 90, 180, 270].includes(op.rotation)) return 'Rotation must be 0, 90, 180, or 270.'
+      it.rotation = op.rotation
+      return ''
+    }
+    case 'removeFurniture': {
+      if (!(e.house.furniture ?? []).some(x => x.id === op.itemId)) return `No piece with id "${op.itemId}".`
+      e.house.furniture = (e.house.furniture ?? []).filter(x => x.id !== op.itemId)
+      return ''
+    }
+    case 'furnishRoom': {
+      const found = findRoom(e, op.roomId)
+      if (!found) return `No room with id "${op.roomId}".`
+      const others = (e.house.furniture ?? []).filter(x => x.roomId !== op.roomId)
+      const used = new Set(others.map(x => x.id))
+      let start = 1
+      const fresh = furnishRoom(e.house, found.room, start)
+      // Keep ids unique if a piece elsewhere happens to share one.
+      while (fresh.some(x => used.has(x.id))) { start += 100; fresh.splice(0, fresh.length, ...furnishRoom(e.house, found.room, start)) }
+      e.house.furniture = [...others, ...fresh]
+      return ''
+    }
     case 'setExcavated': {
       if (e.house.buildingId !== op.buildingId) return `No house with id "${op.buildingId}".`
       e.house.excavated = !!op.excavated
@@ -653,6 +710,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
   const room = (id: string) => houseOfRoom(e, id)?.levels.flatMap(l => l.rooms).find(r => r.id === id)?.name ?? id
   const utility = (id: string) => (e.utilities ?? []).find(u => u.id === id)?.name ?? id
   const device = (id: string) => (e.security ?? []).find(d => d.id === id)?.name ?? id
+  const furniture = (id: string) => { const it = allHouses(e).flatMap(h => h.furniture ?? []).find(x => x.id === id); return it ? `the ${CATALOG[it.kind]?.name.toLowerCase() ?? it.kind} in ${room(it.roomId)}` : id }
   switch (op.op) {
     case 'moveBuilding': return `Move ${building(op.buildingId)} ${direction(op.dx, op.dy)}`
     case 'resizeBuilding': return `Resize ${building(op.buildingId)} to ${feet(op.w)} × ${feet(op.d)}, keeping its ${ANCHOR_WORDS[op.anchor]}`
@@ -702,6 +760,11 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'addBeam': return `Add a ${feet(op.beam.to - op.beam.from)} ${op.beam.material} beam (${op.beam.id}) under the ${allHouses(e).flatMap(h => h.levels).find(l => l.id === op.beam.levelId)?.name.toLowerCase() ?? op.beam.levelId}`
     case 'removeBeam': return `Remove beam ${op.beamId}`
     case 'setBeam': return `Make beam ${op.beamId} ${op.material}${op.posts.length ? ` with ${op.posts.length} post${op.posts.length === 1 ? '' : 's'} at ${op.posts.map(p => feet(p)).join(', ')}` : ', no posts'}`
+    case 'addFurniture': return `Add ${CATALOG[op.item.kind]?.name.toLowerCase() ?? op.item.kind} (${op.item.id}) to ${room(op.item.roomId)}`
+    case 'moveFurniture': return `Move ${furniture(op.itemId)} ${direction(op.dx, op.dy)}`
+    case 'rotateFurniture': return `Turn ${furniture(op.itemId)} to face ${({ 0: 'north', 90: 'west', 180: 'south', 270: 'east' } as const)[op.rotation]}`
+    case 'removeFurniture': return `Remove ${furniture(op.itemId)}`
+    case 'furnishRoom': return `Furnish ${room(op.roomId)} again from the first pass`
     case 'fitBeams': return `Redo the beams of the ${building(op.buildingId).toLowerCase()} from its walls`
     case 'setExcavated': return op.excavated ? `Excavate the ${building(op.buildingId).toLowerCase()} site to its walkout, with retaining walls` : `Rely on the natural fall of the land at the ${building(op.buildingId).toLowerCase()}`
     case 'setSwale': return `${op.swale ? 'Add' : 'Remove'} a drainage swale around ${building(op.buildingId)}`
