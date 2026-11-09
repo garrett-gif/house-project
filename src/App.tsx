@@ -8,6 +8,7 @@ import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject,
 import type { ChatTurn } from './chat/protocol'
 import { checkServer, requestEdits, requestSheetsPdf } from './chat/client'
 import { drawingSet } from './drawings/drawingSet'
+import { allHouses, focusHouse, houseByBuilding, houseName } from './model/houses'
 import { floorPlansDxf } from './drawings/dxf'
 import { SheetView } from './views/SheetView'
 import type { Health } from './chat/protocol'
@@ -44,6 +45,7 @@ export function App() {
   const [view, setView] = useState<View>('site')
   const [tab, setTab] = useState<Tab>('chat')
   const [level, setLevel] = useState('main')
+  const [houseId, setHouseId] = useState('main-house')
   const [timeline, setTimeline] = useState(() => startTimeline(sampleEstate))
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [turns, setTurns] = useState<Turn[]>([])
@@ -101,27 +103,36 @@ export function App() {
     return m
   }, [checks])
   const passed = checks.length - failing
-  const levels = estate.house.levels.slice().reverse()
+  // The detailed building shown in the house views and drawings. Edits still go to the whole estate.
+  const focused = useMemo(() => focusHouse(estate, houseByBuilding(estate, houseId) ? houseId : estate.house.buildingId), [estate, houseId])
+  const houses = allHouses(estate)
+  const chooseHouse = (id: string) => {
+    const h = houseByBuilding(estate, id)
+    if (!h) return
+    setHouseId(id)
+    setLevel(h.levels.find(l => l.elevation === 0)?.id ?? h.levels[0].id)
+  }
+  const levels = focused.house.levels.slice().reverse()
   const showsHouse = view === 'house' || view === 'house3d'
   const revisionNumber = appliedRevisions(timeline).length
   const sheets = useMemo(() => view === 'sheets'
-    ? drawingSet(estate, { revision: revisionNumber, date: new Date().toISOString().slice(0, 10), projectName: estate.name })
-    : [], [view, estate, revisionNumber])
+    ? drawingSet(focused, { revision: revisionNumber, date: new Date().toISOString().slice(0, 10), projectName: estate.name })
+    : [], [view, focused, revisionNumber])
   const [sheetNumber, setSheetNumber] = useState('A-102')
   const shownSheet = sheets.find(s => s.number === sheetNumber) ?? sheets[0]
   const [downloading, setDownloading] = useState(false)
   /** DXF needs no server: it is plain text built from the model in the browser. */
   const downloadDxf = () => {
-    const blob = new Blob([floorPlansDxf(currentEstate(timeline))], { type: 'application/dxf' })
+    const blob = new Blob([floorPlansDxf(focusHouse(currentEstate(timeline), focused.house.buildingId))], { type: 'application/dxf' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `house-project-floor-plans-${new Date().toISOString().slice(0, 10)}.dxf`
+    a.download = `house-project-${focused.house.buildingId}-floor-plans-${new Date().toISOString().slice(0, 10)}.dxf`
     a.click()
     URL.revokeObjectURL(a.href)
   }
   const downloadPdf = async () => {
     setDownloading(true)
-    const res = await requestSheetsPdf(currentEstate(timeline), revisionNumber)
+    const res = await requestSheetsPdf(focusHouse(currentEstate(timeline), focused.house.buildingId), revisionNumber)
     setDownloading(false)
     if (!res.ok) { setNotice(res.error); return }
     const a = document.createElement('a')
@@ -266,6 +277,11 @@ export function App() {
             </div>
           )}
           {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss">×</button></div>}
+          {(showsHouse || view === 'sheets') && houses.length > 1 && (
+            <div className="levels" role="group" aria-label="Building">
+              {houses.map(h => <button key={h.buildingId} className={focused.house.buildingId === h.buildingId ? 'active' : ''} onClick={() => chooseHouse(h.buildingId)}>{houseName(estate, h)}</button>)}
+            </div>
+          )}
           {showsHouse && (
             <div className="levels" role="group" aria-label="House level">
               {levels.map(l => <button key={l.id} className={level === l.id ? 'active' : ''} onClick={() => setLevel(l.id)}>{l.name}</button>)}
@@ -273,9 +289,9 @@ export function App() {
           )}
           {dragText && <div className={dragText.startsWith('Cannot') ? 'notice' : 'preview-bar'} role="status">{dragText}</div>}
           {view === 'site' && <SitePlan estate={estate} flagged={flagged} onDrag={canDrag ? onDrag : undefined} onDrop={canDrag ? onDrop : undefined} />}
-          {view === 'house' && <HousePlan house={estate.house} levelId={level} flagged={flagged} onDrag={canDrag ? onDrag : undefined} onDrop={canDrag ? onDrop : undefined} />}
+          {view === 'house' && <HousePlan house={focused.house} levelId={level} flagged={flagged} onDrag={canDrag ? onDrag : undefined} onDrop={canDrag ? onDrop : undefined} />}
           {view === 'site3d' && <Scene3D estate={estate} mode="site" levelId={level} />}
-          {view === 'house3d' && <Scene3D estate={estate} mode="house" levelId={level} />}
+          {view === 'house3d' && <Scene3D estate={focused} mode="house" levelId={level} />}
           {view === 'sheets' && sheets.length > 0 && (
             <>
               <div className="plan-tools" role="group" aria-label="Sheet">

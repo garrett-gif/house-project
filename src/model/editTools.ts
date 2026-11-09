@@ -23,27 +23,27 @@ const object = (properties: Record<string, unknown>) =>
 export const EDIT_TOOLS: EditToolSpec[] = [
   {
     name: 'moveBuilding',
-    description: 'Move a building on the site by an offset in feet. Moving the main house moves all of its rooms. Covered walkways attached to the building follow it.',
+    description: 'Move a building on the site by an offset in feet. Moving the main house or guest house moves all of its rooms. Covered walkways attached to the building follow it.',
     input_schema: object({ buildingId: str('Building id from the model summary.'), eastFt: num('Feet to move east. Negative moves west.'), northFt: num('Feet to move north. Negative moves south.') }),
   },
   {
     name: 'resizeBuilding',
-    description: 'Set a building footprint to a new east-west width and north-south depth in feet. Not available for the main house, whose outline comes from its rooms.',
+    description: 'Set a building footprint to a new east-west width and north-south depth in feet. Not available for the main house or guest house, whose outlines come from their rooms.',
     input_schema: object({ buildingId: str('Building id from the model summary.'), widthFt: num('New east-west width in feet.'), depthFt: num('New north-south depth in feet.'), anchor }),
   },
   {
     name: 'moveRoom',
-    description: 'Move a room of the main house within its level by an offset in feet.',
+    description: 'Move a room of the main house or guest house within its level by an offset in feet.',
     input_schema: object({ roomId: str('Room id from the model summary.'), eastFt: num('Feet to move east. Negative moves west.'), northFt: num('Feet to move north. Negative moves south.') }),
   },
   {
     name: 'resizeRoom',
-    description: 'Set a room of the main house to a new east-west width and north-south depth in feet. It does not move neighboring rooms. Rooms on the same level may not overlap, so when a room grows into a neighbor, shrink or move that neighbor in the same set of edits.',
+    description: 'Set a room of the main house or guest house to a new east-west width and north-south depth in feet. It does not move neighboring rooms. Rooms on the same level may not overlap, so when a room grows into a neighbor, shrink or move that neighbor in the same set of edits.',
     input_schema: object({ roomId: str('Room id from the model summary.'), widthFt: num('New east-west width in feet.'), depthFt: num('New north-south depth in feet.'), anchor }),
   },
   {
     name: 'addRoom',
-    description: 'Add a rectangular room to one level of the main house. Position is the southwest corner in house-local feet.',
+    description: 'Add a rectangular room to one level of the main house or guest house; the level id decides which. Position is the southwest corner in the house-local feet of that building.',
     input_schema: object({
       levelId: str('Level id from the model summary.'),
       id: str('New unique room id: lowercase letters, numbers, and hyphens.'),
@@ -58,17 +58,17 @@ export const EDIT_TOOLS: EditToolSpec[] = [
   },
   {
     name: 'removeRoom',
-    description: 'Remove a room from the main house.',
+    description: 'Remove a room from the main house or guest house.',
     input_schema: object({ roomId: str('Room id from the model summary.') }),
   },
   {
     name: 'renameRoom',
-    description: 'Change the name of a room in the main house.',
+    description: 'Change the name of a room in the main house or guest house.',
     input_schema: object({ roomId: str('Room id from the model summary.'), name: str('New room name.') }),
   },
   {
     name: 'setRoomType',
-    description: 'Change the type of a room in the main house, for example from service to wellness.',
+    description: 'Change the type of a room in the main house or guest house, for example from service to wellness.',
     input_schema: object({ roomId: str('Room id from the model summary.'), type: { type: 'string', enum: ROOM_TYPES, description: 'New room type.' } }),
   },
   {

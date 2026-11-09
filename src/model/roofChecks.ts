@@ -25,19 +25,20 @@ export function roofChecks(e: Estate): Check[] {
     ? { id: 'roof-coverage', label: 'Every room has a roof over it', status: 'fail', detail: `Open to the sky: ${names.slice(0, 4).join('; ')}${names.length > 4 ? `; and ${names.length - 4} more` : ''}`, elements: [...uncovered.keys()] }
     : { id: 'roof-coverage', label: 'Every room has a roof over it', status: 'pass', detail: `${roofs.length} roofs` })
 
-  // A roof should bear on walls of its own level, or on a two-story room rising from the level below.
+  // A roof should bear on walls of its own level, on a two-story room rising from the level below, or on posts over
+  // an outdoor room of its own level, as a covered porch does.
   const floating: string[] = []
   for (const roof of roofs) {
     const i = levels.findIndex(l => l.id === roof.levelId)
     const level = levels[i]
-    const bearing = [...(level?.rooms ?? []).filter(r => r.type !== 'outdoor'), ...(i > 0 ? levels[i - 1].rooms.filter(r => r.twoStory) : [])].map(r => r.rect)
+    const bearing = [...(level?.rooms ?? []), ...(i > 0 ? levels[i - 1].rooms.filter(r => r.twoStory) : [])].map(r => r.rect)
     const pts = samplePoints(roof.rect)
     const unsupported = pts.filter(p => !bearing.some(b => inside(p, b))).length
     if (!level || unsupported > pts.length * 0.05) floating.push(roof.id)
   }
   checks.push(floating.length
     ? { id: 'roof-support', label: 'Roofs sit on the rooms below them', status: 'warn', detail: `Over open space or the wrong level: ${floating.join(', ')}`, elements: floating }
-    : { id: 'roof-support', label: 'Roofs sit on the rooms below them', status: 'pass', detail: 'Every roof bears on its level' })
+    : { id: 'roof-support', label: 'Roofs sit on the rooms below them', status: 'pass', detail: 'Every roof bears on walls of its level, or on porch posts' })
 
   const steep = roofs.filter(r => r.pitch < 3 || r.pitch > 14)
   checks.push(steep.length

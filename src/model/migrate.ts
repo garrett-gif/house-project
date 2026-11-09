@@ -43,3 +43,21 @@ export function withUtilityDefaults(e: Estate): Estate {
     security: structuredClone(sampleEstate.security ?? []).filter(d => !d.on || ids.has(d.on)),
   }
 }
+
+/**
+ * Projects saved before the guest house had rooms keep its old placeholder box. Give it the guest house layout,
+ * with its southwest corner where the box's was. Its outline is derived from the rooms afterward.
+ */
+export function withGuestHouseDefaults(e: Estate): Estate {
+  if (e.houses !== undefined) return e
+  const box = e.buildings.find(b => b.id === 'guest-house')
+  const design = sampleEstate.houses?.find(h => h.buildingId === 'guest-house')
+  if (!box || !design) return { ...e, houses: [] }
+  const sample = sampleEstate.buildings.find(b => b.id === 'guest-house')!
+  return {
+    ...e,
+    houses: [{ ...structuredClone(design), origin: { x: box.rect.x, y: box.rect.y } }],
+    // The old box slept four; the layout sleeps as many as the sample says.
+    buildings: e.buildings.map(b => b.id === 'guest-house' && (b.beds === undefined || b.beds === 4) ? { ...b, beds: sample.beds } : b),
+  }
+}

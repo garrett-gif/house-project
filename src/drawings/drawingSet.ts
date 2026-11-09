@@ -9,19 +9,21 @@ import type { SetPosition, SheetInfo } from './floorPlanSheet'
 import { openingMarks } from './marks'
 import { elevationSheet, roofPlanSheet } from './elevations'
 import { sectionSheet } from './sections'
+import { sitePlanSheet } from './sitePlanSheet'
 
-/** The full draft set: cover and index, one plan per level, elevations, roof plan, sections, then door and window schedules. */
+/** The full draft set: cover and index, the site plan, one plan per level, elevations, roof plan, sections, then door and window schedules. */
 export function drawingSet(e: Estate, info: SheetInfo): Sheet[] {
   const levels = e.house.levels.length
-  const count = levels + 6
-  const plans = floorPlanSheets(e, info, 2, count)
-  let n = levels + 2
+  const count = levels + 7
+  const site = sitePlanSheet(e, info, { index: 2, count })
+  const plans = floorPlanSheets(e, info, 3, count)
+  let n = levels + 3
   const ns = elevationSheet(e, ['north', 'south'], 'A-201', 'North and south elevations', info, { index: n++, count })
   const ew = elevationSheet(e, ['east', 'west'], 'A-202', 'East and west elevations', info, { index: n++, count })
   const roof = roofPlanSheet(e, info, { index: n++, count })
   const sections = sectionSheet(e, info, { index: n++, count })
   const schedules = scheduleSheet(e, info, { index: n, count })
-  const rest = [...plans, ns, ew, roof, sections, schedules]
+  const rest = [site, ...plans, ns, ew, roof, sections, schedules]
   const index = [{ number: 'G-001', title: 'Cover and sheet index' }, ...rest].map(s => ({ number: s.number, title: s.title }))
   return [coverSheet(e, info, index, { index: 1, count }), ...rest]
 }
@@ -63,7 +65,7 @@ export function coverSheet(e: Estate, info: SheetInfo, index: { number: string; 
   let y = MARGIN + 1.5 * PT_PER_IN
   marks.push({ t: 'text', x, y, text: info.projectName.toUpperCase(), size: 40, bold: true })
   y += 34
-  marks.push({ t: 'text', x, y, text: 'MAIN HOUSE · DRAFT DRAWING SET', size: 18, bold: true })
+  marks.push({ t: 'text', x, y, text: `SITE AND ${(e.buildings.find(b => b.id === e.house.buildingId)?.name ?? 'Main house').toUpperCase()} · DRAFT DRAWING SET`, size: 18, bold: true })
   y += 24
   marks.push({ t: 'text', x, y, text: 'Concept stage. Placeholder massing used to test the model, not a finished design.', size: 11 })
 

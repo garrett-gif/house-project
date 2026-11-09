@@ -5,6 +5,7 @@ import { ROOF_FORMS } from './roofs'
 import { SIDE_WORD, placeOpenings, sideLine } from './walls'
 import { footprintOf, overlaps, toFt, translate } from './geometry'
 import { withDerivedGeometry } from './derive'
+import { allHouses, houseByBuilding, houseOfRoom } from './houses'
 
 /** Which point of a rectangle stays fixed when it is resized. `n` keeps the north edge, `sw` the southwest corner. */
 export type Anchor = 'sw' | 's' | 'se' | 'w' | 'center' | 'e' | 'nw' | 'n' | 'ne'
@@ -149,8 +150,41 @@ function checkOpening(e: Estate, o: Opening, kinds: OpeningKind[]) {
   return checkOpeningSize(o.width, o.height, o.sill) || (finite(o.offset) ? '' : 'Offset must be a number.')
 }
 
-/** Mutates a private copy. Returns an error message, or '' on success. */
+/** The detailed building an edit works inside, by the ids it names. Undefined for site edits. */
+function targetHouse(e: Estate, op: EditOp): string | undefined {
+  const opening = (id: string) => allHouses(e).find(h => h.openings.some(o => o.id === id))?.buildingId
+  switch (op.op) {
+    case 'moveBuilding': case 'resizeBuilding': return houseByBuilding(e, op.buildingId)?.buildingId
+    case 'moveRoom': case 'resizeRoom': case 'removeRoom': case 'renameRoom': case 'setRoomType': case 'moveWall': case 'setSafeRoom':
+      return houseOfRoom(e, op.roomId)?.buildingId
+    case 'addRoom': return allHouses(e).find(h => h.levels.some(l => l.id === op.levelId))?.buildingId
+    case 'addDoor': case 'addWindow': return houseOfRoom(e, op.opening.roomId)?.buildingId
+    case 'moveOpening': case 'resizeOpening': case 'removeOpening': return opening(op.openingId)
+    case 'setRoof': return allHouses(e).find(h => h.roofs.some(r => r.id === op.roofId))?.buildingId
+    default: return undefined
+  }
+}
+
+/**
+ * Mutates a private copy. Returns an error message, or '' on success. Edits inside another detailed building run
+ * with that building swapped into `house`, so every house edit works on any of them. Wall thickness applies to all.
+ */
 function run(e: Estate, op: EditOp): string {
+  if (op.op === 'addRoom' && houseOfRoom(e, op.room.id)) return `A room with id "${op.room.id}" already exists.`
+  if ((op.op === 'addDoor' || op.op === 'addWindow') && allHouses(e).some(h => h.openings.some(o => o.id === op.opening.id))) return `An opening with id "${op.opening.id}" already exists.`
+  const others = e.houses ?? []
+  const within = (i: number) => {
+    const main = e.house
+    e.house = others[i]
+    others[i] = main
+    try { return runInHouse(e, op) } finally { others[i] = e.house; e.house = main }
+  }
+  if (op.op === 'setWallThickness') return runInHouse(e, op) || others.map((_, i) => within(i)).find(Boolean) || ''
+  const i = others.findIndex(h => h.buildingId === targetHouse(e, op))
+  return i < 0 ? runInHouse(e, op) : within(i)
+}
+
+function runInHouse(e: Estate, op: EditOp): string {
   switch (op.op) {
     case 'moveBuilding': {
       const b = e.buildings.find(x => x.id === op.buildingId)
@@ -175,7 +209,7 @@ function run(e: Estate, op: EditOp): string {
     case 'resizeBuilding': {
       const b = e.buildings.find(x => x.id === op.buildingId)
       if (!b) return `No building with id "${op.buildingId}".`
-      if (b.id === e.house.buildingId) return 'The main house outline comes from its rooms. Resize or move rooms instead.'
+      if (b.id === e.house.buildingId) return `The ${b.name.toLowerCase()} outline comes from its rooms. Resize or move rooms instead.`
       if (b.parts) return `${b.name} has several masses and cannot be resized as one rectangle.`
       if (!ANCHORS.includes(op.anchor)) return `Unknown anchor "${op.anchor}".`
       const bad = checkSize(op.w, op.d, e.parcel.size)
@@ -495,7 +529,7 @@ function intersection(a: Rect, b: Rect) {
 /** Every overlapping pair of rooms on the same level and of buildings on the site, keyed so pairs can be compared. */
 function collisions(e: Estate): Map<string, string> {
   const found = new Map<string, string>()
-  for (const level of e.house.levels) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(b => {
+  for (const level of allHouses(e).flatMap(h => h.levels)) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(b => {
     if (overlaps(a.rect, b.rect)) found.set(`room:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(a.rect, b.rect)} on the ${level.name.toLowerCase()}`)
   }))
   e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(b => {
@@ -529,9 +563,9 @@ export function applyOperations(estate: Estate, ops: EditOp[]): EditResult {
   const added = [...collisions(result)].filter(([key]) => !before.has(key)).map(([, text]) => text)
   if (added.length) return { ok: false, error: `Not applied: ${added.join('; ')}. Shrink or move the neighbor in the same set of edits, or choose another size or place.` }
   // Doors and windows that fit before must still fit, and new ones must fit.
-  const fitted = new Set(placeOpenings(estate.house).filter(o => !o.problem).map(o => o.id))
-  const known = new Set(estate.house.openings.map(o => o.id))
-  const broken = placeOpenings(result.house).filter(o => o.problem && (fitted.has(o.id) || !known.has(o.id)))
+  const fitted = new Set(allHouses(estate).flatMap(h => placeOpenings(h)).filter(o => !o.problem).map(o => o.id))
+  const known = new Set(allHouses(estate).flatMap(h => h.openings).map(o => o.id))
+  const broken = allHouses(result).flatMap(h => placeOpenings(h)).filter(o => o.problem && (fitted.has(o.id) || !known.has(o.id)))
   if (broken.length) return { ok: false, error: `Not applied: ${broken.map(o => `${o.id} would not fit because ${o.problem}`).join('; ')}. Move, resize, or remove it in the same set of edits.` }
   return { ok: true, estate: result }
 }
@@ -555,7 +589,7 @@ const ANCHOR_WORDS: Record<Anchor, string> = {
 /** Plain-language description of an edit, using names from the estate it applies to. */
 export function describeEdit(op: EditOp, e: Estate): string {
   const building = (id: string) => e.buildings.find(b => b.id === id)?.name ?? id
-  const room = (id: string) => findRoom(e, id)?.room.name ?? id
+  const room = (id: string) => houseOfRoom(e, id)?.levels.flatMap(l => l.rooms).find(r => r.id === id)?.name ?? id
   const utility = (id: string) => (e.utilities ?? []).find(u => u.id === id)?.name ?? id
   const device = (id: string) => (e.security ?? []).find(d => d.id === id)?.name ?? id
   switch (op.op) {
@@ -564,8 +598,10 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'moveRoom': return `Move ${room(op.roomId)} ${direction(op.dx, op.dy)}`
     case 'resizeRoom': return `Resize ${room(op.roomId)} to ${feet(op.w)} × ${feet(op.d)}, keeping its ${ANCHOR_WORDS[op.anchor]}`
     case 'addRoom': {
-      const level = e.house.levels.find(l => l.id === op.levelId)?.name ?? op.levelId
-      return `Add ${op.room.name} (${feet(op.room.rect.w)} × ${feet(op.room.rect.d)}) to the ${level.toLowerCase()}`
+      const house = allHouses(e).find(h => h.levels.some(l => l.id === op.levelId))
+      const level = house?.levels.find(l => l.id === op.levelId)?.name ?? op.levelId
+      const where = house && house !== e.house ? ` of the ${building(house.buildingId).toLowerCase()}` : ''
+      return `Add ${op.room.name} (${feet(op.room.rect.w)} × ${feet(op.room.rect.d)}) to the ${level.toLowerCase()}${where}`
     }
     case 'removeRoom': return `Remove ${room(op.roomId)}`
     case 'renameRoom': return `Rename ${room(op.roomId)} to ${op.name}`
@@ -575,7 +611,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
       const what = o.kind === 'window' ? 'window' : o.kind === 'garage-door' ? 'garage door' : o.kind === 'opening' ? 'cased opening' : 'door'
       return `Add a ${feet(o.width)} × ${feet(o.height)} ${what} (${o.id}) on the ${SIDE_WORD[o.side]} wall of ${room(o.roomId)}`
     }
-    case 'moveOpening': return `Move ${op.openingId} to ${feet(op.offset)} along the ${SIDE_WORD[op.side]} wall of ${room(e.house.openings.find(o => o.id === op.openingId)?.roomId ?? '')}`
+    case 'moveOpening': return `Move ${op.openingId} to ${feet(op.offset)} along the ${SIDE_WORD[op.side]} wall of ${room(allHouses(e).flatMap(h => h.openings).find(o => o.id === op.openingId)?.roomId ?? '')}`
     case 'resizeOpening': return `Resize ${op.openingId} to ${feet(op.width)} × ${feet(op.height)}${op.sill ? `, sill ${feet(op.sill)}` : ''}`
     case 'removeOpening': return `Remove ${op.openingId}`
     case 'moveWall': return `Move the ${SIDE_WORD[op.side]} wall of ${room(op.roomId)} ${feet(op.distance)} ${op.distance > 0 ? 'out' : 'in'}`
@@ -604,7 +640,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'setUtilityRule': return `Set utility rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
     case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`
     case 'setRoof': {
-      const name = e.house.roofs.find(r => r.id === op.roofId)?.name ?? op.roofId
+      const name = allHouses(e).flatMap(h => h.roofs).find(r => r.id === op.roofId)?.name ?? op.roofId
       const shape = op.form === 'shed' ? `shed sloping down to the ${SIDE_WORD[op.low]}` : `${op.form} with its ridge running ${op.ridge === 'ew' ? 'east-west' : 'north-south'}`
       return `Make the ${name.toLowerCase()} a ${op.pitch}:12 ${shape}, ${feet(op.overhang)} overhang`
     }

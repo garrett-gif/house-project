@@ -29,7 +29,7 @@ describe('building sections', () => {
 
   it('appear on sheet A-401 and are marked on every floor plan', () => {
     const set = drawingSet(sampleEstate, info)
-    expect(set.map(s => s.number)).toEqual(['G-001', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
+    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
     const sections = set.find(s => s.number === 'A-401')!
     expect(texts(sections.marks)).toEqual(expect.arrayContaining(['SECTION A', 'SECTION B', 'BUILDING SECTIONS']))
     for (const n of ['A-101', 'A-102', 'A-103']) {

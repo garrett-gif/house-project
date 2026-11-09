@@ -4,7 +4,7 @@ import { applyOperations } from './edits'
 import { validateEstate } from './validate'
 import { withHouseDefaults } from './firstPass'
 import { withDerivedGeometry } from './derive'
-import { withFireDefaults, withUtilityDefaults } from './migrate'
+import { withFireDefaults, withGuestHouseDefaults, withUtilityDefaults } from './migrate'
 
 /** One saved change: who made it, the edits, and the results of this app's checks afterward. */
 export interface Revision {
@@ -69,7 +69,7 @@ export function loadProject(data: unknown): CommitResult {
     return { ok: false, error: 'This file is not a saved House Project.' }
   }
   // Projects saved before walls and openings existed get the rule-based first pass.
-  let t = startTimeline(withDerivedGeometry(withUtilityDefaults(withFireDefaults({ ...p.base, house: withHouseDefaults(p.base.house) }))))
+  let t = startTimeline(withDerivedGeometry(withGuestHouseDefaults(withUtilityDefaults(withFireDefaults({ ...p.base, house: withHouseDefaults(p.base.house) })))))
   for (const r of p.revisions) {
     const next = commit(t, r.ops, r.author, r.request, new Date(r.timestamp))
     if (!next.ok) return { ok: false, error: `Revision ${r.id} no longer applies: ${next.error}` }

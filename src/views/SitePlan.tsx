@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { EditOp } from '../model/edits'
-import { buildingDragOp } from '../ui/dragOps'
+import { buildingDragOp, deviceDragOp, utilityDragOp } from '../ui/dragOps'
 import type { Estate, RoadKind, SecurityDevice, UtilityKind, ZoneKind } from '../model/types'
 import { center, footprintOf, ft, partsOf, toFt } from '../model/geometry'
 import { fireRules, roadWidth } from '../model/fireChecks'
@@ -32,7 +32,8 @@ const RUNS: UtilityKind[] = ['septic', 'generator', 'propane']
 /** `flagged` maps ids of elements named by checks that do not pass to how badly: red for fail, amber for warn. */
 export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { estate: Estate; flagged?: ReadonlyMap<string, 'warn' | 'fail'>; onDrag?: (op: EditOp | null) => void; onDrop?: (op: EditOp | null) => void }) {
   const svg = useRef<SVGSVGElement>(null)
-  const drag = useRef<{ start: [number, number]; building: Estate['buildings'][number]; op: EditOp | null } | null>(null)
+  /** What is being dragged, and how to turn the pointer's travel into an edit. */
+  const drag = useRef<{ start: [number, number]; toOp: (dx: number, dy: number) => EditOp | null; op: EditOp | null } | null>(null)
   const editable = !!onDrag && !!onDrop
   /** Pointer position in site inches, y north. */
   const toSite = (e: { clientX: number; clientY: number }): [number, number] => {
@@ -41,17 +42,19 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
     const p = pt.matrixTransform(el.getScreenCTM()!.inverse())
     return [ft(p.x), ft(6600 - p.y)]
   }
-  const begin = (e: ReactPointerEvent, building: Estate['buildings'][number]) => {
+  const grab = (e: ReactPointerEvent, toOp: (dx: number, dy: number) => EditOp | null) => {
     if (!editable || e.button !== 0) return
     e.preventDefault()
-    drag.current = { start: toSite(e), building, op: null }
+    e.stopPropagation()
+    drag.current = { start: toSite(e), toOp, op: null }
     svg.current!.setPointerCapture(e.pointerId)
   }
+  const begin = (e: ReactPointerEvent, building: Estate['buildings'][number]) => grab(e, (dx, dy) => buildingDragOp(building, dx, dy))
   const move = (e: ReactPointerEvent) => {
     const d = drag.current
     if (!d) return
     const [x, y] = toSite(e)
-    d.op = buildingDragOp(d.building, x - d.start[0], y - d.start[1])
+    d.op = d.toOp(x - d.start[0], y - d.start[1])
     onDrag!(d.op)
   }
   const end = (cancel: boolean) => { const d = drag.current; drag.current = null; if (d) onDrop!(cancel ? null : d.op) }
@@ -131,7 +134,8 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
           const x = toFt(u.rect.x), w = toFt(u.rect.w), d = toFt(u.rect.d), y = Y(u.rect.y) - d
           const small = Math.max(w, d) < 6 * scale
           return (
-            <g key={u.id} onMouseEnter={() => setHover(`${u.name}, ${u.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[u.kind]}`)}>
+            <g key={u.id} onMouseEnter={() => setHover(`${u.name}, ${u.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[u.kind]}`)}
+              onPointerDown={editable ? e => grab(e, (dx, dy) => utilityDragOp(u, dx, dy)) : undefined} style={editable ? { cursor: 'move' } : undefined}>
               {small
                 ? <circle cx={x + w / 2} cy={y + d / 2} r={Math.max(10, 4 * scale)} fill={UTILITY[u.kind]} stroke={flagged.has(u.id) ? flagColor(u.id) : '#fff'} strokeWidth={Math.max(2, (flagged.has(u.id) ? 2 : 0.8) * scale)} />
                 : <rect x={x} y={y} width={w} height={d} fill={UTILITY[u.kind]} fillOpacity={u.kind === 'septic' ? 0.45 : 0.85} stroke={flagged.has(u.id) ? flagColor(u.id) : UTILITY[u.kind]} strokeWidth={Math.max(2, (flagged.has(u.id) ? 3 : 1) * scale)} />}
@@ -139,7 +143,8 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
             </g>
           )
         })}
-        {security && (estate.security ?? []).map(d => <Device key={d.id} d={d} Y={Y} scale={scale} flag={flagged.has(d.id) ? flagColor(d.id) : undefined} onHover={setHover} />)}
+        {security && (estate.security ?? []).map(d => <Device key={d.id} d={d} Y={Y} scale={scale} flag={flagged.has(d.id) ? flagColor(d.id) : undefined} onHover={setHover}
+          onGrab={editable ? e => grab(e, (dx, dy) => deviceDragOp(d, dx, dy)) : undefined} />)}
         {showLabels && estate.zones.filter(z => ['kart-track', 'training', 'incident-camp', 'pond', 'parking', 'equipment-yard'].includes(z.id)).map(z => (
           <text key={z.id} x={toFt(z.rect.x + z.rect.w / 2)} y={Y(z.rect.y + z.rect.d / 2)} fontSize={label} textAnchor="middle" className="site-label">{z.name}</text>
         ))}
@@ -159,25 +164,33 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
         {utilities && (Object.keys(UTILITY) as UtilityKind[]).map(k => <span key={k}><i style={{ background: UTILITY[k] }} />{k === 'service' ? 'Power service' : k[0].toUpperCase() + k.slice(1)}</span>)}
         {security && <span><i style={{ background: 'rgba(192,38,45,0.25)', outline: '1px solid #c0262d', outlineOffset: -1 }} />Camera view</span>}
         {security && <span><i style={{ background: 'rgba(240,200,60,0.35)', borderRadius: '50%' }} />Light</span>}
-        <span>North is up · building sizes are placeholders{editable ? ' · drag a building to move it' : ''}</span>
+        <span>North is up · building sizes are placeholders{editable ? ` · drag a building${utilities ? ', utility' : ''}${security ? ', camera, or light' : ''} to move it` : ''}</span>
       </div>
     </div>
   )
 }
 
 /** A camera's view as a wedge, or a light's reach as a circle. */
-function Device({ d, Y, scale, flag, onHover }: { d: SecurityDevice; Y: (y: number) => number; scale: number; flag?: string; onHover: (text: string) => void }) {
+function Device({ d, Y, scale, flag, onHover, onGrab }: { d: SecurityDevice; Y: (y: number) => number; scale: number; flag?: string; onHover: (text: string) => void; onGrab?: (e: ReactPointerEvent) => void }) {
   const cx = toFt(d.at.x), cy = Y(d.at.y), r = toFt(d.range)
   const hover = () => onHover(`${d.name}, ${Math.round(r)} ft, ${d.power === 'grid' ? 'grid power only' : d.power === 'backup' ? 'on backup power' : 'solar and battery'}`)
+  // Only the device itself is a handle; its view or reach is drawn under it and ignores the pointer.
+  const handle = <circle cx={cx} cy={cy} r={Math.max(6, 2.5 * scale)} fill={d.kind === 'camera' ? '#c0262d' : '#d9a514'} stroke="#fff" strokeWidth={Math.max(1, 0.5 * scale)}
+    onMouseEnter={hover} onPointerDown={onGrab} style={onGrab ? { cursor: 'move' } : undefined} />
   if (d.kind === 'light') {
-    return <circle cx={cx} cy={cy} r={r} fill="rgba(240,200,60,0.22)" stroke={flag ?? 'rgba(200,150,20,0.5)'} strokeWidth={Math.max(1, (flag ? 3 : 0.5) * scale)} onMouseEnter={hover} />
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={r} fill="rgba(240,200,60,0.22)" stroke={flag ?? 'rgba(200,150,20,0.5)'} strokeWidth={Math.max(1, (flag ? 3 : 0.5) * scale)} pointerEvents="none" />
+        {handle}
+      </g>
+    )
   }
   const fov = Math.min(d.fov ?? 360, 359.9), a0 = ((d.facing ?? 0) - fov / 2) * Math.PI / 180, a1 = ((d.facing ?? 0) + fov / 2) * Math.PI / 180
   const p0 = [cx + r * Math.cos(a0), cy - r * Math.sin(a0)], p1 = [cx + r * Math.cos(a1), cy - r * Math.sin(a1)]
   return (
-    <g onMouseEnter={hover}>
-      <path d={`M ${cx} ${cy} L ${p0[0]} ${p0[1]} A ${r} ${r} 0 ${fov > 180 ? 1 : 0} 0 ${p1[0]} ${p1[1]} Z`} fill="rgba(192,38,45,0.12)" stroke={flag ?? 'rgba(192,38,45,0.45)'} strokeWidth={Math.max(1, (flag ? 3 : 0.5) * scale)} />
-      <circle cx={cx} cy={cy} r={Math.max(6, 2.5 * scale)} fill="#c0262d" stroke="#fff" strokeWidth={Math.max(1, 0.5 * scale)} />
+    <g>
+      <path d={`M ${cx} ${cy} L ${p0[0]} ${p0[1]} A ${r} ${r} 0 ${fov > 180 ? 1 : 0} 0 ${p1[0]} ${p1[1]} Z`} fill="rgba(192,38,45,0.12)" stroke={flag ?? 'rgba(192,38,45,0.45)'} strokeWidth={Math.max(1, (flag ? 3 : 0.5) * scale)} pointerEvents="none" />
+      {handle}
     </g>
   )
 }
