@@ -6,6 +6,7 @@ import { Terrain } from '../model/parcel'
 import { ft, partsOf, samplePath, toFt } from '../model/geometry'
 import { ROOM_COLOR } from './HousePlan'
 import { houseBounds } from '../model/derive'
+import { levelWalls, placeOpenings } from '../model/walls'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
 
@@ -113,11 +114,30 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
     for (const room of level.rooms) {
       const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
       addBox(scene, x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
-      const t = 0.5, y = base + wall / 2, color = 0xf4f0e7
-      addBox(scene, x + w / 2, y, z + d / 2, w, wall, t, color)
-      addBox(scene, x + w / 2, y, z - d / 2, w, wall, t, color)
-      addBox(scene, x, y, z, t, wall, d, color)
-      addBox(scene, x + w, y, z, t, wall, d, color)
+    }
+    // Walls follow the derived segments, with doors and windows cut out of them.
+    const openings = placeOpenings(estate.house).filter(o => o.levelId === level.id && o.wall && !o.problem)
+    const WALL_COLOR = { exterior: 0xe9e3d6, interior: 0xf6f2ea, foundation: 0xc9c2b4 }
+    for (const seg of levelWalls(estate.house, level)) {
+      const t = toFt(seg.thickness), color = WALL_COLOR[seg.kind]
+      // A piece of wall between positions a and b along the segment (inches), from height y0 to y1 (feet above the floor).
+      const piece = (a: number, b: number, y0: number, y1: number, tint = color, opacity = 1) => {
+        if (b - a < 0.5 || y1 - y0 < 0.05) return
+        const len = toFt(b - a), m = (a + b) / 2, h = y1 - y0
+        if (seg.orientation === 'h') addBox(scene, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at), len, h, t, tint, opacity)
+        else addBox(scene, toFt(seg.at) - cx, base + y0 + h / 2, cy - toFt(m), t, h, len, tint, opacity)
+      }
+      const holes = openings.filter(o => o.wall!.id === seg.id).sort((a, b) => a.from - b.from)
+      let cursor = seg.from
+      for (const o of holes) {
+        piece(cursor, o.from, 0, wall)
+        const sill = toFt(o.sill), head = Math.min(wall, toFt(o.sill + o.height))
+        piece(o.from, o.to, 0, sill)
+        piece(o.from, o.to, head, wall)
+        if (o.kind === 'window') piece(o.from, o.to, sill, head, 0x9fc4d6, 0.35)
+        cursor = o.to
+      }
+      piece(cursor, seg.to, 0, wall)
     }
   }
 }

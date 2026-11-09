@@ -1,6 +1,7 @@
 import type { Estate, Rect } from './types'
 import { pathLength, toFt } from './geometry'
 import { validateEstate } from './validate'
+import { placeOpenings } from './walls'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -24,11 +25,22 @@ export function summarizeEstate(e: Estate): string {
   const { origin } = e.house
   lines.push('', `Main house (building ${e.house.buildingId}). Placeholder massing. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
   lines.push('Room positions are house-local: 0,0 is the house origin, x east, y north. The formal entry faces north.')
+  const t = e.house.wallThickness
+  lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
+  lines.push('Openings are listed under their host room as id: kind, side, offset from that side\'s west or south end to the center, width x height, sill, and what is on the other side.')
+  const placed = placeOpenings(e.house)
+  const ft1 = (inches: number) => String(Math.round(inches / 12 * 100) / 100)
   for (const level of e.house.levels) {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
-    for (const r of level.rooms) lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}`)
+    for (const r of level.rooms) {
+      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}`)
+      for (const o of placed.filter(o => o.roomId === r.id)) {
+        lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
+      }
+    }
   }
 
+  if (e.house.stairs.length) lines.push('', `Stairs: ${e.house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
   lines.push('', "This app's planning checks right now (these are planning aids, not code compliance):")
   for (const c of validateEstate(e)) lines.push(`- ${c.status.toUpperCase()} ${c.label}: ${c.detail}`)
   return lines.join('\n')

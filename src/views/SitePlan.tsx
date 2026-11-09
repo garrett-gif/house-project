@@ -17,10 +17,11 @@ const ROAD: Record<RoadKind, [string, number, string?]> = {
   estate: ['#6d6455', 22], work: ['#55524c', 26], perimeter: ['#8d8473', 14, '50 28'], 'gated-link': ['#a4542f', 16, '18 24'],
 }
 const BUILDING = { private: '#2f6f62', work: '#a65a35', visitor: '#a65a35', shared: '#66635c' }
-const FLAG = '#c0262d'
+const FLAG = { fail: '#c0262d', warn: '#c98a14' }
 
-/** `flagged` holds ids of elements named by checks that do not pass. They are outlined in red. */
-export function SitePlan({ estate, flagged = new Set() }: { estate: Estate; flagged?: ReadonlySet<string> }) {
+/** `flagged` maps ids of elements named by checks that do not pass to how badly: red for fail, amber for warn. */
+export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flagged?: ReadonlyMap<string, 'warn' | 'fail'> }) {
+  const flagColor = (id: string) => FLAG[flagged.get(id) ?? 'fail']
   const [focus, setFocus] = useState<Focus>('Whole property')
   const [hover, setHover] = useState<string | null>(null)
   const [vx, vy, vw, vh] = FOCUS[focus]
@@ -43,10 +44,10 @@ export function SitePlan({ estate, flagged = new Set() }: { estate: Estate; flag
           const x = toFt(z.rect.x), w = toFt(z.rect.w), d = toFt(z.rect.d), y = Y(z.rect.y) - d
           const dashed = z.kind === 'fuelbreak'
           return z.round
-            ? <ellipse key={z.id} cx={x + w / 2} cy={y + d / 2} rx={w / 2} ry={d / 2} fill={ZONE[z.kind]} stroke={flagged.has(z.id) ? FLAG : '#7b7464'} strokeWidth={scale * (flagged.has(z.id) ? 3 : 1)} onMouseEnter={() => setHover(z.name)} />
-            : <rect key={z.id} x={x} y={y} width={w} height={d} fill={ZONE[z.kind]} fillOpacity={dashed ? 0.55 : 0.9} stroke={flagged.has(z.id) ? FLAG : dashed ? '#55702f' : '#8c8473'} strokeWidth={scale * (flagged.has(z.id) ? 3 : dashed ? 2 : 1)} strokeDasharray={dashed ? `${12 * scale} ${8 * scale}` : undefined} onMouseEnter={() => setHover(z.name)} />
+            ? <ellipse key={z.id} cx={x + w / 2} cy={y + d / 2} rx={w / 2} ry={d / 2} fill={ZONE[z.kind]} stroke={flagged.has(z.id) ? flagColor(z.id) : '#7b7464'} strokeWidth={scale * (flagged.has(z.id) ? 3 : 1)} onMouseEnter={() => setHover(z.name)} />
+            : <rect key={z.id} x={x} y={y} width={w} height={d} fill={ZONE[z.kind]} fillOpacity={dashed ? 0.55 : 0.9} stroke={flagged.has(z.id) ? flagColor(z.id) : dashed ? '#55702f' : '#8c8473'} strokeWidth={scale * (flagged.has(z.id) ? 3 : dashed ? 2 : 1)} strokeDasharray={dashed ? `${12 * scale} ${8 * scale}` : undefined} onMouseEnter={() => setHover(z.name)} />
         })}
-        {estate.walkways.map(w => <polyline key={w.id} points={pts(w.points)} fill="none" stroke={flagged.has(w.id) ? FLAG : '#2f6f62'} strokeWidth={Math.max(flagged.has(w.id) ? 14 : 8, (flagged.has(w.id) ? 4 : 2) * scale)} onMouseEnter={() => setHover(w.name)} />)}
+        {estate.walkways.map(w => <polyline key={w.id} points={pts(w.points)} fill="none" stroke={flagged.has(w.id) ? flagColor(w.id) : '#2f6f62'} strokeWidth={Math.max(flagged.has(w.id) ? 14 : 8, (flagged.has(w.id) ? 4 : 2) * scale)} onMouseEnter={() => setHover(w.name)} />)}
         {estate.roads.map(r => {
           const [color, width, dash] = ROAD[r.kind]
           return <polyline key={r.id} points={pts(r.points)} fill="none" stroke={color} strokeWidth={Math.max(width, 2 * scale)} strokeDasharray={dash} strokeLinejoin="round" onMouseEnter={() => setHover(r.name)} />
@@ -58,7 +59,7 @@ export function SitePlan({ estate, flagged = new Set() }: { estate: Estate; flag
             <g key={b.id} onMouseEnter={() => setHover(b.name)}>
               {b.footprint && footprintOf(b).map((part, i) => <rect key={`f${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} fillOpacity={0.3} />)}
               {partsOf(b).map((part, i) => <rect key={i} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} />)}
-              {flagged.has(b.id) && footprintOf(b).map((part, i) => <rect key={`x${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill="none" stroke={FLAG} strokeWidth={Math.max(4, 2 * scale)} />)}
+              {flagged.has(b.id) && footprintOf(b).map((part, i) => <rect key={`x${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill="none" stroke={flagColor(b.id)} strokeWidth={Math.max(4, 2 * scale)} />)}
               {showLabels && <text x={x + w / 2} y={y - 5 * scale} fontSize={label} textAnchor="middle" className="site-label">{b.name}</text>}
             </g>
           )
@@ -73,7 +74,8 @@ export function SitePlan({ estate, flagged = new Set() }: { estate: Estate; flag
         <span><i style={{ background: BUILDING.shared }} />Shared aviation</span>
         <span><i style={{ background: '#a4542f' }} />Gated link</span>
         <span><i style={{ background: BUILDING.private, opacity: 0.3 }} />Below grade only</span>
-        <span><i style={{ background: 'none', outline: `2px solid ${FLAG}`, outlineOffset: -2 }} />Named by a failing check</span>
+        <span><i style={{ background: 'none', outline: `2px solid ${FLAG.fail}`, outlineOffset: -2 }} />Failing check</span>
+        <span><i style={{ background: 'none', outline: `2px solid ${FLAG.warn}`, outlineOffset: -2 }} />Warning</span>
         <span>North is up · building sizes are placeholders</span>
       </div>
     </div>

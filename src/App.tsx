@@ -87,7 +87,12 @@ export function App() {
   const estate = proposal?.estate ?? current
   const checks = useMemo(() => validateEstate(estate), [estate])
   const failing = checks.filter(c => c.status !== 'pass').length
-  const flagged = useMemo(() => new Set(checks.filter(c => c.status !== 'pass').flatMap(c => c.elements ?? [])), [checks])
+  // Elements named by checks that do not pass. A failure outranks a warning on the same element.
+  const flagged = useMemo(() => {
+    const m = new Map<string, 'warn' | 'fail'>()
+    for (const c of checks) if (c.status !== 'pass') for (const id of c.elements ?? []) if (m.get(id) !== 'fail') m.set(id, c.status)
+    return m
+  }, [checks])
   const passed = checks.length - failing
   const levels = estate.house.levels.slice().reverse()
   const showsHouse = view === 'house' || view === 'house3d'

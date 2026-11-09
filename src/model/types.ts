@@ -40,8 +40,54 @@ export interface Walkway { id: string; name: string; points: Pt[]; from?: string
 
 export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool' | 'outdoor'
 export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string }
-export interface Level { id: string; name: string; floorHeight: Inches; elevation: Inches; rooms: Room[] }
-export interface HouseModel { buildingId: string; origin: Pt; levels: Level[]; concept: true }
+/** A side of a rectangle: north, south, east, or west. */
+export type Side = 'n' | 's' | 'e' | 'w'
+
+/**
+ * `exposed` applies to levels below grade (elevation under 0): exterior walls facing these sides are above grade
+ * and framed, as on a walkout. All other exterior walls on that level are foundation walls.
+ */
+export interface Level { id: string; name: string; floorHeight: Inches; elevation: Inches; rooms: Room[]; exposed?: Side[] }
+
+export type WallKind = 'exterior' | 'interior' | 'foundation'
+/** Default wall thickness by kind. Walls are derived from room edges, which are wall centerlines. */
+export type WallThickness = Record<WallKind, Inches>
+
+export type OpeningKind = 'door' | 'window' | 'opening' | 'garage-door'
+export type WindowOperation = 'casement' | 'double-hung' | 'slider' | 'fixed'
+
+/**
+ * A door, window, or cased opening in a wall. It is hosted on one side of a room, and `offset` is the distance from
+ * that side's start (its west end for north and south sides, its south end for east and west sides) to the center
+ * of the opening. What lies on the other side is worked out from the rooms.
+ */
+export interface Opening {
+  id: string
+  kind: OpeningKind
+  roomId: string
+  side: Side
+  offset: Inches
+  width: Inches
+  height: Inches
+  /** Height of the bottom of the opening above the floor. 0 for doors. */
+  sill: Inches
+  operation?: WindowOperation
+  /** Doors: swings into the host room, or out of it. */
+  swing?: 'in' | 'out'
+}
+
+/** A stair from a stair room on one level up to a stair room on the next. */
+export interface Stair { id: string; roomId: string; toRoomId: string; shape: 'straight' | 'u-shaped'; width: Inches; tread: Inches }
+
+export interface HouseModel {
+  buildingId: string
+  origin: Pt
+  levels: Level[]
+  concept: true
+  wallThickness: WallThickness
+  openings: Opening[]
+  stairs: Stair[]
+}
 
 export interface Estate {
   name: string

@@ -2,6 +2,8 @@ import type { Check, Estate } from './types'
 import type { EditOp } from './edits'
 import { applyOperations } from './edits'
 import { validateEstate } from './validate'
+import { withHouseDefaults } from './firstPass'
+import { withDerivedGeometry } from './derive'
 
 /** One saved change: who made it, the edits, and the results of this app's checks afterward. */
 export interface Revision {
@@ -65,7 +67,8 @@ export function loadProject(data: unknown): CommitResult {
   if (!p || p.format !== 'house-project' || p.version !== 1 || !p.base || !Array.isArray(p.revisions)) {
     return { ok: false, error: 'This file is not a saved House Project.' }
   }
-  let t = startTimeline(p.base)
+  // Projects saved before walls and openings existed get the rule-based first pass.
+  let t = startTimeline(withDerivedGeometry({ ...p.base, house: withHouseDefaults(p.base.house) }))
   for (const r of p.revisions) {
     const next = commit(t, r.ops, r.author, r.request, new Date(r.timestamp))
     if (!next.ok) return { ok: false, error: `Revision ${r.id} no longer applies: ${next.error}` }

@@ -24,7 +24,11 @@ npm run build   # type-check src and server, vite build, then scan dist/ for cre
 - `src/model/sampleEstate.ts`: the approved sample layout. `src/model/house.ts`: placeholder main house massing, with room coordinates local to `house.origin`.
 - `src/model/validate.ts`: planning checks, returning `pass`, `warn`, or `fail`.
 - `src/model/derive.ts`: geometry computed from other model data. The main house building's outline comes from its rooms and `house.origin`; never edit it by hand. `parts` are above-grade masses (drawn and extruded); `footprint` adds rooms on levels below elevation 0 and is what collisions use.
-- Checks list the ids they are about in `elements` when they do not pass; the plans outline those in red.
+- Checks list the ids they are about in `elements` when they do not pass; the plans outline failures in red and warnings in amber.
+- `src/model/walls.ts`: walls are derived from room rectangles (room edges are wall centerlines), never stored. Exterior, interior, and foundation thicknesses live in `house.wallThickness`. Below-grade levels list their `exposed` sides (the walkout is exposed to the south).
+- Openings (`house.openings`) are stored on a host room's side with an `offset` from that side's west or south end to the center. What they lead to is derived. `applyOperations` rejects edits that leave a previously fitting door or window off its wall.
+- `src/model/firstPass.ts`: the rule-based first pass of doors, windows, and stairs. A placeholder to edit, not a design. Saved projects without openings get it on load.
+- `src/model/wallChecks.ts`: openings fit, reachability, circulation, exit door, door sizes, hall widths, escape windows, stairs, and wall stacking. Values come from the 2006 IRC as planning values only; the detail text says so.
 - `src/model/edits.ts`: named edit operations (`moveBuilding`, `resizeBuilding`, `moveRoom`, `resizeRoom`, `addRoom`, `removeRoom`, `renameRoom`, `setRoomType`). `applyOperations(estate, ops)` is pure, all or nothing, and rejects unknown ids, invalid sizes, and any new overlap between rooms on a level or buildings on the site. All chat and future manual edits go through it.
 - `src/model/editTools.ts`: the tool definitions Claude sees (in feet) and the converter to edit operations (in inches).
 - `src/model/history.ts`: revisions, undo and redo, saved-project format.

@@ -1,5 +1,5 @@
 import type { EditOp } from './edits'
-import { ANCHORS, ROOM_TYPES } from './edits'
+import { ANCHORS, DOOR_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
 
 /**
  * Tool definitions for the chat editor. Claude works in feet, which it handles more reliably;
@@ -10,6 +10,8 @@ export interface EditToolSpec { name: EditOp['op']; description: string; input_s
 const num = (description: string) => ({ type: 'number', description })
 const str = (description: string) => ({ type: 'string', description })
 const anchor = { type: 'string', enum: ANCHORS, description: 'Point that stays fixed: sw, s, se, w, center, e, nw, n, ne. For example n keeps the north edge in place and grows or shrinks to the south.' }
+const side = { type: 'string', enum: SIDES, description: 'Side of the room: n, s, e, or w.' }
+const offset = num('Distance in feet from the start of that side (its west end for n and s sides, its south end for e and w sides) to the center of the opening.')
 const object = (properties: Record<string, unknown>) =>
   ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false })
 
@@ -64,6 +66,54 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     description: 'Change the type of a room in the main house, for example from service to wellness.',
     input_schema: object({ roomId: str('Room id from the model summary.'), type: { type: 'string', enum: ROOM_TYPES, description: 'New room type.' } }),
   },
+  {
+    name: 'addDoor',
+    description: 'Add a door, cased opening, or garage door in a wall of a room. It connects to whatever is on the other side of that wall. Must fit on one wall without crossing a corner or another opening.',
+    input_schema: object({
+      id: str('New unique opening id: lowercase letters, numbers, and hyphens.'),
+      kind: { type: 'string', enum: DOOR_KINDS, description: 'door, opening (cased, no door), or garage-door.' },
+      roomId: str('Room id the door is hosted on.'), side, offsetFt: offset,
+      widthFt: num('Door width in feet. Typical: 2.67 for baths, 3 for rooms, 3.5 for an entry, 6 for a patio door.'),
+      heightFt: num('Door height in feet. Typical: 6.67 or 8.'),
+      swing: { type: 'string', enum: ['in', 'out', 'none'], description: 'Swings into the host room (in) or out of it (out). none for openings and garage doors.' },
+    }),
+  },
+  {
+    name: 'addWindow',
+    description: 'Add a window in an outside wall of a room. Bedroom windows need enough clear opening to escape through.',
+    input_schema: object({
+      id: str('New unique opening id: lowercase letters, numbers, and hyphens.'),
+      roomId: str('Room id the window is in.'), side, offsetFt: offset,
+      widthFt: num('Window width in feet.'), heightFt: num('Window height in feet.'),
+      sillFt: num('Height of the sill above the floor in feet. Bedroom escape windows need 3.67 or lower.'),
+      operation: { type: 'string', enum: WINDOW_OPERATIONS, description: 'How it opens. Casement gives the most clear opening.' },
+    }),
+  },
+  {
+    name: 'moveOpening',
+    description: 'Move an existing door or window along its wall, or to another side of its room.',
+    input_schema: object({ openingId: str('Opening id from the model summary.'), side, offsetFt: offset }),
+  },
+  {
+    name: 'resizeOpening',
+    description: 'Change the size of an existing door or window. Doors keep a sill of 0.',
+    input_schema: object({ openingId: str('Opening id from the model summary.'), widthFt: num('New width in feet.'), heightFt: num('New height in feet.'), sillFt: num('Sill height in feet. 0 for doors.') }),
+  },
+  {
+    name: 'removeOpening',
+    description: 'Remove a door, window, or opening.',
+    input_schema: object({ openingId: str('Opening id from the model summary.') }),
+  },
+  {
+    name: 'moveWall',
+    description: 'Move one wall of a room in or out. The room grows or shrinks, and any room on the other side of that wall gives or takes the same space. Use this for requests like "make the kitchen 10 ft wider" when a neighbor should give up the room.',
+    input_schema: object({ roomId: str('Room id from the model summary.'), side, distanceFt: num('Feet to move the wall. Positive moves it outward and makes the room bigger.') }),
+  },
+  {
+    name: 'setWallThickness',
+    description: 'Set the default thickness of one kind of wall for the whole house, in inches.',
+    input_schema: object({ kind: { type: 'string', enum: WALL_KINDS, description: 'exterior, interior, or foundation.' }, thicknessIn: num('Thickness in inches, for example 8 for 2x6 framing with siding.') }),
+  },
 ]
 
 /** Feet to inches, rounded to 1/8 inch so repeated edits do not collect float noise. */
@@ -108,5 +158,24 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeRoom': return { ok: true, op: { op: 'removeRoom', roomId: s('roomId') } }
     case 'renameRoom': return { ok: true, op: { op: 'renameRoom', roomId: s('roomId'), name: s('name') } }
     case 'setRoomType': return { ok: true, op: { op: 'setRoomType', roomId: s('roomId'), type: s('type') as never } }
+    case 'addDoor': return {
+      ok: true,
+      op: { op: 'addDoor', opening: {
+        id: s('id'), kind: s('kind') as never, roomId: s('roomId'), side: s('side') as never, offset: inches(n('offsetFt')),
+        width: inches(n('widthFt')), height: inches(n('heightFt')), sill: 0, ...(v.swing === 'in' || v.swing === 'out' ? { swing: s('swing') as never } : {}),
+      } },
+    }
+    case 'addWindow': return {
+      ok: true,
+      op: { op: 'addWindow', opening: {
+        id: s('id'), kind: 'window', roomId: s('roomId'), side: s('side') as never, offset: inches(n('offsetFt')),
+        width: inches(n('widthFt')), height: inches(n('heightFt')), sill: inches(n('sillFt')), operation: s('operation') as never,
+      } },
+    }
+    case 'moveOpening': return { ok: true, op: { op: 'moveOpening', openingId: s('openingId'), side: s('side') as never, offset: inches(n('offsetFt')) } }
+    case 'resizeOpening': return { ok: true, op: { op: 'resizeOpening', openingId: s('openingId'), width: inches(n('widthFt')), height: inches(n('heightFt')), sill: inches(n('sillFt')) } }
+    case 'removeOpening': return { ok: true, op: { op: 'removeOpening', openingId: s('openingId') } }
+    case 'moveWall': return { ok: true, op: { op: 'moveWall', roomId: s('roomId'), side: s('side') as never, distance: inches(n('distanceFt')) } }
+    case 'setWallThickness': return { ok: true, op: { op: 'setWallThickness', kind: s('kind') as never, thickness: n('thicknessIn') } }
   }
 }

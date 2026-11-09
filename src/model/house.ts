@@ -1,5 +1,6 @@
 import type { HouseModel, Room, RoomType } from './types'
 import { ft, p } from './geometry'
+import { withHouseDefaults } from './firstPass'
 
 const r = (id: string, name: string, type: RoomType, x: number, y: number, w: number, d: number, bathId?: string): Room => ({
   id, name, type, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, bathId,
@@ -32,13 +33,13 @@ function kidsRooms(): Room[] {
  * Placeholder layout for testing the U-shaped arrangement, not a finished design.
  * Room coordinates are local to the house: 0,0 is the southwest corner of the west wing.
  */
-export const mainHouse: HouseModel = {
+export const mainHouse: HouseModel = withHouseDefaults({
   buildingId: 'main-house',
   origin: p(1060, 5360),
   concept: true,
   levels: [
     {
-      id: 'walkout', name: 'Walkout level', elevation: ft(-11), floorHeight: ft(11),
+      id: 'walkout', name: 'Walkout level', elevation: ft(-11), floorHeight: ft(11), exposed: ['s'],
       rooms: [
         r('concessions', 'Candy wall and concessions', 'service', 0, 0, 46, 16),
         r('theater', '20-seat theater', 'living', 0, 16, 46, 48),
@@ -103,4 +104,4 @@ export const mainHouse: HouseModel = {
       ],
     },
   ],
-}
+})
