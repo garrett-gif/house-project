@@ -173,6 +173,8 @@ export interface Ceiling {
   ridge?: 'ew' | 'ns'
   /** Vaulted: timber trusses this far apart (0 for none). Beamed: beams this far apart. */
   spacing?: Inches
+  /** Vaulted: end walls whose triangle above the plate is glass. */
+  glassEnds?: Side[]
 }
 
 /** A wing of a house, turned `angle` degrees counterclockwise about `pivot` (house-local inches). See src/model/wings.ts. */
@@ -213,7 +215,12 @@ export interface Opening {
   swing?: 'in' | 'out'
   /** At a joint between wings: the room on the other side, which is in another frame. */
   through?: string
+  /** Windows: projects out of the wall as a bay. See src/model/bays.ts. */
+  bay?: Bay
 }
+
+/** A bay window's projection: `depth` out from the wall centerline, square (box) or with 45 degree sides (angled). */
+export interface Bay { form: 'box' | 'angled'; depth: Inches; seat?: boolean }
 
 export type RoofForm = 'gable' | 'hip' | 'shed'
 
@@ -289,6 +296,8 @@ export interface HouseModel {
   roofs: Roof[]
   /** Wings turned at angles. Rooms, roofs, and beams name their wing. */
   wings?: Wing[]
+  /** The material palette, from src/model/materials.ts. Absent means mountain modern. */
+  style?: 'mountain-modern' | 'metal-timber' | 'lodge' | 'glass-gallery'
   /** Beams carrying upper walls over open floor. Optional so older saves still load; they get the first pass. */
   beams?: Beam[]
   /** Furniture, fixtures, appliances, and machines. Optional so older saves still load; they get the first pass. */

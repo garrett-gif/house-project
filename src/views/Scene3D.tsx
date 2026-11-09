@@ -4,13 +4,16 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { Estate, Rect } from '../model/types'
 import { Terrain } from '../model/parcel'
 import { ft, partsOf, samplePath, toFt } from '../model/geometry'
-import { ROOM_COLOR } from './HousePlan'
 import { houseBounds } from '../model/derive'
 import { CATALOG, parts } from '../model/furniture'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
 import { wingById } from '../model/wings'
-import { ceilingPolygons, ceilingTimber } from '../model/ceilings'
+import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
+import { SEAT, bayOutline } from '../model/bays'
+import { floorColor, paletteOf } from '../model/materials'
+import { outwardSide } from '../model/walls'
+import type { Palette } from '../model/materials'
 import type { P3, Poly3 } from '../model/roofs'
 import { flyoverKeyframes, step, walkStart } from '../ui/tour'
 
@@ -48,7 +51,7 @@ function addTimber(group: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, w:
 }
 
 /** Flat polygons as one mesh. With `facing` 'down', each is wound to face down, so a ceiling shows from inside only. */
-function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => number[], color: number, facing: 'down' | 'both') {
+function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => number[], color: number, facing: 'down' | 'both', opacity = 1) {
   const verts: number[] = []
   for (const poly of polys) {
     let v = poly.pts.map(toScene)
@@ -63,7 +66,7 @@ function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => num
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
   g.computeVertexNormals()
-  group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: facing === 'down' ? THREE.FrontSide : THREE.DoubleSide })))
+  group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: facing === 'down' ? THREE.FrontSide : THREE.DoubleSide, transparent: opacity < 1, opacity })))
 }
 
 function buildSite(scene: THREE.Scene, estate: Estate) {
@@ -141,14 +144,14 @@ function buildSite(scene: THREE.Scene, estate: Estate) {
 }
 
 /** Roof planes and gable walls as flat polygons, fanned into triangles. Plan x east, y north, z up; scene y is up. */
-function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number) {
+function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number, pal: Palette = paletteOf(estate.house)) {
   const roofVerts: number[] = [], gableVerts: number[] = []
   for (const roof of estate.house.roofs) for (const poly of roofPolygons(estate.house, roof)) {
     const v = poly.pts.map(([x, y, z]) => [toFt(x) - cx, toFt(z), cy - toFt(y)])
     const out = poly.kind === 'roof' ? roofVerts : gableVerts
     for (let i = 1; i < v.length - 1; i++) out.push(...v[0], ...v[i], ...v[i + 1])
   }
-  for (const [verts, color] of [[roofVerts, 0x5b5f63], [gableVerts, 0xe9e3d6]] as const) {
+  for (const [verts, color] of [[roofVerts, pal.roof], [gableVerts, pal.siding]] as const) {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
     g.computeVertexNormals()
@@ -162,6 +165,7 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const visible = onlyThisLevel ? [levels[top < 0 ? 0 : top]] : levels.slice(0, (top < 0 ? 1 : top) + 1)
   const showRoofs = !onlyThisLevel && top === levels.length - 1
   const b = houseBounds(estate.house)
+  const pal = paletteOf(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
   addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
   // Each wing is a group turned about its pivot; inside it, rooms, walls, and furniture use the wing's own inches.
@@ -182,23 +186,34 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
     const base = toFt(level.elevation)
     for (const room of level.rooms) {
       const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
-      addBox(frame(room.wingId), x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
+      addBox(frame(room.wingId), x + w / 2, base, z, w, 0.4, d, floorColor(pal, room.type))
     }
     // Walls follow the derived segments, with doors and windows cut out of them.
     const openings = placeOpenings(estate.house).filter(o => o.levelId === level.id && o.wall && !o.problem)
-    const WALL_COLOR = { exterior: 0xe9e3d6, interior: 0xf6f2ea, foundation: 0xc9c2b4 }
     for (const seg of levelWalls(estate.house, level)) {
-      const t = toFt(seg.thickness), color = WALL_COLOR[seg.kind], g = frame(seg.wingId)
+      const t = toFt(seg.thickness), g = frame(seg.wingId)
+      // Outside walls have two faces: siding over a stone base outside, the interior finish inside.
+      const out = seg.kind === 'interior' ? null : outwardSide(seg)
+      const sign = out === 'n' || out === 'e' ? 1 : -1, stoneTop = toFt(pal.baseHeight)
       // Walls of two-story rooms rise through the floor above, up to the roof.
       const index = levels.indexOf(level)
       const tall = seg.sides.some(id => level.rooms.find(r => r.id === id)?.twoStory) && levels[index + 1] && visible.includes(levels[index + 1])
       const wall = toFt(level.floorHeight + (tall ? levels[index + 1].floorHeight : 0))
       // A piece of wall between positions a and b along the segment (inches), from height y0 to y1 (feet above the floor).
-      const piece = (a: number, b: number, y0: number, y1: number, tint = color, opacity = 1) => {
+      const slab = (a: number, b: number, y0: number, y1: number, off: number, thick: number, tint: number, opacity = 1) => {
         if (b - a < 0.5 || y1 - y0 < 0.05) return
         const len = toFt(b - a), m = (a + b) / 2, h = y1 - y0
-        if (seg.orientation === 'h') addBox(g, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at), len, h, t, tint, opacity)
-        else addBox(g, toFt(seg.at) - cx, base + y0 + h / 2, cy - toFt(m), t, h, len, tint, opacity)
+        if (seg.orientation === 'h') addBox(g, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at) - off, len, h, thick, tint, opacity)
+        else addBox(g, toFt(seg.at) - cx + off, base + y0 + h / 2, cy - toFt(m), thick, h, len, tint, opacity)
+      }
+      const piece = (a: number, b: number, y0: number, y1: number, tint?: number, opacity = 1) => {
+        if (tint !== undefined || !out) return slab(a, b, y0, y1, 0, t, tint ?? pal.interior, opacity)
+        // slab() moves a positive offset north (scene -z) or east (+x), so the outer half sits at +t/4 on the outside.
+        const o = sign * t / 4
+        slab(a, b, y0, y1, -o, t / 2, pal.interior)
+        const outer = seg.kind === 'foundation' || level.elevation < 0 ? pal.stone : pal.siding
+        slab(a, b, Math.max(y0, Math.min(y1, stoneTop)), y1, o, t / 2, outer)
+        slab(a, b, y0, Math.min(y1, stoneTop), o, t / 2, pal.stone)
       }
       const holes = openings.filter(o => o.wall!.id === seg.id).sort((a, b) => a.from - b.from)
       let cursor = seg.from
@@ -207,10 +222,34 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
         const sill = toFt(o.sill), head = Math.min(wall, toFt(o.sill + o.height))
         piece(o.from, o.to, 0, sill)
         piece(o.from, o.to, head, wall)
-        if (o.kind === 'window') piece(o.from, o.to, sill, head, 0x9fc4d6, 0.35)
+        if (o.kind === 'window' && !o.bay) {
+          piece(o.from, o.to, sill, head, pal.glass, 0.35)
+          // Wide glass reads as panels: dark mullions about every 4 ft, as black window frames.
+          const panels = Math.round((o.to - o.from) / 48)
+          for (let j = 1; j < panels; j++) { const m = o.from + (o.to - o.from) * j / panels; piece(m - 1.5, m + 1.5, sill, head, pal.frame) }
+        }
         cursor = o.to
       }
       piece(cursor, seg.to, 0, wall)
+    }
+  }
+  // Bays: the floor carried out, solid below the sill and glass above on each face, a window seat, and a little roof.
+  for (const level of visible) {
+    const base = toFt(level.elevation)
+    for (const o of placeOpenings(estate.house).filter(o => o.bay && !o.problem && o.wall && o.levelId === level.id)) {
+      const g = frame(o.wall!.wingId), pts = bayOutline(o)
+      const toBay = (p: P3) => [toFt(p[0]) - cx, base + toFt(p[2]), cy - toFt(p[1])]
+      const flat = (z: number): Poly3 => ({ kind: 'roof', pts: pts.map(p => [p.x, p.y, z] as P3) })
+      const head = o.sill + o.height
+      addPolys(g, [flat(2)], toBay, 0xefe3cb, 'both')
+      addPolys(g, [flat(head + 2)], toBay, pal.roof, 'both')
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p = pts[i], q = pts[i + 1]
+        const face = (z0: number, z1: number): Poly3 => ({ kind: 'gable', pts: [[p.x, p.y, z0], [q.x, q.y, z0], [q.x, q.y, z1], [p.x, p.y, z1]] })
+        addPolys(g, [face(0, o.sill)], toBay, pal.siding, 'both')
+        addPolys(g, [face(o.sill, head)], toBay, pal.glass, 'both', 0.35)
+      }
+      if (o.bay!.seat) addPolys(g, [flat(Math.min(o.sill, SEAT.height))], toBay, pal.timber, 'both')
     }
   }
   // Furniture and machines as plain blocks at their real heights.
@@ -222,7 +261,7 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
       const c = CATALOG[item.kind], g = frame(level.rooms.find(r => r.id === item.roomId)?.wingId)
       for (const q of parts(item)) {
         const h = Math.max(0.1, toFt(q.h))
-        addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
+        addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : c.material ? pal[c.material] : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
       }
     }
   }
@@ -230,14 +269,16 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const toScene = (p: P3) => [toFt(p[0]) - cx, toFt(p[2]), cy - toFt(p[1])]
   for (const level of visible) for (const room of level.rooms.filter(r => r.ceiling)) {
     const g = frame(room.wingId), polys = ceilingPolygons(estate.house, room)
-    addPolys(g, polys.filter(p => p.kind === 'roof'), toScene, 0xf3eee4, 'down')
-    addPolys(g, polys.filter(p => p.kind === 'gable'), toScene, 0xf6f2ea, 'both')
+    addPolys(g, polys.filter(p => p.kind === 'roof'), toScene, pal.ceiling, 'down')
+    const glass = new Set(ceilingOf(estate.house, room).glassEnds ?? [])
+    addPolys(g, polys.filter(p => p.kind === 'gable' && !(p.side && glass.has(p.side))), toScene, pal.interior, 'both')
+    addPolys(g, polys.filter(p => p.kind === 'gable' && p.side && glass.has(p.side)), toScene, pal.glass, 'both', 0.35)
     for (const t of ceilingTimber(estate.house, room)) {
       const [a, b] = [t.a, t.b].map(p => new THREE.Vector3(...toScene(p)))
-      addTimber(g, a, b, toFt(t.w), toFt(t.d), 0x7a5634)
+      addTimber(g, a, b, toFt(t.w), toFt(t.d), pal.timber)
     }
   }
-  if (showRoofs) addRoofs(scene, estate, cx, cy)
+  if (showRoofs) addRoofs(scene, estate, cx, cy, pal)
 }
 
 type Tour = 'none' | 'fly' | 'walk'

@@ -71,6 +71,7 @@ const roofs: Roof[] = [
 /** First layout of the guest house, about 4,960 sq ft. A starting point to react to. */
 const firstPass: HouseModel = withHouseDefaults({
   buildingId: 'guest-house',
+  style: 'mountain-modern',
   origin: p(600, 4860),
   concept: true,
   program,

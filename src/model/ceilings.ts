@@ -31,12 +31,12 @@ export function plateHeight(house: HouseModel, room: Room): Inches {
 }
 
 /** The room's ceiling with defaults filled in. Vaulted ridges run the long way, spans the short way. */
-export function ceilingOf(house: HouseModel, room: Room): Required<Ceiling> {
+export function ceilingOf(house: HouseModel, room: Room): Required<Omit<Ceiling, 'glassEnds'>> & Pick<Ceiling, 'glassEnds'> {
   const plate = plateHeight(house, room)
   const c = room.ceiling ?? { form: 'flat', height: plate }
   const long: 'ew' | 'ns' = room.rect.w >= room.rect.d ? 'ew' : 'ns'
   const spacing = c.spacing ?? (c.form === 'vaulted' ? 12 * 12 : c.form === 'beamed' ? 6 * 12 : 0)
-  return { form: c.form, height: c.height, ridge: c.ridge ?? long, spacing }
+  return { form: c.form, height: c.height, ridge: c.ridge ?? long, spacing, glassEnds: c.glassEnds }
 }
 
 /** Half the span across the ridge, the run of a vault. */
@@ -74,16 +74,16 @@ export function ceilingPolygons(house: HouseModel, room: Room): Poly3[] {
     return [
       { kind: 'roof', pts: [[x0, y0, lo], [x1, y0, lo], [x1, ym, hi], [x0, ym, hi]] },
       { kind: 'roof', pts: [[x1, y1, lo], [x0, y1, lo], [x0, ym, hi], [x1, ym, hi]] },
-      { kind: 'gable', pts: [[x0, y0, lo], [x0, y1, lo], [x0, ym, hi]] },
-      { kind: 'gable', pts: [[x1, y1, lo], [x1, y0, lo], [x1, ym, hi]] },
+      { kind: 'gable', side: 'w', pts: [[x0, y0, lo], [x0, y1, lo], [x0, ym, hi]] },
+      { kind: 'gable', side: 'e', pts: [[x1, y1, lo], [x1, y0, lo], [x1, ym, hi]] },
     ]
   }
   const xm = (x0 + x1) / 2
   return [
     { kind: 'roof', pts: [[x0, y1, lo], [x0, y0, lo], [xm, y0, hi], [xm, y1, hi]] },
     { kind: 'roof', pts: [[x1, y0, lo], [x1, y1, lo], [xm, y1, hi], [xm, y0, hi]] },
-    { kind: 'gable', pts: [[x1, y0, lo], [x0, y0, lo], [xm, y0, hi]] },
-    { kind: 'gable', pts: [[x0, y1, lo], [x1, y1, lo], [xm, y1, hi]] },
+    { kind: 'gable', side: 's', pts: [[x1, y0, lo], [x0, y0, lo], [xm, y0, hi]] },
+    { kind: 'gable', side: 'n', pts: [[x0, y1, lo], [x1, y1, lo], [xm, y1, hi]] },
   ]
 }
 

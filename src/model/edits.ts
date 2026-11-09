@@ -1,4 +1,4 @@
-import type { Beam, BeamMaterial, Ceiling, Estate, FireRules, FurnitureItem, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
+import type { Bay, Beam, BeamMaterial, Ceiling, Estate, FireRules, FurnitureItem, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
 import { DEFAULT_FIRE_RULES } from './fireChecks'
 import { UTILITY_KINDS, UTILITY_RULE_NAMES, UTILITY_UNIT } from './utilities'
 import { ROOF_FORMS } from './roofs'
@@ -9,6 +9,8 @@ import { allHouses, houseByBuilding, houseOfRoom } from './houses'
 import { BEAM_MATERIALS, firstPassBeams } from './beams'
 import { CATALOG, furnishRoom } from './furniture'
 import { CEILING_FORMS } from './ceilings'
+import { PALETTES, STYLES } from './materials'
+import type { StyleId } from './materials'
 const allHousesOf = allHouses
 
 /** Which point of a rectangle stays fixed when it is resized. `n` keeps the north edge, `sw` the southwest corner. */
@@ -63,6 +65,8 @@ export type EditOp =
   | { op: 'setUtilityRule'; rule: keyof UtilityRules; value: number }
   | { op: 'setSafeRoom'; roomId: string; safeRoom: boolean }
   | { op: 'setCeiling'; roomId: string; ceiling: Ceiling | null }
+  | { op: 'setBay'; openingId: string; bay: Bay | null }
+  | { op: 'setStyle'; buildingId: string; style: StyleId }
   /** A graded swale or curtain drain around a building. */
   | { op: 'setSwale'; buildingId: string; swale: boolean }
   /** Beams in house-local inches; see Beam. */
@@ -176,12 +180,12 @@ function checkOpening(e: Estate, o: Opening, kinds: OpeningKind[]) {
 function targetHouse(e: Estate, op: EditOp): string | undefined {
   const opening = (id: string) => allHouses(e).find(h => h.openings.some(o => o.id === id))?.buildingId
   switch (op.op) {
-    case 'moveBuilding': case 'resizeBuilding': case 'setExcavated': return houseByBuilding(e, op.buildingId)?.buildingId
+    case 'moveBuilding': case 'resizeBuilding': case 'setExcavated': case 'setStyle': return houseByBuilding(e, op.buildingId)?.buildingId
     case 'moveRoom': case 'resizeRoom': case 'removeRoom': case 'renameRoom': case 'setRoomType': case 'moveWall': case 'setSafeRoom': case 'setCeiling':
       return houseOfRoom(e, op.roomId)?.buildingId
     case 'addRoom': return allHouses(e).find(h => h.levels.some(l => l.id === op.levelId))?.buildingId
     case 'addDoor': case 'addWindow': return houseOfRoom(e, op.opening.roomId)?.buildingId
-    case 'moveOpening': case 'resizeOpening': case 'removeOpening': return opening(op.openingId)
+    case 'moveOpening': case 'resizeOpening': case 'removeOpening': case 'setBay': return opening(op.openingId)
     case 'setRoof': return allHouses(e).find(h => h.roofs.some(r => r.id === op.roofId))?.buildingId
     case 'addBeam': return allHouses(e).find(h => h.levels.some(l => l.id === op.beam.levelId))?.buildingId
     case 'removeBeam': case 'setBeam': return allHouses(e).find(h => (h.beams ?? []).some(b => b.id === op.beamId))?.buildingId
@@ -629,6 +633,22 @@ function runInHouse(e: Estate, op: EditOp): string {
       else delete b.swale
       return ''
     }
+    case 'setStyle': {
+      if (e.house.buildingId !== op.buildingId) return `"${op.buildingId}" is not a detailed building with rooms.`
+      if (!(STYLES as readonly string[]).includes(op.style)) return `Unknown style "${op.style}". Use ${STYLES.join(', ')}.`
+      e.house.style = op.style
+      return ''
+    }
+    case 'setBay': {
+      const o = e.house.openings.find(x => x.id === op.openingId)
+      if (!o) return `No opening with id "${op.openingId}".`
+      if (!op.bay) { delete o.bay; return '' }
+      if (o.kind !== 'window') return 'Only windows can be bays.'
+      if (op.bay.form !== 'box' && op.bay.form !== 'angled') return 'A bay is box or angled.'
+      if (!finite(op.bay.depth) || op.bay.depth < 12 || op.bay.depth > 48) return 'Bay depth is 1 to 4 ft.'
+      o.bay = { form: op.bay.form, depth: op.bay.depth, ...(op.bay.seat ? { seat: true } : {}) }
+      return ''
+    }
     case 'setCeiling': {
       const found = findRoom(e, op.roomId)
       if (!found) return `No room with id "${op.roomId}".`
@@ -783,6 +803,8 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'fitBeams': return `Redo the beams of the ${building(op.buildingId).toLowerCase()} from its walls`
     case 'setExcavated': return op.excavated ? `Excavate the ${building(op.buildingId).toLowerCase()} site to its walkout, with retaining walls` : `Rely on the natural fall of the land at the ${building(op.buildingId).toLowerCase()}`
     case 'setSwale': return `${op.swale ? 'Add' : 'Remove'} a drainage swale around ${building(op.buildingId)}`
+    case 'setStyle': return `Give ${building(op.buildingId)} the ${PALETTES[op.style]?.name.split(':')[0].toLowerCase() ?? op.style} look`
+    case 'setBay': return op.bay ? `Make window ${op.openingId} a ${feet(op.bay.depth)} ${op.bay.form} bay${op.bay.seat ? ' with a window seat' : ''}` : `Make window ${op.openingId} flush with its wall`
     case 'setCeiling': return op.ceiling ? `Give ${room(op.roomId)} a ${op.ceiling.form} ceiling at ${feet(op.ceiling.height)}` : `Give ${room(op.roomId)} a plain flat ceiling`
     case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`
     case 'setRoof': {

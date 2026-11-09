@@ -47,7 +47,7 @@ export function shopBuilding(spec: ShopSpec): HouseModel {
     ...(spec.needs ?? []),
   ]
   const base = withHouseDefaults({
-    buildingId: spec.buildingId, origin: p(...spec.at), concept: true, program, roofs, furniture: [],
+    buildingId: spec.buildingId, origin: p(...spec.at), concept: true, program, roofs, furniture: [], style: 'metal-timber',
     levels: [{ id: levelId, name: 'Shop floor', elevation: 0, floorHeight: ft(spec.door.heightFt + 6), rooms }],
   })
 

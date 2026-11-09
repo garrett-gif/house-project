@@ -73,7 +73,7 @@ const officeProgram: ProgramItem[] = [
   { roomId: 'of-reception', need: 'Reception', minArea: 800 },
 ]
 export const officeBuilding: HouseModel = build({
-  buildingId: 'offices', origin: p(3360, 440), concept: true, program: officeProgram,
+  buildingId: 'offices', origin: p(3360, 440), concept: true, program: officeProgram, style: 'lodge',
   levels: [{ id: 'of-floor', name: 'Office floor', elevation: 0, floorHeight: ft(12), rooms: rooms('of', OFFICE) }],
 }, [
   door('of-entry', 'of-reception', 's', 20, 6), door('of-exec-entry', 'of-exec-lounge', 's', 3, 3.5),
@@ -135,7 +135,7 @@ const carProgram: ProgramItem[] = [
   { roomId: 'cb-lounge', need: 'Lounge and event space on the mezzanine, open to the showroom', minArea: 3000 },
 ]
 export const carBuilding: HouseModel = build({
-  buildingId: 'car-building', origin: p(1170, 4320), concept: true, program: carProgram,
+  buildingId: 'car-building', origin: p(1170, 4320), concept: true, program: carProgram, style: 'glass-gallery',
   levels: [
     { id: 'cb-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(18), rooms: rooms('cb', CAR_GROUND, ['showroom']) },
     { id: 'cb-mezz', name: 'Mezzanine', elevation: ft(18), floorHeight: ft(12), rooms: rooms('cb', CAR_MEZZ) },
@@ -185,7 +185,7 @@ const entProgram: ProgramItem[] = [
   { roomId: 'en-viewing', need: 'Viewing mezzanine looking over the trampolines', minArea: 4000 },
 ]
 export const entertainmentBuilding: HouseModel = build({
-  buildingId: 'entertainment', origin: p(700, 4320), concept: true, program: entProgram,
+  buildingId: 'entertainment', origin: p(700, 4320), concept: true, program: entProgram, style: 'mountain-modern',
   levels: [
     { id: 'en-floor', name: 'Ground floor', elevation: 0, floorHeight: ft(18), rooms: rooms('en', ENT_GROUND, ['trampoline', 'climbing', 'court']) },
     { id: 'en-mezz', name: 'Mezzanine', elevation: ft(18), floorHeight: ft(14), rooms: rooms('en', ENT_MEZZ) },

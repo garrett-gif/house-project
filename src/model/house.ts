@@ -179,6 +179,7 @@ const roofs: Roof[] = [
 /** Second layout of the main house, about 24,500 sq ft. A starting point to react to. */
 const firstPass: HouseModel = withHouseDefaults({
   buildingId: 'main-house',
+  style: 'mountain-modern',
   // The owner chose to keep the walkout facing south and excavate for it.
   excavated: true,
   origin: p(1060, 5395),

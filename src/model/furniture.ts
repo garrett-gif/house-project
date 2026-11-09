@@ -23,6 +23,8 @@ export interface CatalogEntry {
   /** Goes on a short wall, as a theater screen does, leaving the long dimension for what faces it. */
   shortWall?: boolean
   parts?: Part[]
+  /** Drawn in the building's stone or timber rather than by category. */
+  material?: 'stone' | 'timber'
 }
 
 const p = (name: string, x: number, y: number, w: number, d: number, h: number): Part => ({ name, x, y, w, d, h })
@@ -202,6 +204,22 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'water-heater': { name: 'Water heaters', w: 60, d: 30, h: 72, category: 'equipment', place: 'wall', front: 30, kw: 4.5 },
   'electrical-panels': { name: 'Electrical panels', w: 72, d: 12, h: 72, category: 'equipment', place: 'wall', front: 42 },
   'pool-filter': { name: 'Pool pumps and filters', w: 72, d: 36, h: 48, category: 'equipment', place: 'wall', front: 36, kw: 3.7 },
+  // Fireplaces and built-ins, per the brief: floor-to-ceiling stone in the great room, stone in the primary suite and outdoors.
+  'fireplace-stone-tall': { name: 'Stone fireplace, floor to ceiling', w: 120, d: 36, h: 216, category: 'fixture', place: 'wall', front: 48, material: 'stone',
+    parts: [p('Hearth', 0, 18, 120, 18, 16), p('Stone chimney breast', 12, 0, 96, 18, 216)] },
+  'fireplace-stone': { name: 'Stone fireplace', w: 84, d: 30, h: 108, category: 'fixture', place: 'wall', front: 42, material: 'stone',
+    parts: [p('Hearth', 0, 14, 84, 16, 16), p('Stone surround', 6, 0, 72, 14, 108)] },
+  'fireplace-outdoor': { name: 'Outdoor stone fireplace', w: 96, d: 36, h: 132, category: 'outdoor', place: 'wall', front: 60, material: 'stone',
+    parts: [p('Hearth', 0, 18, 96, 18, 18), p('Stone firebox and chimney', 8, 0, 80, 18, 132)] },
+  'outdoor-kitchen': { name: 'Outdoor kitchen: grill, sink, fridge, counter', w: 144, d: 30, h: 36, category: 'outdoor', place: 'wall', front: 42, kw: 2, material: 'stone' },
+  'built-in-shelves': { name: 'Built-in shelves and cabinets', w: 120, d: 16, h: 96, category: 'storage', place: 'wall', front: 30, material: 'timber' },
+  'bunk-nook': { name: 'Built-in bunk nook, sleeps two, with reading lights', w: 84, d: 48, h: 84, category: 'bed', place: 'wall', front: 30, material: 'timber',
+    parts: [p('Lower bunk', 2, 6, 80, 40, 18), p('Upper bunk', 2, 6, 80, 40, 60), p('Timber surround', 0, 0, 84, 6, 84)] },
+  'reading-nook': { name: 'Reading nook with cushions and shelves', w: 60, d: 36, h: 84, category: 'seating', place: 'wall', front: 24, seats: 1, material: 'timber',
+    parts: [p('Cushion', 0, 8, 60, 28, 18), p('Shelves', 0, 0, 60, 8, 84)] },
+  'breakfast-banquette': { name: 'Breakfast banquette and table', w: 96, d: 72, h: 36, category: 'table', place: 'wall', front: 24, seats: 6, material: 'timber',
+    parts: [p('Banquette', 0, 0, 96, 22, 36), p('Table', 12, 24, 72, 36, 30)] },
+  'wine-wall': { name: 'Glass-fronted wine wall', w: 144, d: 24, h: 96, category: 'storage', place: 'wall', front: 36, kw: 1.5 },
   'wine-rack': { name: 'Wine racks', w: 72, d: 16, h: 84, category: 'storage', place: 'wall', front: 30 },
 }
 

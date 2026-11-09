@@ -5,6 +5,8 @@ import type { PlacedOpening, WallSegment } from '../model/walls'
 import { ARCH_D, PT_PER_IN, ftIn, turnMarks } from './sheet'
 import { toHouse } from '../model/wings'
 import { ceilingNote } from '../model/ceilings'
+import { bayOutline } from '../model/bays'
+const lineOf = ([x1, y1]: [number, number], [x2, y2]: [number, number]) => ({ x1, y1, x2, y2 })
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
 import { beamMarks, beamsAbove } from '../model/beams'
@@ -181,6 +183,13 @@ function drawOpening(marks: Mark[], o: PlacedOpening, X: (x: number) => number, 
   const [gx1, gy1] = P(o.to, o.at + (o.orientation === 'h' ? -t / 2 - 0.5 : t / 2 + 0.5))
   marks.push({ t: 'rect', x: Math.min(gx0, gx1), y: Math.min(gy0, gy1), w: Math.abs(gx1 - gx0), h: Math.abs(gy1 - gy0), fill: '#fff' })
   const along = (p: number, off = 0) => P(p, o.at + off)
+  if (o.kind === 'window' && o.bay) {
+    // A bay: its outline out from the wall, glazed, with the seat edge dashed inside.
+    const pts = bayOutline(o).map(p => [X(p.x), Y(p.y)])
+    marks.push({ t: 'path', d: 'M ' + pts.map(p => p.join(' ')).join(' L '), stroke: '#000', sw: 0.9 })
+    marks.push({ t: 'line', ...lineOf(along(o.from), along(o.to)), w: 0.35, dash: [3, 2] })
+    return
+  }
   if (o.kind === 'window') {
     for (const off of [-t / 2, 0, t / 2]) {
       const [x1, y1] = along(o.from, off), [x2, y2] = along(o.to, off)

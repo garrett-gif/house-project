@@ -11,6 +11,7 @@ import { UTILITY_UNIT, demand, occupancy, utilityRules } from './utilities'
 import { earthwork, groundAt, roadGrade, siteSlope } from './terrain'
 import { bounds, center, footprintOf } from './geometry'
 import { ceilingNote } from './ceilings'
+import { paletteOf } from './materials'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -54,6 +55,7 @@ export function summarizeEstate(e: Estate): string {
   const { origin } = house
   lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.${house.excavated ? ` Its site is excavated to the walkout by design, about ${Math.round(earthwork(e, house).cutCy / 100) * 100} cubic yards of cut.` : ''}`)
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
+  lines.push(`Look: ${paletteOf(house).name}.`)
   if (house.wings?.length) lines.push(`Wings (id: name, turned counterclockwise about a house-local pivot): ${house.wings.map(w => `${w.id}: ${w.name}, ${w.angle} degrees about ${f(w.pivot.x)},${f(w.pivot.y)} ft`).join('; ')}. A room marked with a wing has its position in that wing's own coordinates, before the turn; walls only join rooms in the same wing, and a joint opening names the room beyond.`)
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
@@ -71,7 +73,7 @@ export function summarizeEstate(e: Estate): string {
       const overhead = placed.filter(o => o.roomId === r.id && o.kind === 'garage-door')
       if (overhead.length > 6) lines.push(`    ${overhead.length} overhead doors, ${ft1(overhead[0].width)}x${ft1(overhead[0].height)} or smaller, one at each end of every lane on the n and s sides (ids ${overhead[0].id} to ${overhead[overhead.length - 1].id})`)
       for (const o of placed.filter(o => o.roomId === r.id && !(overhead.length > 6 && o.kind === 'garage-door'))) {
-        lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
+        lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}${o.bay ? `, ${o.bay.form} bay ${ft1(o.bay.depth)} ft deep${o.bay.seat ? ' with seat' : ''}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
       }
     }
   }

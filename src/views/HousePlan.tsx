@@ -13,6 +13,7 @@ import { CATALOG, parts as furnitureParts } from '../model/furniture'
 import type { FurnitureItem } from '../model/types'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 import { toWing, wingById } from '../model/wings'
+import { bayOutline } from '../model/bays'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -121,6 +122,10 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
     const handlers = editable ? { onPointerDown: (e: ReactPointerEvent) => begin(e, { kind: 'opening', opening: o }), style: { cursor: o.orientation === 'h' ? 'ew-resize' : 'ns-resize' } } : {}
     const gap = <rect x={ax} y={ay} width={bx - ax} height={by - ay} fill="#fffdf8" />
     const along = (p: number): [number, number] => o.orientation === 'h' ? [p, o.at] : [o.at, p]
+    if (o.kind === 'window' && o.bay) {
+      const d = 'M ' + bayOutline(o).map(p => P(p.x, p.y).join(' ')).join(' L ')
+      return <g key={o.id} {...handlers}>{gap}<path d={d} fill={ROOM_COLOR.living} stroke={color} strokeWidth={0.22} /></g>
+    }
     if (o.kind === 'window' || o.kind === 'garage-door') {
       const [sx, sy] = P(...along(o.from)), [ex, ey] = P(...along(o.to))
       const off = toFt(t) / 4, [nx, ny] = o.orientation === 'h' ? [0, off] : [off, 0]

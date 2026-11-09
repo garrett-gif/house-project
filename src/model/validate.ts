@@ -9,6 +9,7 @@ import { terrainChecks } from './terrainChecks'
 import { allHouses, checksForEachHouse } from './houses'
 import { beamChecks } from './beams'
 import { ceilingChecks } from './ceilings'
+import { bayChecks } from './bays'
 import { furnitureChecks } from './furniture'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 import { JOINT_WEDGE_SQFT, crossFrameOverlapSqFt, roomBoxInHouse } from './wings'
@@ -137,6 +138,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(...checksForEachHouse(e, roofChecks))
   checks.push(...checksForEachHouse(e, beamChecks))
   checks.push(...checksForEachHouse(e, ceilingChecks))
+  checks.push(...checksForEachHouse(e, bayChecks))
   checks.push(...checksForEachHouse(e, furnitureChecks))
   checks.push(...fireChecks(e))
   checks.push(...utilityChecks(e))

@@ -5,7 +5,7 @@ import { toHouse } from './wings'
 /** A point in house-local inches: x east, y north, z up from the main floor. */
 export type P3 = [number, number, number]
 /** A flat polygon in 3D. Roof planes are roofing; gable walls are the wall triangles under a gable or beside a shed. */
-export interface Poly3 { pts: P3[]; kind: 'roof' | 'gable' }
+export interface Poly3 { pts: P3[]; kind: 'roof' | 'gable'; side?: 'n' | 's' | 'e' | 'w' }
 
 export const ROOF_FORMS = ['gable', 'hip', 'shed'] as const
 
