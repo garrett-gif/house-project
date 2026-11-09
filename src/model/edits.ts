@@ -1,5 +1,6 @@
-import type { Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, Side, WallKind, WaterSource, WindowOperation } from './types'
+import type { Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, SecurityDevice, Side, Utility, UtilityRules, WallKind, WaterSource, WindowOperation } from './types'
 import { DEFAULT_FIRE_RULES } from './fireChecks'
+import { UTILITY_KINDS, UTILITY_RULE_NAMES, UTILITY_UNIT } from './utilities'
 import { ROOF_FORMS } from './roofs'
 import { SIDE_WORD, placeOpenings, sideLine } from './walls'
 import { footprintOf, overlaps, toFt, translate } from './geometry'
@@ -42,6 +43,20 @@ export type EditOp =
   | { op: 'removeWaterSource'; sourceId: string }
   | { op: 'setIgnition'; buildingId: string; ignition: Ignition }
   | { op: 'setFireRule'; rule: FireRuleName; value: number }
+  /** Utilities sit on site rectangles; `capacity` is in the unit of their kind (see Utility). */
+  | { op: 'addUtility'; utility: Utility }
+  | { op: 'moveUtility'; utilityId: string; dx: Inches; dy: Inches }
+  | { op: 'resizeUtility'; utilityId: string; w: Inches; d: Inches; anchor: Anchor }
+  | { op: 'setUtility'; utilityId: string; capacity: number; serves: string[] }
+  | { op: 'removeUtility'; utilityId: string }
+  | { op: 'addDevice'; device: SecurityDevice }
+  | { op: 'moveDevice'; deviceId: string; dx: Inches; dy: Inches }
+  /** `facing` and `fov` in degrees, 0 east and 90 north. */
+  | { op: 'aimCamera'; deviceId: string; facing: number; fov: number; range: Inches }
+  | { op: 'removeDevice'; deviceId: string }
+  | { op: 'setOccupancy'; buildingId: string; beds: number; staff: number; backupPower: boolean }
+  | { op: 'setUtilityRule'; rule: keyof UtilityRules; value: number }
+  | { op: 'setSafeRoom'; roomId: string; safeRoom: boolean }
 
 export const ROAD_KINDS: RoadKind[] = ['estate', 'work', 'perimeter', 'gated-link']
 export const FIRE_RULE_NAMES = ['zone1Ft', 'zone2Ft', 'zone3Ft', 'minRoadWidthFt', 'maxHosePullFt', 'maxDeadEndFt', 'maxWaterDistanceFt', 'minWaterGallons'] as const
@@ -101,6 +116,20 @@ function setRect(e: Estate, room: Room, next: Rect) {
   room.rect = next
 }
 
+function checkInside(e: Estate, r: Rect) {
+  return r.x < 0 || r.y < 0 || r.x + r.w > e.parcel.size || r.y + r.d > e.parcel.size ? 'It must stay inside the parcel.' : ''
+}
+
+function checkUtility(e: Estate, capacity: number, serves: string[]) {
+  if (!finite(capacity) || capacity < 0 || capacity > 100_000_000) return 'Capacity must be a positive number.'
+  if (!Array.isArray(serves)) return 'Serves must be a list of building ids.'
+  const unknown = serves.filter(id => !e.buildings.some(b => b.id === id))
+  return unknown.length ? `No building with id "${unknown[0]}".` : ''
+}
+
+const checkReach = (range: number) => !finite(range) || range < 12 || range > 12 * 2000 ? 'Range must be between 1 and 2,000 ft.' : ''
+const checkAim = (facing: number, fov: number) => !finite(facing, fov) ? 'Facing and view must be numbers.' : fov < 5 || fov > 360 ? 'View must be between 5 and 360 degrees.' : ''
+
 function checkOpeningSize(width: number, height: number, sill: number) {
   if (!finite(width, height, sill)) return 'Opening sizes must be numbers.'
   if (width < 12 || height < 12) return 'Openings must be at least 1 ft wide and 1 ft tall.'
@@ -139,6 +168,8 @@ function run(e: Estate, op: EditOp): string {
         if (w.from === b.id) w.points[0] = { x: w.points[0].x + op.dx, y: w.points[0].y + op.dy }
         if (w.to === b.id) w.points[last] = { x: w.points[last].x + op.dx, y: w.points[last].y + op.dy }
       }
+      // Cameras and lights mounted on the building go with it.
+      for (const d of e.security ?? []) if (d.on === b.id) d.at = { x: d.at.x + op.dx, y: d.at.y + op.dy }
       return ''
     }
     case 'resizeBuilding': {
@@ -345,6 +376,111 @@ function run(e: Estate, op: EditOp): string {
       e.fireRules = r
       return ''
     }
+    case 'addUtility': {
+      const u = op.utility
+      const list = e.utilities ?? []
+      if (!ID.test(u.id)) return 'Utility ids use lowercase letters, numbers, and hyphens.'
+      if (list.some(x => x.id === u.id)) return `A utility with id "${u.id}" already exists.`
+      if (!u.name?.trim()) return 'A new utility needs a name.'
+      if (!UTILITY_KINDS.includes(u.kind)) return `Utility kind must be one of: ${UTILITY_KINDS.join(', ')}.`
+      const bad = checkSize(u.rect.w, u.rect.d, e.parcel.size) || checkInside(e, u.rect) || checkUtility(e, u.capacity, u.serves)
+      if (bad) return bad
+      e.utilities = [...list, { id: u.id, name: u.name, kind: u.kind, rect: { ...u.rect }, capacity: u.capacity, serves: [...u.serves] }]
+      return ''
+    }
+    case 'moveUtility': {
+      const u = (e.utilities ?? []).find(x => x.id === op.utilityId)
+      if (!u) return `No utility with id "${op.utilityId}".`
+      if (!finite(op.dx, op.dy)) return 'Move distances must be numbers.'
+      u.rect = translate(u.rect, op.dx, op.dy)
+      return checkInside(e, u.rect)
+    }
+    case 'resizeUtility': {
+      const u = (e.utilities ?? []).find(x => x.id === op.utilityId)
+      if (!u) return `No utility with id "${op.utilityId}".`
+      if (!ANCHORS.includes(op.anchor)) return `Unknown anchor "${op.anchor}".`
+      const bad = checkSize(op.w, op.d, e.parcel.size)
+      if (bad) return bad
+      u.rect = resizeRect(u.rect, op.w, op.d, op.anchor)
+      return checkInside(e, u.rect)
+    }
+    case 'setUtility': {
+      const u = (e.utilities ?? []).find(x => x.id === op.utilityId)
+      if (!u) return `No utility with id "${op.utilityId}".`
+      const bad = checkUtility(e, op.capacity, op.serves)
+      if (bad) return bad
+      u.capacity = op.capacity
+      u.serves = [...new Set(op.serves)]
+      return ''
+    }
+    case 'removeUtility': {
+      if (!(e.utilities ?? []).some(u => u.id === op.utilityId)) return `No utility with id "${op.utilityId}".`
+      e.utilities = (e.utilities ?? []).filter(u => u.id !== op.utilityId)
+      return ''
+    }
+    case 'addDevice': {
+      const d = op.device
+      const list = e.security ?? []
+      if (!ID.test(d.id)) return 'Device ids use lowercase letters, numbers, and hyphens.'
+      if (list.some(x => x.id === d.id)) return `A device with id "${d.id}" already exists.`
+      if (!d.name?.trim()) return 'A new device needs a name.'
+      if (d.kind !== 'camera' && d.kind !== 'light') return 'Kind must be camera or light.'
+      if (!['grid', 'backup', 'solar'].includes(d.power)) return 'Power must be grid, backup, or solar.'
+      if (!finite(d.at.x, d.at.y) || d.at.x < 0 || d.at.y < 0 || d.at.x > e.parcel.size || d.at.y > e.parcel.size) return 'The device must be inside the parcel.'
+      const bad = checkReach(d.range) || (d.kind === 'camera' ? checkAim(d.facing ?? 0, d.fov ?? 90) : '')
+      if (bad) return bad
+      if (d.on && !e.buildings.some(b => b.id === d.on)) return `No building with id "${d.on}".`
+      e.security = [...list, { ...d, at: { ...d.at }, ...(d.kind === 'camera' ? { facing: d.facing ?? 0, fov: d.fov ?? 90 } : {}) }]
+      return ''
+    }
+    case 'moveDevice': {
+      const d = (e.security ?? []).find(x => x.id === op.deviceId)
+      if (!d) return `No camera or light with id "${op.deviceId}".`
+      if (!finite(op.dx, op.dy)) return 'Move distances must be numbers.'
+      d.at = { x: d.at.x + op.dx, y: d.at.y + op.dy }
+      if (d.at.x < 0 || d.at.y < 0 || d.at.x > e.parcel.size || d.at.y > e.parcel.size) return 'The device must stay inside the parcel.'
+      return ''
+    }
+    case 'aimCamera': {
+      const d = (e.security ?? []).find(x => x.id === op.deviceId)
+      if (!d) return `No camera with id "${op.deviceId}".`
+      if (d.kind !== 'camera') return `${d.name} is a light, not a camera.`
+      const bad = checkAim(op.facing, op.fov) || checkReach(op.range)
+      if (bad) return bad
+      d.facing = ((op.facing % 360) + 360) % 360
+      d.fov = op.fov
+      d.range = op.range
+      return ''
+    }
+    case 'removeDevice': {
+      if (!(e.security ?? []).some(d => d.id === op.deviceId)) return `No camera or light with id "${op.deviceId}".`
+      e.security = (e.security ?? []).filter(d => d.id !== op.deviceId)
+      return ''
+    }
+    case 'setOccupancy': {
+      const b = e.buildings.find(x => x.id === op.buildingId)
+      if (!b) return `No building with id "${op.buildingId}".`
+      if (!finite(op.beds, op.staff) || op.beds < 0 || op.staff < 0 || op.beds > 5000 || op.staff > 5000) return 'Beds and staff must be between 0 and 5,000.'
+      b.beds = Math.round(op.beds)
+      b.staff = Math.round(op.staff)
+      b.backupPower = !!op.backupPower
+      return ''
+    }
+    case 'setUtilityRule': {
+      if (!UTILITY_RULE_NAMES.includes(op.rule)) return `Rule must be one of: ${UTILITY_RULE_NAMES.join(', ')}.`
+      if (!finite(op.value) || op.value <= 0 || op.value > 1_000_000) return 'Rule values must be positive numbers.'
+      if (op.rule === 'backupShare' && op.value > 1) return 'backupShare is a fraction from 0 to 1.'
+      if (op.rule === 'wellPumpHours' && op.value > 24) return 'wellPumpHours is at most 24.'
+      e.utilityRules = { ...e.utilityRules, [op.rule]: op.value }
+      return ''
+    }
+    case 'setSafeRoom': {
+      const found = findRoom(e, op.roomId)
+      if (!found) return `No room with id "${op.roomId}".`
+      if (op.safeRoom) found.room.safeRoom = true
+      else delete found.room.safeRoom
+      return ''
+    }
     default:
       return `Unknown edit "${(op as { op: string }).op}".`
   }
@@ -367,6 +503,12 @@ function collisions(e: Estate): Map<string, string> {
       if (overlaps(pa, pb)) { found.set(`building:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(pa, pb)}`); return }
     }
   }))
+  // Utilities take ground of their own: they may not sit on a building or on each other.
+  const utilities = e.utilities ?? []
+  utilities.forEach((u, i) => {
+    for (const b of e.buildings) if (footprintOf(b).some(p => overlaps(p, u.rect))) found.set(`utility:${u.id}|${b.id}`, `${u.name} (${u.id}) would sit on ${b.name} (${b.id})`)
+    for (const v of utilities.slice(i + 1)) if (overlaps(u.rect, v.rect)) found.set(`utility:${[u.id, v.id].sort().join('|')}`, `${u.name} (${u.id}) and ${v.name} (${v.id}) would overlap by ${intersection(u.rect, v.rect)}`)
+  })
   return found
 }
 
@@ -414,6 +556,8 @@ const ANCHOR_WORDS: Record<Anchor, string> = {
 export function describeEdit(op: EditOp, e: Estate): string {
   const building = (id: string) => e.buildings.find(b => b.id === id)?.name ?? id
   const room = (id: string) => findRoom(e, id)?.room.name ?? id
+  const utility = (id: string) => (e.utilities ?? []).find(u => u.id === id)?.name ?? id
+  const device = (id: string) => (e.security ?? []).find(d => d.id === id)?.name ?? id
   switch (op.op) {
     case 'moveBuilding': return `Move ${building(op.buildingId)} ${direction(op.dx, op.dy)}`
     case 'resizeBuilding': return `Resize ${building(op.buildingId)} to ${feet(op.w)} × ${feet(op.d)}, keeping its ${ANCHOR_WORDS[op.anchor]}`
@@ -444,6 +588,21 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeWaterSource': return `Remove ${(e.waterSources ?? []).find(w => w.id === op.sourceId)?.name ?? op.sourceId}`
     case 'setIgnition': return `Set ${e.buildings.find(b => b.id === op.buildingId)?.name ?? op.buildingId} to a class ${op.ignition.roofClass} roof, ${op.ignition.emberVents ? 'ember-resistant' : 'standard'} vents, ${op.ignition.enclosedEaves ? 'boxed' : 'open'} eaves, ${op.ignition.decks === 'none' ? 'no' : op.ignition.decks} decks`
     case 'setFireRule': return `Set fire rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
+    case 'addUtility': return `Add ${op.utility.name} (${op.utility.kind}, ${op.utility.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[op.utility.kind]}, ${feet(op.utility.rect.w)} × ${feet(op.utility.rect.d)})`
+    case 'moveUtility': return `Move ${utility(op.utilityId)} ${direction(op.dx, op.dy)}`
+    case 'resizeUtility': return `Resize ${utility(op.utilityId)} to ${feet(op.w)} × ${feet(op.d)}, keeping its ${ANCHOR_WORDS[op.anchor]}`
+    case 'setUtility': {
+      const kind = (e.utilities ?? []).find(u => u.id === op.utilityId)?.kind
+      return `Set ${utility(op.utilityId)} to ${op.capacity.toLocaleString('en-US')} ${kind ? UTILITY_UNIT[kind] : ''}, serving ${op.serves.map(building).join(', ') || 'no buildings'}`
+    }
+    case 'removeUtility': return `Remove ${utility(op.utilityId)}`
+    case 'addDevice': return `Add ${op.device.name}${op.device.kind === 'camera' ? `, facing ${Math.round(op.device.facing ?? 0)}°, ${op.device.fov ?? 90}° view` : ''}, ${feet(op.device.range)} reach`
+    case 'moveDevice': return `Move ${device(op.deviceId)} ${direction(op.dx, op.dy)}`
+    case 'aimCamera': return `Aim ${device(op.deviceId)} at ${Math.round(op.facing)}° with a ${op.fov}° view and ${feet(op.range)} range`
+    case 'removeDevice': return `Remove ${device(op.deviceId)}`
+    case 'setOccupancy': return `Set ${building(op.buildingId)} to ${op.beds} sleeping and ${op.staff} by day${op.backupPower ? ', on backup power' : ', no backup power'}`
+    case 'setUtilityRule': return `Set utility rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
+    case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`
     case 'setRoof': {
       const name = e.house.roofs.find(r => r.id === op.roofId)?.name ?? op.roofId
       const shape = op.form === 'shed' ? `shed sloping down to the ${SIDE_WORD[op.low]}` : `${op.form} with its ridge running ${op.ridge === 'ew' ? 'east-west' : 'north-south'}`

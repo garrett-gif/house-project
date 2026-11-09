@@ -1,5 +1,6 @@
 import type { Building, Check, Estate, FireRules, Pt, Rect, Road } from './types'
 import { ft, partsOf, pathLength, pointToRect, samplePath, toFt } from './geometry'
+import { clearedRects } from './utilities'
 
 /**
  * Planning values for wildfire and fire access, from common wildland-urban interface guidance: defensible-space
@@ -37,7 +38,7 @@ export function fireChecks(e: Estate): Check[] {
   const [, near, far] = rules.zones
   const checks: Check[] = []
   const parcel: Rect = { x: 0, y: 0, w: e.parcel.size, d: e.parcel.size }
-  const cleared = e.zones.filter(z => z.cleared).map(z => z.rect)
+  const cleared = clearedRects(e)
   const treated = [...cleared, ...e.zones.filter(z => z.kind === 'fuelbreak').map(z => z.rect)]
 
   // Defensible space: cleared ground within the near zone, cleared or thinned out to the far zone.

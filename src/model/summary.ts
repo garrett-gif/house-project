@@ -4,6 +4,7 @@ import { validateEstate } from './validate'
 import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
+import { UTILITY_UNIT, demand, occupancy, utilityRules } from './utilities'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -14,8 +15,12 @@ export function summarizeEstate(e: Estate): string {
   lines.push(`Estate "${e.name}", site layout ${e.layoutVersion}. All numbers are feet.`)
   lines.push(`Site coordinates: x east, y north, origin at the southwest parcel corner. Parcel is ${f(e.parcel.size)} x ${f(e.parcel.size)} ft. Rectangles give the southwest corner, then east-west width x north-south depth.`)
 
-  lines.push('', 'Buildings (id: name, use, access, position, height):')
-  for (const b of e.buildings) lines.push(`- ${b.id}: ${b.name}, ${b.use}, ${b.access}, ${box(b.rect)}, ${f(b.height)} ft tall`)
+  lines.push('', 'Buildings (id: name, use, access, position, height, people at peak, estimated peak power):')
+  for (const b of e.buildings) {
+    const o = occupancy(e, b)
+    const people = [o.beds ? `sleeps ${o.beds}` : '', o.staff ? `${o.staff} by day` : ''].filter(Boolean).join(', ') || 'no one stays'
+    lines.push(`- ${b.id}: ${b.name}, ${b.use}, ${b.access}, ${box(b.rect)}, ${f(b.height)} ft tall, ${people}, ${Math.round(demand(e, b).kw)} kW${b.backupPower ? ', on backup power' : ''}${b.fuelStorage ? ', stores fuel' : ''}`)
+  }
 
   lines.push('', 'Covered walkways (id: name, from building to building, length):')
   for (const w of e.walkways) lines.push(`- ${w.id}: ${w.name}, ${w.from ?? 'unlinked'} to ${w.to ?? 'unlinked'}, ${f(pathLength(w.points))} ft`)
@@ -30,6 +35,14 @@ export function summarizeEstate(e: Estate): string {
   const fr = fireRules(e)
   lines.push(`Fire rules (planning values): zones ${fr.zones.join(', ')} ft; roads ${fr.minRoadWidthFt} ft wide; hose pull ${fr.maxHosePullFt} ft; dead ends over ${fr.maxDeadEndFt} ft need a turnaround; ${fr.minWaterGallons.toLocaleString('en-US')} gallons within ${fr.maxWaterDistanceFt.toLocaleString('en-US')} ft.`)
 
+  lines.push('', 'Utilities (id: name, kind, rectangle in site feet, capacity, buildings served). Septic rectangles are drainfields with a reserve:')
+  for (const u of e.utilities ?? []) lines.push(`- ${u.id}: ${u.name}, ${u.kind}, ${box(u.rect)}, ${u.capacity.toLocaleString('en-US')} ${UTILITY_UNIT[u.kind]}, serves ${u.serves.join(', ') || 'none (feeds the grid service)'}`)
+  const devices = e.security ?? []
+  lines.push('', `Security: ${devices.filter(d => d.kind === 'camera').length} cameras and ${devices.filter(d => d.kind === 'light').length} lights (id: kind, at site feet, facing and view for cameras, range, power, mounted on):`)
+  for (const d of devices) lines.push(`- ${d.id}: ${d.kind} at ${f(d.at.x)},${f(d.at.y)}${d.kind === 'camera' ? `, facing ${Math.round(d.facing ?? 0)} deg, ${d.fov ?? 360} deg view` : ''}, ${f(d.range)} ft, ${d.power}${d.on ? `, on ${d.on}` : ''}`)
+  const ur = utilityRules(e)
+  lines.push(`Utility rules (planning values): ${Object.entries(ur).map(([k, v]) => `${k} ${v}`).join(', ')}.`)
+
   const { origin } = e.house
   lines.push('', `Main house (building ${e.house.buildingId}). Placeholder massing. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
   lines.push('Room positions are house-local: 0,0 is the house origin, x east, y north. The formal entry faces north.')
@@ -41,7 +54,7 @@ export function summarizeEstate(e: Estate): string {
   for (const level of e.house.levels) {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
-      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}`)
+      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}`)
       for (const o of placed.filter(o => o.roomId === r.id)) {
         lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
       }
