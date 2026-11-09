@@ -1,4 +1,5 @@
 import type { Estate, HouseModel } from '../model/types'
+import { existingGrade } from '../model/terrain'
 import { levelWalls, outwardSide, placeOpenings } from '../model/walls'
 import { eaveHeight, ridgeHeight, roofPolygons } from '../model/roofs'
 import type { P3 } from '../model/roofs'
@@ -150,6 +151,19 @@ export function elevationMarks(e: Estate, view: ElevationView, sx: number, sy: n
   const earth = `M ${tx(hMin)} ${tz(zBottom)} ` + steps.map(([h, z]) => `L ${tx(h)} ${tz(z)}`).join(' ') + ` L ${tx(hMax)} ${tz(zBottom)} Z`
   placedMarks.push({ t: 'path', d: earth, fill: '#fff' })
   placedMarks.push({ t: 'path', d: 'M ' + steps.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 2.2 })
+  const solid = house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor').map(r => r.rect)
+  const face = { s: Math.min(...solid.map(r => r.y)), n: Math.max(...solid.map(r => r.y + r.d)), w: Math.min(...solid.map(r => r.x)), e: Math.max(...solid.map(r => r.x + r.w)) }
+  const existingAt = (h: number) => view === 'south' ? existingGrade(e, house, h, face.s) : view === 'north' ? existingGrade(e, house, -h, face.n)
+    : view === 'east' ? existingGrade(e, house, face.e, h) : existingGrade(e, house, face.w, -h)
+
+  // Existing ground from the terrain, dashed, so the cut and fill the design asks for is visible.
+  {
+    const clamp = (z: number) => Math.max(zBottom, Math.min(zTop, z))
+    const existing: [number, number][] = []
+    for (let h = hMin; h <= hMax; h += 12) existing.push([h, clamp(existingAt(h))])
+    placedMarks.push({ t: 'path', d: 'M ' + existing.map(([h, z]) => `${tx(h)} ${tz(z)}`).join(' L '), stroke: '#000', sw: 0.8, dash: [6, 3] })
+    placedMarks.push({ t: 'text', x: tx(hMin) + 2, y: tz(existing[0][1]) - 3, text: 'EXISTING GRADE, SAMPLE TERRAIN', size: 5.5 })
+  }
 
   // Level lines and heights at the right.
   const labelX = tx(hMax) + 6

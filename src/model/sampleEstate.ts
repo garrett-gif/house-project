@@ -68,6 +68,8 @@ const PEOPLE: Record<string, Partial<Building>> = {
   classroom: { staff: 50 },
   hangars: { staff: 15, backupPower: true, fuelStorage: true },
   helipads: { loadKw: 10 },
+  // It sits in a slight hollow; a swale carries runoff around it.
+  'car-building': { swale: true },
 }
 
 const ESTATE = ['main-house', 'guest-house', 'outdoor-pool', 'car-building', 'entertainment']
@@ -85,7 +87,8 @@ const u = (id: string, name: string, kind: UtilityKind, x0: number, y0: number, 
 const utilities: Utility[] = [
   u('estate-well', 'Estate well', 'well', 860, 5620, 880, 5640, 15, ESTATE),
   u('estate-storage', 'Estate water storage', 'storage', 890, 5615, 915, 5645, 10000, ESTATE),
-  u('estate-septic', 'Estate septic and drainfield', 'septic', 900, 4700, 1000, 4800, 3000, ESTATE),
+  // Downhill to the east of the house, below the walkout floor, so it drains by gravity.
+  u('estate-septic', 'Estate septic and drainfield', 'septic', 1900, 4450, 2000, 4550, 3000, ESTATE),
   u('estate-service', 'Estate power service', 'service', 1160, 5560, 1180, 5580, 600, ESTATE),
   u('estate-generator', 'Estate generator', 'generator', 1270, 5480, 1294, 5492, 150, ['main-house', 'guest-house']),
   u('estate-propane', 'Estate propane tank', 'propane', 1320, 5600, 1340, 5606, 1000, ['main-house', 'guest-house']),
@@ -93,9 +96,10 @@ const utilities: Utility[] = [
   u('compound-well-1', 'Compound well 1', 'well', 2190, 1830, 2210, 1850, 20, [...LODGING, ...WORK]),
   u('compound-well-2', 'Compound well 2', 'well', 3690, 1640, 3710, 1660, 20, [...LODGING, ...WORK]),
   u('compound-storage', 'Compound water storage', 'storage', 2600, 1830, 2640, 1870, 30000, [...LODGING, ...WORK]),
-  u('lodging-septic', 'Lodging septic and drainfield', 'septic', 2470, 1170, 2870, 1270, 12000, LODGING),
-  u('ops-septic', 'Operations septic and drainfield', 'septic', 3300, 1180, 3500, 1255, 4000, ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'classroom']),
-  u('aviation-septic', 'Aviation septic and drainfield', 'septic', 5600, 1250, 5660, 1280, 500, ['hangars', 'fuel', 'helipads']),
+  // The compound systems are large enough to dose their fields by pump, so they need not sit downhill of every building.
+  { ...u('lodging-septic', 'Lodging septic and drainfield', 'septic', 2470, 1170, 2870, 1270, 12000, LODGING), pumped: true },
+  { ...u('ops-septic', 'Operations septic and drainfield', 'septic', 3300, 1180, 3500, 1255, 4000, ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'classroom']), pumped: true },
+  { ...u('aviation-septic', 'Aviation septic and drainfield', 'septic', 5600, 1250, 5660, 1280, 500, ['hangars', 'fuel', 'helipads']), pumped: true },
   u('compound-service', 'Compound substation', 'service', 3160, 170, 3200, 210, 2500, [...LODGING, ...WORK]),
   u('compound-solar', 'Compound solar array', 'solar', 5500, 350, 6300, 500, 600, []),
   u('lodging-generator', 'Lodging generator', 'generator', 2510, 1520, 2534, 1532, 400, LODGES),

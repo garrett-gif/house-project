@@ -5,6 +5,7 @@ import { roofChecks } from './roofChecks'
 import { fireChecks } from './fireChecks'
 import { utilityChecks } from './utilityChecks'
 import { securityChecks } from './securityChecks'
+import { terrainChecks } from './terrainChecks'
 import { allHouses, checksForEachHouse } from './houses'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
@@ -129,6 +130,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(...fireChecks(e))
   checks.push(...utilityChecks(e))
   checks.push(...securityChecks(e))
+  checks.push(...terrainChecks(e))
   return checks
 }
 

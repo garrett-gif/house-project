@@ -48,7 +48,7 @@ export type EditOp =
   | { op: 'addUtility'; utility: Utility }
   | { op: 'moveUtility'; utilityId: string; dx: Inches; dy: Inches }
   | { op: 'resizeUtility'; utilityId: string; w: Inches; d: Inches; anchor: Anchor }
-  | { op: 'setUtility'; utilityId: string; capacity: number; serves: string[] }
+  | { op: 'setUtility'; utilityId: string; capacity: number; serves: string[]; pumped?: boolean }
   | { op: 'removeUtility'; utilityId: string }
   | { op: 'addDevice'; device: SecurityDevice }
   | { op: 'moveDevice'; deviceId: string; dx: Inches; dy: Inches }
@@ -58,6 +58,8 @@ export type EditOp =
   | { op: 'setOccupancy'; buildingId: string; beds: number; staff: number; backupPower: boolean }
   | { op: 'setUtilityRule'; rule: keyof UtilityRules; value: number }
   | { op: 'setSafeRoom'; roomId: string; safeRoom: boolean }
+  /** A graded swale or curtain drain around a building. */
+  | { op: 'setSwale'; buildingId: string; swale: boolean }
 
 export const ROAD_KINDS: RoadKind[] = ['estate', 'work', 'perimeter', 'gated-link']
 export const FIRE_RULE_NAMES = ['zone1Ft', 'zone2Ft', 'zone3Ft', 'minRoadWidthFt', 'maxHosePullFt', 'maxDeadEndFt', 'maxWaterDistanceFt', 'minWaterGallons'] as const
@@ -419,7 +421,7 @@ function runInHouse(e: Estate, op: EditOp): string {
       if (!UTILITY_KINDS.includes(u.kind)) return `Utility kind must be one of: ${UTILITY_KINDS.join(', ')}.`
       const bad = checkSize(u.rect.w, u.rect.d, e.parcel.size) || checkInside(e, u.rect) || checkUtility(e, u.capacity, u.serves)
       if (bad) return bad
-      e.utilities = [...list, { id: u.id, name: u.name, kind: u.kind, rect: { ...u.rect }, capacity: u.capacity, serves: [...u.serves] }]
+      e.utilities = [...list, { id: u.id, name: u.name, kind: u.kind, rect: { ...u.rect }, capacity: u.capacity, serves: [...u.serves], ...(u.kind === 'septic' && u.pumped ? { pumped: true } : {}) }]
       return ''
     }
     case 'moveUtility': {
@@ -445,6 +447,7 @@ function runInHouse(e: Estate, op: EditOp): string {
       if (bad) return bad
       u.capacity = op.capacity
       u.serves = [...new Set(op.serves)]
+      if (op.pumped !== undefined) { if (u.kind === 'septic' && op.pumped) u.pumped = true; else delete u.pumped }
       return ''
     }
     case 'removeUtility': {
@@ -506,6 +509,13 @@ function runInHouse(e: Estate, op: EditOp): string {
       if (op.rule === 'backupShare' && op.value > 1) return 'backupShare is a fraction from 0 to 1.'
       if (op.rule === 'wellPumpHours' && op.value > 24) return 'wellPumpHours is at most 24.'
       e.utilityRules = { ...e.utilityRules, [op.rule]: op.value }
+      return ''
+    }
+    case 'setSwale': {
+      const b = e.buildings.find(x => x.id === op.buildingId)
+      if (!b) return `No building with id "${op.buildingId}".`
+      if (op.swale) b.swale = true
+      else delete b.swale
       return ''
     }
     case 'setSafeRoom': {
@@ -629,7 +639,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'resizeUtility': return `Resize ${utility(op.utilityId)} to ${feet(op.w)} × ${feet(op.d)}, keeping its ${ANCHOR_WORDS[op.anchor]}`
     case 'setUtility': {
       const kind = (e.utilities ?? []).find(u => u.id === op.utilityId)?.kind
-      return `Set ${utility(op.utilityId)} to ${op.capacity.toLocaleString('en-US')} ${kind ? UTILITY_UNIT[kind] : ''}, serving ${op.serves.map(building).join(', ') || 'no buildings'}`
+      return `Set ${utility(op.utilityId)} to ${op.capacity.toLocaleString('en-US')} ${kind ? UTILITY_UNIT[kind] : ''}, serving ${op.serves.map(building).join(', ') || 'no buildings'}${kind === 'septic' && op.pumped !== undefined ? (op.pumped ? ', pumped' : ', by gravity') : ''}`
     }
     case 'removeUtility': return `Remove ${utility(op.utilityId)}`
     case 'addDevice': return `Add ${op.device.name}${op.device.kind === 'camera' ? `, facing ${Math.round(op.device.facing ?? 0)}°, ${op.device.fov ?? 90}° view` : ''}, ${feet(op.device.range)} reach`
@@ -638,6 +648,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeDevice': return `Remove ${device(op.deviceId)}`
     case 'setOccupancy': return `Set ${building(op.buildingId)} to ${op.beds} sleeping and ${op.staff} by day${op.backupPower ? ', on backup power' : ', no backup power'}`
     case 'setUtilityRule': return `Set utility rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
+    case 'setSwale': return `${op.swale ? 'Add' : 'Remove'} a drainage swale around ${building(op.buildingId)}`
     case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`
     case 'setRoof': {
       const name = allHouses(e).flatMap(h => h.roofs).find(r => r.id === op.roofId)?.name ?? op.roofId

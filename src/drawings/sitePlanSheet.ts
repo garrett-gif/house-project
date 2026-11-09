@@ -2,6 +2,7 @@ import type { Estate, Pt, Rect } from '../model/types'
 import { center, partsOf, toFt } from '../model/geometry'
 import { roadWidth } from '../model/fireChecks'
 import { UTILITY_UNIT, demand, occupancy } from '../model/utilities'
+import { contours } from '../model/terrain'
 import { ARCH_D, PT_PER_IN } from './sheet'
 import type { Mark, Sheet } from './sheet'
 import { MARGIN, TITLE_W, drawTitleBlock } from './floorPlanSheet'
@@ -53,6 +54,12 @@ export function sitePlanSheet(e: Estate, info: SheetInfo, position: SetPosition)
   }
   for (const z of e.zones.filter(z => ['estate-core', 'operations', 'lodging', 'training', 'incident-camp', 'pond', 'estate-fuelbreak'].includes(z.id))) {
     marks.push({ t: 'text', x: X(z.rect.x) + 3, y: Y(z.rect.y + z.rect.d) + 9, text: z.name.toUpperCase(), size: 5.5, bold: true })
+  }
+  // Contours every 10 ft from the sample terrain, heavier and labeled every 50 ft.
+  for (const c of contours(e, 10)) {
+    if (!c.segs.length) continue
+    marks.push({ t: 'path', d: c.segs.map(([a, b]) => `M ${X(a.x).toFixed(1)} ${Y(a.y).toFixed(1)} L ${X(b.x).toFixed(1)} ${Y(b.y).toFixed(1)}`).join(' '), stroke: c.major ? '#8a8a8a' : '#c4c4c4', sw: c.major ? 0.5 : 0.25 })
+    if (c.major) { const [a, b] = c.segs[Math.floor(c.segs.length / 3)]; marks.push({ t: 'text', x: X((a.x + b.x) / 2), y: Y((a.y + b.y) / 2), text: `${c.level}`, size: 4.5, anchor: 'middle' }) }
   }
   rect({ x: 0, y: 0, w: size, d: size }, { stroke: '#000', sw: 2 })
 
@@ -125,6 +132,7 @@ export function sitePlanSheet(e: Estate, info: SheetInfo, position: SetPosition)
     'Black: buildings. Gray bands: roads at drivable width, circle at a turnaround. Heavy bar: gate.',
     'Shaded: cleared or developed land; darker shading is hardstand. Dashed outline: forest or fuel break.',
     'Dashed box: septic drainfield, primary and reserve. Dots: fire water. Coordinates are from the SW parcel corner.',
+    'Contours every 10 ft, labeled every 50 ft, in feet above sea level, from generated sample terrain, not a survey.',
     'Utility sizes come from this app\'s demand estimates and need soil, percolation, well, and utility tests.',
     'Cameras and lights are kept in the model but left off this sheet.',
     "Passing this app's planning checks does not mean the design meets code or county rules.",

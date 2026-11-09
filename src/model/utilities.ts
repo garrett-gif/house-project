@@ -14,6 +14,8 @@ export const DEFAULT_UTILITY_RULES: UtilityRules = {
   drainfieldGpdPerSqFt: 0.6, drainfieldReserve: 2, wellPumpHours: 12, storageDays: 1, backupShare: 0.6,
   wellToSepticFt: 100, wellToFuelFt: 100, septicToBuildingFt: 20, septicToWaterFt: 100, solarShadeFt: 100,
   maxTrenchFt: 1500, sqFtPerParkingSpace: 350, cameraForestFt: 50, approachFt: 300, backupFeedFt: 1500,
+  // Site and grading: fire apparatus roads at 10%, building pads and drainfields on gentle ground, sewer fall.
+  maxRoadGradePct: 10, maxBuildingSlopePct: 10, maxDrainfieldSlopePct: 15, septicFallFt: 2, wellUpgradientFt: 500,
 }
 export const UTILITY_RULE_NAMES = Object.keys(DEFAULT_UTILITY_RULES) as (keyof UtilityRules)[]
 export const UTILITY_KINDS: UtilityKind[] = ['well', 'storage', 'septic', 'service', 'solar', 'generator', 'propane']
