@@ -49,9 +49,9 @@ describe('edits inside the guest house', () => {
   })
 
   it('add a room to the guest house by its level id', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'addRoom', levelId: 'g-main', room: { id: 'g-porch', name: 'North porch', type: 'outdoor', rect: { x: ft(20), y: ft(38), w: ft(24), d: ft(8) } } }]))
-    expect(guest(e).levels[0].rooms.some(r => r.id === 'g-porch')).toBe(true)
-    expect(e.house.levels.flatMap(l => l.rooms).some(r => r.id === 'g-porch')).toBe(false)
+    const e = ok(applyOperations(sampleEstate, [{ op: 'addRoom', levelId: 'g-main', room: { id: 'g-deck', name: 'East deck', type: 'outdoor', rect: { x: ft(74), y: 0, w: ft(12), d: ft(22) } } }]))
+    expect(guest(e).levels[0].rooms.some(r => r.id === 'g-deck')).toBe(true)
+    expect(e.house.levels.flatMap(l => l.rooms).some(r => r.id === 'g-deck')).toBe(false)
   })
 
   it('keep room and opening ids unique across both houses', () => {
@@ -111,5 +111,20 @@ describe('the chat summary', () => {
     expect(text).toMatch(/Guest house \(building guest-house\)\. Concept layout\. Its house origin is at site 600,4860\./)
     expect(text).toMatch(/Level g-upper: Upper floor/)
     expect(text).toMatch(/- g-bunk: Bunk room, sleeps six, bedroom/)
+  })
+})
+
+describe('the covered porch', () => {
+  it('covers the front and mudroom doors on posts, and passes the roof checks', () => {
+    const porch = room(sampleEstate, 'g-porch')!
+    expect(porch.type).toBe('outdoor')
+    expect(guest(sampleEstate).roofs.find(r => r.id === 'g-porch-roof')).toMatchObject({ form: 'shed', low: 'n', rect: porch.rect })
+    for (const id of ['roof-support', 'roof-pitch', 'program']) expect(check(sampleEstate, id).status, id).toBe('pass')
+  })
+
+  it('still flags a roof over nothing at all', () => {
+    const e = structuredClone(sampleEstate)
+    e.houses![0].roofs.push({ id: 'g-stray', name: 'Stray roof', levelId: 'g-main', rect: { x: ft(100), y: 0, w: ft(10), d: ft(10) }, form: 'shed', pitch: 4, ridge: 'ew', low: 'n', overhang: 0 })
+    expect(check(e, 'roof-support').elements).toEqual(['g-stray'])
   })
 })

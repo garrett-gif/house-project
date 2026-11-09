@@ -21,6 +21,8 @@ const main: Room[] = [
   r('g-bed-1', 'Main-floor suite', 'bedroom', 52, 0, 14, 22, 'g-bath-1'),
   r('g-bath-1', 'Main-floor suite bath', 'bath', 66, 0, 8, 22),
   r('g-terrace', 'South terrace', 'outdoor', 0, -16, 52, 16),
+  // Covered porch across the front door and the mudroom door, out of the snow.
+  r('g-porch', 'Covered north porch', 'outdoor', 0, 38, 40, 8),
   r('g-hall', 'Hall', 'circulation', 0, 22, 74, 6),
   // North band: entry and service.
   r('g-mudroom', 'Mudroom and laundry', 'service', 0, 28, 14, 10),
@@ -51,6 +53,7 @@ const program: ProgramItem[] = [
   { roomId: 'g-great', need: 'Great room big enough for a crowd', levelId: 'g-main', minArea: 600, minWidth: 20, near: ['g-kitchen'] },
   { roomId: 'g-kitchen', need: 'Kitchen and dining for a crowd', levelId: 'g-main', minArea: 450, near: ['g-terrace'] },
   { roomId: 'g-terrace', need: 'Terrace off the great room', levelId: 'g-main', near: ['g-great'] },
+  { roomId: 'g-porch', need: 'Covered porch at the front door', levelId: 'g-main', near: ['g-foyer', 'g-mudroom'] },
   { roomId: 'g-bed-1', need: 'One suite on the main floor', levelId: 'g-main', minArea: 250 },
   { roomId: 'g-bed-2', need: 'Guest suite', minArea: 250 },
   { roomId: 'g-bed-3', need: 'Guest suite', minArea: 250 },
@@ -61,6 +64,7 @@ const program: ProgramItem[] = [
 
 const roofs: Roof[] = [
   { id: 'g-roof', name: 'Guest house roof', levelId: 'g-upper', rect: { x: 0, y: 0, w: ft(74), d: ft(38) }, form: 'gable', pitch: 8, ridge: 'ew', low: 's', overhang: ft(2) },
+  { id: 'g-porch-roof', name: 'North porch roof', levelId: 'g-main', rect: { x: 0, y: ft(38), w: ft(40), d: ft(8) }, form: 'shed', pitch: 4, ridge: 'ew', low: 'n', overhang: ft(1) },
 ]
 
 /** First layout of the guest house, about 4,960 sq ft. A starting point to react to. */
