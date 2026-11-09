@@ -47,8 +47,8 @@ describe('checks name what they are about', () => {
     const noBath = structuredClone(sampleEstate)
     noBath.house.levels[2].rooms.find(r => r.id === 'kid-1')!.bathId = undefined
     expect(validateEstate(noBath).find(c => c.id === 'baths')!.elements).toEqual(['kid-1'])
-    const close = ok(applyOperations(sampleEstate, [{ op: 'moveBuilding', buildingId: 'forestry-shop', dx: ft(-1690), dy: ft(2360) }]))
-    expect(validateEstate(close).find(c => c.id === 'separation')!.elements).toContain('forestry-shop')
+    const close = ok(applyOperations(sampleEstate, [{ op: 'moveBuilding', buildingId: 'fuel', dx: ft(-3500), dy: ft(3300) }]))
+    expect(validateEstate(close).find(c => c.id === 'separation')!.elements).toContain('fuel')
   })
 
   it('leaves passing checks without elements', () => {

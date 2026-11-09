@@ -2,6 +2,7 @@ import type { Access, Building, BuildingUse, Estate, Ignition, Pt, Road, Securit
 import { bezier, box, ft, p, samplePath } from './geometry'
 import { mainHouse } from './house'
 import { guestHouse } from './guestHouse'
+import { SHOP_SPECS, shopBuildings } from './shops'
 import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
@@ -63,7 +64,7 @@ const PEOPLE: Record<string, Partial<Building>> = {
   offices: { staff: 60, backupPower: true },
   'forestry-shop': { staff: 50 },
   'wildland-shop': { staff: 60, backupPower: true },
-  'maintenance-shop': { staff: 30 },
+  'maintenance-shop': { staff: 30, backupPower: true },
   fuel: { staff: 5, fuelStorage: true },
   classroom: { staff: 50 },
   hangars: { staff: 15, backupPower: true, fuelStorage: true },
@@ -75,7 +76,7 @@ const PEOPLE: Record<string, Partial<Building>> = {
 const ESTATE = ['main-house', 'guest-house', 'outdoor-pool', 'car-building', 'entertainment']
 const LODGING = ['lodge-1', 'lodge-2', 'lodge-3', 'lodge-4', 'lodge-5', 'commons', 'cabins', 'rv']
 const LODGES = LODGING.filter(id => id !== 'rv')
-const WORK = ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'fuel', 'classroom', 'hangars', 'helipads']
+const WORK = ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'dozer-barn', 'forestry-barn', 'forestry-fleet', 'fuel', 'classroom', 'hangars', 'helipads']
 const u = (id: string, name: string, kind: UtilityKind, x0: number, y0: number, x1: number, y1: number, capacity: number, serves: string[]): Utility =>
   ({ id, name, kind, rect: { x: ft(x0), y: ft(y0), w: ft(x1 - x0), d: ft(y1 - y0) }, capacity, serves })
 
@@ -94,16 +95,17 @@ const utilities: Utility[] = [
   u('estate-propane', 'Estate propane tank', 'propane', 1320, 5600, 1340, 5606, 1000, ['main-house', 'guest-house']),
   u('estate-solar', 'Estate solar array', 'solar', 2000, 4000, 2250, 4180, 250, []),
   u('compound-well-1', 'Compound well 1', 'well', 2190, 1830, 2210, 1850, 20, [...LODGING, ...WORK]),
-  u('compound-well-2', 'Compound well 2', 'well', 3690, 1640, 3710, 1660, 20, [...LODGING, ...WORK]),
+  u('compound-well-2', 'Compound well 2', 'well', 3200, 1640, 3220, 1660, 20, [...LODGING, ...WORK]),
   u('compound-storage', 'Compound water storage', 'storage', 2600, 1830, 2640, 1870, 30000, [...LODGING, ...WORK]),
   // The compound systems are large enough to dose their fields by pump, so they need not sit downhill of every building.
   { ...u('lodging-septic', 'Lodging septic and drainfield', 'septic', 2470, 1170, 2870, 1270, 12000, LODGING), pumped: true },
   { ...u('ops-septic', 'Operations septic and drainfield', 'septic', 3300, 1180, 3500, 1255, 4000, ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'classroom']), pumped: true },
   { ...u('aviation-septic', 'Aviation septic and drainfield', 'septic', 5600, 1250, 5660, 1280, 500, ['hangars', 'fuel', 'helipads']), pumped: true },
-  u('compound-service', 'Compound substation', 'service', 3160, 170, 3200, 210, 2500, [...LODGING, ...WORK]),
+  // Sized for the shops: about 290,000 sq ft of bays and support rooms.
+  u('compound-service', 'Compound substation', 'service', 3160, 170, 3200, 210, 3500, [...LODGING, ...WORK]),
   u('compound-solar', 'Compound solar array', 'solar', 5500, 350, 6300, 500, 600, []),
   u('lodging-generator', 'Lodging generator', 'generator', 2510, 1520, 2534, 1532, 400, LODGES),
-  u('ops-generator', 'Operations generator', 'generator', 3600, 560, 3624, 572, 250, ['offices', 'wildland-shop']),
+  u('ops-generator', 'Operations generator', 'generator', 3600, 560, 3624, 572, 400, ['offices', 'wildland-shop', 'maintenance-shop']),
   u('aviation-generator', 'Aviation generator', 'generator', 5840, 1880, 5864, 1892, 100, ['hangars']),
   u('lodging-propane', 'Lodging propane tank', 'propane', 2520, 1445, 2545, 1452, 2000, LODGES),
 ]
@@ -174,9 +176,8 @@ const laidOut: Estate = withDerivedGeometry({
     b('cabins', 'Cabins', 'lodging', 'work', 2150, 680, 220, 120, 16),
     b('rv', 'RV hookups', 'lodging', 'work', 2650, 680, 200, 120, 2),
     b('offices', 'Offices and dispatch', 'business', 'work', 3470, 500, 160, 110, 28),
-    b('forestry-shop', 'Forestry shop', 'business', 'work', 3490, 1440, 300, 120, 28),
-    b('wildland-shop', 'Wildland shop', 'business', 'work', 4270, 1440, 300, 120, 28),
-    b('maintenance-shop', 'Maintenance shop', 'business', 'work', 5010, 1440, 260, 120, 28),
+    // The shops' outlines come from their bays and rooms (src/model/shops.ts).
+    ...SHOP_SPECS.map((spec): Building => ({ id: spec.buildingId, name: spec.name, use: 'business', access: 'work', height: ft(26), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } })),
     b('fuel', 'Fuel island and storage', 'business', 'work', 5050, 470, 160, 120, 18),
     b('classroom', 'Classroom building', 'assembly', 'visitor', 4100, 2030, 150, 90, 20),
     b('hangars', 'Hangars and aviation fuel', 'aviation', 'work', 5970, 1970, 200, 120, 30),
@@ -195,7 +196,8 @@ const laidOut: Estate = withDerivedGeometry({
     z('aviation-corridor', 'Runway corridor', 'aviation', 'shared', 5710, 2200, 6210, 5700, true),
     { ...z('aviation-apron', 'Aviation apron', 'aviation', 'shared', 5500, 1450, 6400, 2200, true), hardstand: true },
     // Paved aprons around the shops and the fuel island, which an engine can work from.
-    { ...z('shop-apron', 'Shop aprons', 'operations', 'work', 3250, 1320, 5250, 1560, true), hardstand: true },
+    // Paved aprons on both sides of the shop row, in front of every overhead door.
+    { ...z('shop-apron', 'Shop aprons', 'operations', 'work', 3250, 1300, 5250, 1700, true), hardstand: true },
     { ...z('fuel-apron', 'Fuel island apron', 'operations', 'work', 4920, 360, 5200, 580, true), hardstand: true },
     // Cleared ground around the classroom, which otherwise sits in the training forest.
     z('classroom-clearing', 'Classroom clearing', 'training', 'visitor', 3925, 1885, 4275, 2175, true),
@@ -211,7 +213,7 @@ const laidOut: Estate = withDerivedGeometry({
   waterSources,
   utilities,
   house: mainHouse,
-  houses: [guestHouse],
+  houses: [guestHouse, ...shopBuildings()],
 })
 laidOut.buildings = laidOut.buildings.map(b => ({ ...b, ...PEOPLE[b.id] }))
 

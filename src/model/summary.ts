@@ -65,7 +65,10 @@ export function summarizeEstate(e: Estate): string {
       lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}`)
       const furniture = furnitureLine(house, r)
       if (furniture) lines.push(furniture)
-      for (const o of placed.filter(o => o.roomId === r.id)) {
+      // Rows of overhead doors in a shop's bays read as one line.
+      const overhead = placed.filter(o => o.roomId === r.id && o.kind === 'garage-door')
+      if (overhead.length > 6) lines.push(`    ${overhead.length} overhead doors, ${ft1(overhead[0].width)}x${ft1(overhead[0].height)} or smaller, one at each end of every lane on the n and s sides (ids ${overhead[0].id} to ${overhead[overhead.length - 1].id})`)
+      for (const o of placed.filter(o => o.roomId === r.id && !(overhead.length > 6 && o.kind === 'garage-door'))) {
         lines.push(`    ${o.id}: ${o.kind}${o.operation ? ` (${o.operation})` : ''}, side ${o.side}, offset ${ft1(o.offset)}, ${ft1(o.width)}x${ft1(o.height)}${o.sill ? `, sill ${ft1(o.sill)}` : ''}, to ${o.leadsTo ?? '?'}${o.problem ? ` (does not fit: ${o.problem})` : ''}`)
       }
     }

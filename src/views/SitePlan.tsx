@@ -6,6 +6,7 @@ import type { Estate, RoadKind, SecurityDevice, UtilityKind, ZoneKind } from '..
 import { center, footprintOf, ft, partsOf, toFt } from '../model/geometry'
 import { fireRules, roadWidth } from '../model/fireChecks'
 import { UTILITY_UNIT } from '../model/utilities'
+import { fitLabel, placeLabels } from './planLabel'
 import { contours } from '../model/terrain'
 
 const FOCUS = {
@@ -76,6 +77,12 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
   const label = 11 * scale
   const pts = (list: { x: number; y: number }[]) => list.map(q => `${toFt(q.x)},${Y(q.y)}`).join(' ')
   const showLabels = focus !== 'Whole property'
+  const ZONE_LABELS = ['kart-track', 'training', 'incident-camp', 'pond', 'parking', 'equipment-yard']
+  // Building and zone names placed so they never overlap: big buildings first, shorter names where space is tight.
+  const labels = useMemo(() => placeLabels([
+    ...estate.buildings.map(b => ({ id: b.id, name: b.name, cx: toFt(b.rect.x + b.rect.w / 2), y: Y(b.rect.y) - toFt(b.rect.d) - 5 * scale, below: Y(b.rect.y) + 12 * scale, size: b.rect.w * b.rect.d })),
+    ...estate.zones.filter(z => ZONE_LABELS.includes(z.id)).map(z => ({ id: `zone:${z.id}`, name: z.name, cx: toFt(z.rect.x + z.rect.w / 2), y: Y(z.rect.y + z.rect.d / 2), size: 0 })),
+  ], label), [estate.buildings, estate.zones, label, scale]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="plan">
@@ -113,13 +120,13 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
         })}
         <rect x={toFt(estate.runway.rect.x)} y={Y(estate.runway.rect.y) - toFt(estate.runway.rect.d)} width={toFt(estate.runway.rect.w)} height={toFt(estate.runway.rect.d)} fill="#46443f" onMouseEnter={() => setHover(estate.runway.name)} />
         {estate.buildings.map(b => {
-          const x = toFt(b.rect.x), w = toFt(b.rect.w), d = toFt(b.rect.d), y = Y(b.rect.y) - d
+          const x = toFt(b.rect.x), w = toFt(b.rect.w)
           return (
             <g key={b.id} onMouseEnter={() => setHover(b.name)} onPointerDown={editable ? e => begin(e, b) : undefined} style={editable ? { cursor: 'move' } : undefined}>
               {b.footprint && footprintOf(b).map((part, i) => <rect key={`f${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} fillOpacity={0.3} />)}
               {partsOf(b).map((part, i) => <rect key={i} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} />)}
               {flagged.has(b.id) && footprintOf(b).map((part, i) => <rect key={`x${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill="none" stroke={flagColor(b.id)} strokeWidth={Math.max(4, 2 * scale)} />)}
-              {showLabels && <text x={x + w / 2} y={y - 5 * scale} fontSize={label} textAnchor="middle" className="site-label">{b.name}</text>}
+              {showLabels && labels.get(b.id) && <text x={x + w / 2} y={labels.get(b.id)!.y} fontSize={label} textAnchor="middle" className="site-label">{labels.get(b.id)!.text}</text>}
             </g>
           )
         })}
@@ -152,14 +159,14 @@ export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { esta
               {small
                 ? <circle cx={x + w / 2} cy={y + d / 2} r={Math.max(10, 4 * scale)} fill={UTILITY[u.kind]} stroke={flagged.has(u.id) ? flagColor(u.id) : '#fff'} strokeWidth={Math.max(2, (flagged.has(u.id) ? 2 : 0.8) * scale)} />
                 : <rect x={x} y={y} width={w} height={d} fill={UTILITY[u.kind]} fillOpacity={u.kind === 'septic' ? 0.45 : 0.85} stroke={flagged.has(u.id) ? flagColor(u.id) : UTILITY[u.kind]} strokeWidth={Math.max(2, (flagged.has(u.id) ? 3 : 1) * scale)} />}
-              {showLabels && <text x={x + w / 2} y={y - 4 * scale} fontSize={label * 0.8} textAnchor="middle" className="site-label">{u.name}</text>}
+              {showLabels && <text x={x + w / 2} y={y - 4 * scale} fontSize={label * 0.8} textAnchor="middle" className="site-label">{fitLabel(u.name, w + 40 * scale, label * 0.8)}</text>}
             </g>
           )
         })}
         {security && (estate.security ?? []).map(d => <Device key={d.id} d={d} Y={Y} scale={scale} flag={flagged.has(d.id) ? flagColor(d.id) : undefined} onHover={setHover}
           onGrab={editable ? e => grab(e, (dx, dy) => deviceDragOp(d, dx, dy)) : undefined} />)}
-        {showLabels && estate.zones.filter(z => ['kart-track', 'training', 'incident-camp', 'pond', 'parking', 'equipment-yard'].includes(z.id)).map(z => (
-          <text key={z.id} x={toFt(z.rect.x + z.rect.w / 2)} y={Y(z.rect.y + z.rect.d / 2)} fontSize={label} textAnchor="middle" className="site-label">{z.name}</text>
+        {showLabels && estate.zones.filter(z => labels.has(`zone:${z.id}`)).map(z => (
+          <text key={z.id} x={toFt(z.rect.x + z.rect.w / 2)} y={Y(z.rect.y + z.rect.d / 2)} fontSize={label} textAnchor="middle" className="site-label">{labels.get(`zone:${z.id}`)!.text}</text>
         ))}
       </svg>
       <div className="legend">

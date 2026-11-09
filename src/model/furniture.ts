@@ -120,6 +120,30 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'spa-bench': { name: 'Bench', w: 72, d: 20, h: 18, category: 'seating', place: 'wall', front: 18, seats: 3 },
   'lounge-chairs': { name: 'Two lounge chairs', w: 72, d: 76, h: 18, category: 'seating', place: 'wall', seats: 2, parts: [p('Lounge chair', 0, 0, 28, 76, 18), p('Lounge chair', 44, 0, 28, 76, 18)] },
   'pool-basin': { name: 'Pool, 36 x 20 ft', w: 432, d: 240, h: 0, category: 'fixture', place: 'center', around: 48 },
+  // Fire apparatus and forestry machines, stored indoors in drive-through bays. Sizes are typical, not specific models.
+  'engine-t3': { name: 'Type 3 wildland engine', w: 102, d: 360, h: 120, category: 'vehicle', place: 'floor', around: 24 },
+  'engine-t6': { name: 'Type 6 wildland engine', w: 96, d: 264, h: 108, category: 'vehicle', place: 'floor', around: 24 },
+  'water-tender': { name: 'Water tender', w: 102, d: 384, h: 126, category: 'vehicle', place: 'floor', around: 24 },
+  'crew-carrier': { name: 'Crew carrier', w: 102, d: 360, h: 126, category: 'vehicle', place: 'floor', around: 24 },
+  'dozer-lowboy': { name: 'Dozer loaded on its lowboy transport', w: 144, d: 900, h: 156, category: 'vehicle', place: 'floor', around: 24 },
+  'feller-buncher': { name: 'Feller buncher', w: 132, d: 336, h: 144, category: 'equipment', place: 'floor', around: 24 },
+  harvester: { name: 'Harvester', w: 120, d: 420, h: 144, category: 'equipment', place: 'floor', around: 24 },
+  skidder: { name: 'Skidder', w: 132, d: 300, h: 132, category: 'equipment', place: 'floor', around: 24 },
+  forwarder: { name: 'Forwarder', w: 120, d: 420, h: 144, category: 'equipment', place: 'floor', around: 24 },
+  'log-loader': { name: 'Log loader', w: 132, d: 420, h: 144, category: 'equipment', place: 'floor', around: 24 },
+  excavator: { name: 'Excavator', w: 120, d: 384, h: 132, category: 'equipment', place: 'floor', around: 24 },
+  masticator: { name: 'Masticator', w: 108, d: 300, h: 120, category: 'equipment', place: 'floor', around: 24 },
+  chipper: { name: 'Chipper or grinder', w: 102, d: 360, h: 132, category: 'equipment', place: 'floor', around: 24 },
+  'log-truck': { name: 'Log truck, trailer loaded on it', w: 102, d: 540, h: 156, category: 'vehicle', place: 'floor', around: 24 },
+  pickup: { name: 'Pickup', w: 84, d: 240, h: 78, category: 'vehicle', place: 'floor', around: 24 },
+  utv: { name: 'UTV', w: 60, d: 132, h: 78, category: 'vehicle', place: 'floor', around: 18 },
+  'service-lift': { name: 'Heavy service bay with lift', w: 144, d: 600, h: 4, category: 'equipment', place: 'floor', kw: 7.5 },
+  'wash-rack': { name: 'Wash bay with pressure washer', w: 144, d: 600, h: 4, category: 'equipment', place: 'floor', kw: 11 },
+  'parts-racks': { name: 'Parts racks', w: 120, d: 36, h: 144, category: 'storage', place: 'wall', front: 48 },
+  'welding-bench': { name: 'Welding bench and fume arm', w: 96, d: 48, h: 36, category: 'equipment', place: 'wall', front: 48, kw: 12 },
+  'hose-washer': { name: 'Hose washer and drying rack', w: 144, d: 48, h: 96, category: 'equipment', place: 'wall', front: 48, kw: 3 },
+  'gear-lockers': { name: 'Turnout and gear lockers', w: 144, d: 24, h: 84, category: 'storage', place: 'wall', front: 48 },
+  'conference-table': { name: 'Table for 12', w: 192, d: 96, h: 30, category: 'table', place: 'center', around: 24, seats: 12, parts: [p('Table', 24, 24, 144, 48, 30), ...row('Chair', 5, 20, 20, 36, 8, 32, 2), ...row('Chair', 5, 20, 20, 36, 8, 32, 74), p('Chair', 2, 38, 20, 20, 36), p('Chair', 170, 38, 20, 20, 36)] },
   // Mechanical and storage rooms.
   boiler: { name: 'Boiler', w: 36, d: 36, h: 72, category: 'equipment', place: 'wall', front: 36, kw: 1 },
   'water-heater': { name: 'Water heaters', w: 60, d: 30, h: 72, category: 'equipment', place: 'wall', front: 30, kw: 4.5 },
@@ -176,9 +200,9 @@ const clip = (a: Rect, b: Rect): Rect | null => {
 }
 
 /** Space inside a room kept clear for each door, cased opening, and garage door, so pieces do not block them. */
-export function doorZones(house: HouseModel, room: Room): Rect[] {
+export function doorZones(house: HouseModel, room: Room, placed = placeOpenings(house)): Rect[] {
   const r = room.rect
-  return placeOpenings(house).filter(o => !o.problem && o.kind !== 'window' && o.kind !== 'garage-door' && (o.roomId === room.id || o.leadsTo === room.id)).flatMap(o => {
+  return placed.filter(o => !o.problem && o.kind !== 'window' && o.kind !== 'garage-door' && (o.roomId === room.id || o.leadsTo === room.id)).flatMap(o => {
     // A door swings its leaf width into the room; a pair of doors wider than 4 ft swings two half-width leaves.
     const depth = o.kind === 'opening' ? 30 : Math.max(36, o.width > 48 ? o.width / 2 : o.width)
     const z = o.orientation === 'h'
@@ -229,6 +253,14 @@ function recipe(room: Room): string[] {
     'wine-cellar': ['wine-rack'], 'safe-room': ['spa-bench', 'shelving'],
     bunk: ['bunk-bed', 'bunk-bed', 'bunk-bed'],
   }
+  if (/gear lockers/.test(name)) return ['gear-lockers', 'gear-lockers', 'gear-lockers', 'bench']
+  if (/hose/.test(name)) return ['hose-washer', 'shelving']
+  if (/ready room/.test(name)) return ['conference-table', 'living-group', 'tv-console']
+  if (/fitness/.test(name)) return ['power-rack', 'treadmill', 'treadmill', 'rower', 'bike', 'dumbbell-rack']
+  if (/parts/.test(name)) return ['parts-racks', 'parts-racks', 'parts-racks', 'parts-racks']
+  if (/welding|fabrication/.test(name)) return ['welding-bench', 'workbench']
+  if (/shop office|offices/.test(name)) return ['desk', 'desk', 'desk', 'bookshelf']
+  if (/decon|locker room|restroom/.test(name)) return ['shower', 'shower', 'vanity-double', 'toilet', 'toilet', 'lockers']
   if (byId[id]) return byId[id]
   if (room.type === 'bedroom') return area >= 280 ? ['queen-bed-set', 'dresser'] : ['twin-bed', 'desk', 'small-dresser']
   if (room.type === 'bath') {
@@ -313,6 +345,7 @@ export function firstPassFurniture(house: HouseModel): FurnitureItem[] {
 export function furnitureChecks(e: Estate): Check[] {
   const house = e.house
   const items = house.furniture ?? []
+  const placed = placeOpenings(house)
   const room = (id: string) => house.levels.flatMap(l => l.rooms).find(r => r.id === id)
   const levelOf = (id: string) => house.levels.find(l => l.rooms.some(r => r.id === id))?.id
   const name = (i: FurnitureItem) => `${CATALOG[i.kind]?.name ?? i.kind} in ${room(i.roomId)?.name ?? i.roomId}`
@@ -335,13 +368,22 @@ export function furnitureChecks(e: Estate): Check[] {
       const hit = known.find(b => b !== a && b.roomId === a.roomId && overlap(z, footprint(b)))
       if (hit) { tight.push({ text: `${name(a)} has ${CATALOG[hit.kind].name.toLowerCase()} in its walking room`, ids: [a.id, hit.id] }); break }
     }
-    if (r.type !== 'outdoor') for (const z of doorZones(house, r)) if (overlap(z, footprint(a))) { tight.push({ text: `${name(a)} blocks a door`, ids: [a.id] }); break }
+    if (r.type !== 'outdoor') for (const z of doorZones(house, r, placed)) if (overlap(z, footprint(a))) { tight.push({ text: `${name(a)} blocks a door`, ids: [a.id] }); break }
   }
   const seats: { text: string; ids: string[] }[] = []
   for (const need of house.program ?? []) {
     if (!need.seats) continue
     const have = known.filter(i => i.roomId === need.roomId).reduce((s, i) => s + (CATALOG[i.kind].seats ?? 0), 0)
     if (have < need.seats) seats.push({ text: `${room(need.roomId)?.name ?? need.roomId} seats ${have} of ${need.seats}`, ids: [need.roomId] })
+  }
+  const fleet: { text: string; ids: string[] }[] = []
+  const fleetOk: string[] = []
+  for (const need of house.program ?? []) {
+    for (const [kind, count] of Object.entries(need.holds ?? {})) {
+      const have = known.filter(i => i.roomId === need.roomId && i.kind === kind).length
+      if (have < count) fleet.push({ text: `${room(need.roomId)?.name ?? need.roomId} holds ${have} of ${count} ${CATALOG[kind]?.name.toLowerCase() ?? kind}s`, ids: [need.roomId] })
+      else fleetOk.push(`${have} ${CATALOG[kind]?.name.toLowerCase() ?? kind}s`)
+    }
   }
   const BASIS = 'Real-size pieces with common walking-room allowances; a planning check, not a code review'
   const list = (b: { text: string }[]) => `${b.slice(0, 4).map(x => x.text).join('; ')}${b.length > 4 ? `; and ${b.length - 4} more` : ''}. ${BASIS}.`
@@ -351,6 +393,7 @@ export function furnitureChecks(e: Estate): Check[] {
   return [
     make('furniture-fit', 'Furniture fits its rooms without overlapping', bad, `${known.length} pieces placed, ${Math.round(kw * 10) / 10} kW of appliances and machines`),
     make('furniture-clearance', 'Furniture keeps its walking room and leaves doors clear', tight, 'Every piece has its walking room'),
+    ...(fleetOk.length || fleet.length ? [make('fleet', 'Shops hold their fleets indoors', fleet, fleetOk.join(', '))] : []),
     make('seating', 'Rooms seat the people the brief asks for', seats, (house.program ?? []).filter(p => p.seats).map(p => `${room(p.roomId)?.name ?? p.roomId} seats ${p.seats}`).join('; ') || 'No seat counts in the brief'),
   ]
 }
@@ -358,5 +401,10 @@ export function furnitureChecks(e: Estate): Check[] {
 /** One line per room for the chat summary. */
 export function furnitureLine(house: HouseModel, room: Room) {
   const items = (house.furniture ?? []).filter(i => i.roomId === room.id)
+  if (items.length > 12) {
+    const counts = new Map<string, number>()
+    for (const i of items) counts.set(i.kind, (counts.get(i.kind) ?? 0) + 1)
+    return `    furniture: ${[...counts].map(([k, c]) => `${c} ${k}`).join(', ')} (ids ${items[0].id} to ${items[items.length - 1].id})`
+  }
   return items.length ? `    furniture: ${items.map(i => `${i.id} ${i.kind} at ${Math.round(toFt(i.x) * 10) / 10},${Math.round(toFt(i.y) * 10) / 10} rot ${i.rotation}`).join('; ')}` : ''
 }

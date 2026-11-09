@@ -1,4 +1,4 @@
-import type { Estate, Level, Side } from '../model/types'
+import type { Estate, Level, Side, HouseModel } from '../model/types'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
@@ -14,6 +14,20 @@ export const SCALE = { label: '1/8" = 1\'-0"', ptPerInch: (PT_PER_IN / 8) / 12 }
 
 export const MARGIN = 0.5 * PT_PER_IN
 export const TITLE_W = 3.5 * PT_PER_IN
+
+/**
+ * The drawing scale for a building: 1/8" = 1'-0" when it fits the sheet, as the houses do, then 1/16", 1/32", or
+ * 1/64" for the long shops.
+ */
+export function scaleFor(house: HouseModel) {
+  const b = houseBounds(house)
+  const areaW = ARCH_D.width - 2 * MARGIN - TITLE_W - PT_PER_IN, areaH = ARCH_D.height - 4.5 * PT_PER_IN
+  for (const den of [8, 16, 32]) {
+    const ptPerInch = (PT_PER_IN / den) / 12
+    if (b.w * ptPerInch <= areaW && b.d * ptPerInch <= areaH) return { label: `1/${den}" = 1'-0"`, ptPerInch }
+  }
+  return { label: `1/64" = 1'-0"`, ptPerInch: (PT_PER_IN / 64) / 12 }
+}
 const INWARD: Record<Side, [number, number]> = { n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0] }
 
 export interface SheetInfo {
@@ -37,7 +51,8 @@ export function floorPlanSheets(e: Estate, info: SheetInfo, firstIndex = 1, coun
 export function floorPlanSheet(e: Estate, level: Level, number: string, info: SheetInfo, position: SetPosition = { index: 1, count: 1 }): Sheet {
   const { width: W, height: H } = ARCH_D
   const marks: Mark[] = []
-  const k = SCALE.ptPerInch
+  const scale = scaleFor(e.house)
+  const k = scale.ptPerInch
   const b = houseBounds(e.house)
   const areaW = W - 2 * MARGIN - TITLE_W
   const ox = MARGIN + (areaW - b.w * k) / 2
@@ -121,11 +136,11 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
   const titleX = MARGIN + 0.6 * PT_PER_IN
   marks.push({ t: 'text', x: titleX, y: titleY, text: `${level.name.toUpperCase()} PLAN`, size: 16, bold: true })
   marks.push({ t: 'line', x1: titleX, y1: titleY + 5, x2: titleX + 3.2 * PT_PER_IN, y2: titleY + 5, w: 1.2 })
-  marks.push({ t: 'text', x: titleX, y: titleY + 18, text: `SCALE: ${SCALE.label}    DIMENSIONS TO WALL CENTERLINES`, size: 8 })
+  marks.push({ t: 'text', x: titleX, y: titleY + 18, text: `SCALE: ${scale.label}    DIMENSIONS TO WALL CENTERLINES`, size: 8 })
   drawNorthArrow(marks, titleX + 4.4 * PT_PER_IN, titleY - 6)
   drawScaleBar(marks, titleX + 5.4 * PT_PER_IN, titleY + 2, k)
 
-  drawTitleBlock(marks, e, { title: `${level.name.toUpperCase()} PLAN`, scale: SCALE.label, number }, info, position)
+  drawTitleBlock(marks, e, { title: `${level.name.toUpperCase()} PLAN`, scale: scale.label, number }, info, position)
   return { number, title: `${level.name} plan`, width: W, height: H, marks }
 }
 

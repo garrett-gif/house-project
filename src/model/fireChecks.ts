@@ -96,10 +96,14 @@ export function fireChecks(e: Estate): Check[] {
   // Hose pull: every outside wall within reach of a road or hardstand an engine can use.
   const apparatus = e.roads.filter(r => roadWidth(r) >= minW).flatMap(r => samples.get(r.id)!)
   const hardstand = e.zones.filter(z => z.hardstand).map(z => z.rect)
-  const reach = (p: Pt) => Math.min(...apparatus.map(q => Math.hypot(q.x - p.x, q.y - p.y)), ...hardstand.map(r => pointToRect(p, r)))
   const far2 = e.buildings.flatMap(b => {
+    // Only road points and paved areas near this building can be the closest; skip the rest of the property.
+    const box = grow(b.rect, ft(rules.maxHosePullFt) * 2)
+    const near = apparatus.filter(q => inside(q, box))
+    const pads = hardstand.filter(r => r.x < box.x + box.w && box.x < r.x + r.w && r.y < box.y + box.d && box.y < r.y + r.d)
+    const reach = (p: Pt) => Math.min(Infinity, ...near.map(q => Math.hypot(q.x - p.x, q.y - p.y)), ...pads.map(r => pointToRect(p, r)))
     const worst = Math.max(...outline(b).flatMap(r => ring(r)).map(reach))
-    return worst > ft(rules.maxHosePullFt) ? [{ text: `${b.name}: ${n(toFt(worst))} ft`, ids: [b.id] }] : []
+    return worst > ft(rules.maxHosePullFt) ? [{ text: `${b.name}: ${Number.isFinite(worst) ? `${n(toFt(worst))} ft` : `no apparatus road or apron within ${n(rules.maxHosePullFt * 2)} ft`}`, ids: [b.id] }] : []
   })
   checks.push(warn('hose-pull', `Every outside wall within ${rules.maxHosePullFt} ft of an apparatus road or hardstand`, far2, `${e.buildings.length} buildings`))
 

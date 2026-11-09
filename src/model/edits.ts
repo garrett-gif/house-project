@@ -154,7 +154,7 @@ const checkAim = (facing: number, fov: number) => !finite(facing, fov) ? 'Facing
 function checkOpeningSize(width: number, height: number, sill: number) {
   if (!finite(width, height, sill)) return 'Opening sizes must be numbers.'
   if (width < 12 || height < 12) return 'Openings must be at least 1 ft wide and 1 ft tall.'
-  if (width > 12 * 24 || height > 12 * 12) return 'Openings must be under 24 ft wide and 12 ft tall.'
+  if (width > 12 * 24 || height > 12 * 20) return 'Openings must be under 24 ft wide and 20 ft tall.'
   if (sill < 0 || sill > 12 * 8) return 'Sill height must be between 0 and 8 ft.'
   return ''
 }

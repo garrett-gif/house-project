@@ -6,7 +6,7 @@ import { gradeAt } from './elevations'
 import { existingGrade } from '../model/terrain'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import type { Mark, Sheet } from './sheet'
-import { MARGIN, SCALE, drawTitleBlock } from './floorPlanSheet'
+import { MARGIN, drawTitleBlock, scaleFor } from './floorPlanSheet'
 import type { SetPosition, SheetInfo } from './floorPlanSheet'
 
 import { sectionCuts } from './sectionCuts'
@@ -35,7 +35,7 @@ function crossing(pts: P3[], cut: SectionCut): [number, number][] | null {
 
 /** One section's marks, placed with h = hMin at sheet x = sx and the top at sheet y = sy. */
 export function sectionMarks(e: Estate, cut: SectionCut, sx: number, sy: number) {
-  const house = e.house, k = SCALE.ptPerInch
+  const house = e.house, k = scaleFor(e.house).ptPerInch
   const levels = [...house.levels].sort((a, b) => a.elevation - b.elevation)
   const inSpan = (r: { rect: { x: number; y: number; w: number; d: number } }) =>
     cut.axis === 'x' ? r.rect.x < cut.at && cut.at < r.rect.x + r.rect.w : r.rect.y < cut.at && cut.at < r.rect.y + r.rect.d
@@ -135,10 +135,10 @@ export function sectionSheet(e: Estate, info: SheetInfo, position: SetPosition):
     const dir = cut.axis === 'x' ? 'NORTH-SOUTH, LOOKING WEST' : 'EAST-WEST, LOOKING NORTH'
     marks.push({ t: 'text', x: left, y: ty, text: `SECTION ${cut.id}`, size: 14, bold: true })
     marks.push({ t: 'line', x1: left, y1: ty + 5, x2: left + 2.4 * PT_PER_IN, y2: ty + 5, w: 1.2 })
-    marks.push({ t: 'text', x: left, y: ty + 17, text: `SCALE: ${SCALE.label}    ${dir}. CUT ELEMENTS ONLY; WALLS BEYOND NOT SHOWN. GRADE ASSUMED.`, size: 7.5 })
+    marks.push({ t: 'text', x: left, y: ty + 17, text: `SCALE: ${scaleFor(e.house).label}    ${dir}. CUT ELEMENTS ONLY; WALLS BEYOND NOT SHOWN. GRADE ASSUMED.`, size: 7.5 })
     y = ty + 0.9 * PT_PER_IN
   }
   marks.push({ t: 'text', x: left, y: ARCH_D.height - MARGIN - 18, text: 'Floor and roof structure are shown as simple bands for planning. Structure, insulation, and assemblies are by others.', size: 7.5 })
-  drawTitleBlock(marks, e, { title: 'BUILDING SECTIONS', scale: SCALE.label, number: 'A-401' }, info, position)
+  drawTitleBlock(marks, e, { title: 'BUILDING SECTIONS', scale: scaleFor(e.house).label, number: 'A-401' }, info, position)
   return { number: 'A-401', title: 'Building sections', width: ARCH_D.width, height: ARCH_D.height, marks }
 }

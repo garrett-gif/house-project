@@ -248,6 +248,8 @@ export interface ProgramItem {
   near?: string[]
   /** Seats the room's furniture must provide, such as a 20-seat theater. */
   seats?: number
+  /** Machines or vehicles the room must house, by catalog kind, such as 25 Type 3 engines. */
+  holds?: Record<string, number>
 }
 
 export interface HouseModel {

@@ -55,7 +55,7 @@ describe('proposeEdits', () => {
 
   it('reports newly failing checks back to Claude', async () => {
     const { create, calls } = scripted(
-      reply([tool('t', 'moveBuilding', { buildingId: 'forestry-shop', eastFt: -1690, northFt: 2360 })], 'tool_use'),
+      reply([tool('t', 'moveBuilding', { buildingId: 'fuel', eastFt: -3500, northFt: 3300 })], 'tool_use'),
       reply([text('Moved it, but the separation check now fails.')]),
     )
     await proposeEdits(create, request('move the forestry shop next to the house'))

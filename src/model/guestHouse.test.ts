@@ -80,7 +80,8 @@ describe('focusing on a house', () => {
   it('swaps it into the house slot and keeps the main house in the list', () => {
     const f = focusHouse(sampleEstate, 'guest-house')
     expect(f.house.buildingId).toBe('guest-house')
-    expect(f.houses!.map(h => h.buildingId)).toEqual(['main-house'])
+    expect(f.houses!.map(h => h.buildingId)).toContain('main-house')
+    expect(f.houses!.map(h => h.buildingId)).not.toContain('guest-house')
     expect(focusHouse(sampleEstate, 'main-house')).toBe(sampleEstate)
   })
 

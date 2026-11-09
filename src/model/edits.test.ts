@@ -75,7 +75,7 @@ describe('moveBuilding', () => {
   it('rejects unknown ids, bad numbers, and moves onto another building', () => {
     expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'nope', dx: 0, dy: 0 }))).toMatch(/No building with id "nope"/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'fuel', dx: Number.NaN, dy: 0 }))).toMatch(/numbers/)
-    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'fuel', dx: 0, dy: ft(970) }))).toMatch(/Maintenance shop \(maintenance-shop\) and Fuel island and storage \(fuel\) would overlap/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'fuel', dx: 0, dy: ft(970) }))).toMatch(/Forestry machine shop \(forestry-shop\) and Fuel island and storage \(fuel\) would overlap/)
   })
 })
 
@@ -186,7 +186,7 @@ describe('room operations', () => {
 
 describe('checks and descriptions', () => {
   it('shows a check failure caused by an edit', () => {
-    const e = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'forestry-shop', dx: ft(-1690), dy: ft(2360) }))
+    const e = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'fuel', dx: ft(-3500), dy: ft(3300) }))
     expect(diffChecks(validateEstate(sampleEstate), validateEstate(e)).find(c => c.id === 'separation')).toMatchObject({ from: 'pass', to: 'fail' })
   })
 
@@ -197,7 +197,7 @@ describe('checks and descriptions', () => {
       { op: 'setRoomType', roomId: 'office', type: 'service' },
       { op: 'removeRoom', roomId: 'office' },
     ], sampleEstate)).toEqual([
-      'Move Forestry shop 100 ft east',
+      'Move Forestry machine shop 100 ft east',
       'Rename Library and home office to Reading room',
       'Make Reading room a service room',
       'Remove Reading room',

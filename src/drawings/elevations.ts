@@ -6,7 +6,7 @@ import type { P3 } from '../model/roofs'
 import { houseBounds } from '../model/derive'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import type { Mark, Sheet } from './sheet'
-import { MARGIN, SCALE, TITLE_W, drawTitleBlock } from './floorPlanSheet'
+import { MARGIN, TITLE_W, drawTitleBlock, scaleFor } from './floorPlanSheet'
 import type { SetPosition, SheetInfo } from './floorPlanSheet'
 
 export type ElevationView = 'north' | 'south' | 'east' | 'west'
@@ -39,7 +39,7 @@ interface Item { depth: number; marks: Mark[] }
 
 /** One elevation as marks, placed so that h = hLeft lands at sheet x = sx and z = zTop lands at sheet y = sy. */
 export function elevationMarks(e: Estate, view: ElevationView, sx: number, sy: number) {
-  const house = e.house, k = SCALE.ptPerInch
+  const house = e.house, k = scaleFor(e.house).ptPerInch
   const levels = [...house.levels].sort((a, b) => a.elevation - b.elevation)
   const items: Item[] = []
   const all: { h: number; z: number }[] = []
@@ -118,7 +118,7 @@ export function elevationMarks(e: Estate, view: ElevationView, sx: number, sy: n
   const zTop = Math.max(...all.map(p => p.z))
   const zBottom = Math.min(...levels.map(l => l.elevation)) - 48
   const tx = (h: number) => sx + (h - hMin) * k, tz = (z: number) => sy + (zTop - z) * k
-  const placedMarks = raw.map(m => place(m, tx, tz))
+  const placedMarks = raw.map(m => place(m, tx, tz, k))
 
   // Grade: earth in front of everything, then the grade line.
   const [spanW, spanE] = walkoutSpan(house)
@@ -181,11 +181,11 @@ function seams(q: { h: number; z: number }[]): [[number, number], [number, numbe
 }
 
 /** Moves a mark from elevation coordinates (h, z in inches) onto the sheet. */
-function place(m: Mark, tx: (h: number) => number, tz: (z: number) => number): Mark {
+function place(m: Mark, tx: (h: number) => number, tz: (z: number) => number, k: number): Mark {
   switch (m.t) {
     case 'line': return { ...m, x1: tx(m.x1), y1: tz(m.y1), x2: tx(m.x2), y2: tz(m.y2) }
     case 'path': return { ...m, d: m.d.replace(/(-?[\d.]+(?:e-?\d+)?) (-?[\d.]+(?:e-?\d+)?)/g, (_, a, b) => `${tx(Number(a))} ${tz(Number(b))}`) }
-    case 'rect': return { ...m, x: tx(m.x), y: tz(m.y + m.h), w: m.w * SCALE.ptPerInch, h: m.h * SCALE.ptPerInch }
+    case 'rect': return { ...m, x: tx(m.x), y: tz(m.y + m.h), w: m.w * k, h: m.h * k }
     case 'text': return { ...m, x: tx(m.x), y: tz(m.y) }
   }
 }
@@ -194,10 +194,10 @@ function frame(marks: Mark[]) {
   marks.push({ t: 'rect', x: MARGIN / 2, y: MARGIN / 2, w: ARCH_D.width - MARGIN, h: ARCH_D.height - MARGIN, stroke: '#000', sw: 1.5 })
 }
 
-function title(marks: Mark[], x: number, y: number, text: string) {
+function title(marks: Mark[], x: number, y: number, text: string, scale: string) {
   marks.push({ t: 'text', x, y, text, size: 14, bold: true })
   marks.push({ t: 'line', x1: x, y1: y + 5, x2: x + 3 * PT_PER_IN, y2: y + 5, w: 1.2 })
-  marks.push({ t: 'text', x, y: y + 17, text: `SCALE: ${SCALE.label}    GRADE ASSUMED, FALLING SOUTH. CONFIRM WITH A SURVEY.`, size: 7.5 })
+  marks.push({ t: 'text', x, y: y + 17, text: `SCALE: ${scale}    GRADE ASSUMED, FALLING SOUTH. CONFIRM WITH A SURVEY.`, size: 7.5 })
 }
 
 /** Two elevations on one sheet: stacked when long (north and south), side by side when short (east and west). */
@@ -211,21 +211,21 @@ export function elevationSheet(e: Estate, views: [ElevationView, ElevationView],
   if (stacked) {
     const a = elevationMarks(e, views[0], left, top)
     marks.push(...a.marks)
-    title(marks, left, top + a.height + 30, `${views[0].toUpperCase()} ELEVATION`)
+    title(marks, left, top + a.height + 30, `${views[0].toUpperCase()} ELEVATION`, scaleFor(e.house).label)
     const y2 = top + a.height + 1.2 * PT_PER_IN
     const b = elevationMarks(e, views[1], left, y2)
     marks.push(...b.marks)
-    title(marks, left, y2 + b.height + 30, `${views[1].toUpperCase()} ELEVATION`)
+    title(marks, left, y2 + b.height + 30, `${views[1].toUpperCase()} ELEVATION`, scaleFor(e.house).label)
   } else {
     const a = elevationMarks(e, views[0], left, top + 1.5 * PT_PER_IN)
     marks.push(...a.marks)
-    title(marks, left, top + 1.5 * PT_PER_IN + a.height + 30, `${views[0].toUpperCase()} ELEVATION`)
+    title(marks, left, top + 1.5 * PT_PER_IN + a.height + 30, `${views[0].toUpperCase()} ELEVATION`, scaleFor(e.house).label)
     const x2 = left + a.width + 0.6 * PT_PER_IN
     const b = elevationMarks(e, views[1], x2, top + 1.5 * PT_PER_IN)
     marks.push(...b.marks)
-    title(marks, x2, top + 1.5 * PT_PER_IN + b.height + 30, `${views[1].toUpperCase()} ELEVATION`)
+    title(marks, x2, top + 1.5 * PT_PER_IN + b.height + 30, `${views[1].toUpperCase()} ELEVATION`, scaleFor(e.house).label)
   }
-  drawTitleBlock(marks, e, { title: sheetTitle.toUpperCase(), scale: SCALE.label, number }, info, position)
+  drawTitleBlock(marks, e, { title: sheetTitle.toUpperCase(), scale: scaleFor(e.house).label, number }, info, position)
   return { number, title: sheetTitle, width: ARCH_D.width, height: ARCH_D.height, marks }
 }
 
@@ -233,7 +233,7 @@ export function elevationSheet(e: Estate, views: [ElevationView, ElevationView],
 export function roofPlanSheet(e: Estate, info: SheetInfo, position: SetPosition): Sheet {
   const marks: Mark[] = []
   frame(marks)
-  const house = e.house, k = SCALE.ptPerInch
+  const house = e.house, k = scaleFor(e.house).ptPerInch
   const b = houseBounds(house)
   const areaW = ARCH_D.width - 2 * MARGIN - TITLE_W
   const ox = MARGIN + (areaW - b.w * k) / 2, oy = MARGIN + 1.8 * PT_PER_IN
@@ -267,8 +267,8 @@ export function roofPlanSheet(e: Estate, info: SheetInfo, position: SetPosition)
   const ty = Y(b.y) + 1.1 * PT_PER_IN
   marks.push({ t: 'text', x: MARGIN + 0.6 * PT_PER_IN, y: ty, text: 'ROOF PLAN', size: 16, bold: true })
   marks.push({ t: 'line', x1: MARGIN + 0.6 * PT_PER_IN, y1: ty + 5, x2: MARGIN + 3.4 * PT_PER_IN, y2: ty + 5, w: 1.2 })
-  marks.push({ t: 'text', x: MARGIN + 0.6 * PT_PER_IN, y: ty + 18, text: `SCALE: ${SCALE.label}    ARROWS POINT DOWNSLOPE. HEIGHTS ABOVE THE MAIN FLOOR. DASHED: OUTSIDE WALLS BELOW.`, size: 8 })
+  marks.push({ t: 'text', x: MARGIN + 0.6 * PT_PER_IN, y: ty + 18, text: `SCALE: ${scaleFor(e.house).label}    ARROWS POINT DOWNSLOPE. HEIGHTS ABOVE THE MAIN FLOOR. DASHED: OUTSIDE WALLS BELOW.`, size: 8 })
   marks.push({ t: 'text', x: MARGIN + 0.6 * PT_PER_IN, y: ty + 30, text: 'Roofing, structure, snow load, and drainage to be designed and confirmed by others.', size: 8 })
-  drawTitleBlock(marks, e, { title: 'ROOF PLAN', scale: SCALE.label, number: 'A-301' }, info, position)
+  drawTitleBlock(marks, e, { title: 'ROOF PLAN', scale: scaleFor(e.house).label, number: 'A-301' }, info, position)
   return { number: 'A-301', title: 'Roof plan', width: ARCH_D.width, height: ARCH_D.height, marks }
 }
