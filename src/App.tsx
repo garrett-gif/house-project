@@ -8,6 +8,7 @@ import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject,
 import type { ChatTurn } from './chat/protocol'
 import { checkServer, requestEdits, requestSheetsPdf } from './chat/client'
 import { drawingSet } from './drawings/drawingSet'
+import { floorPlansDxf } from './drawings/dxf'
 import { SheetView } from './views/SheetView'
 import type { Health } from './chat/protocol'
 import { browserProjectStore } from './storage/projectStore'
@@ -105,6 +106,15 @@ export function App() {
   const [sheetNumber, setSheetNumber] = useState('A-102')
   const shownSheet = sheets.find(s => s.number === sheetNumber) ?? sheets[0]
   const [downloading, setDownloading] = useState(false)
+  /** DXF needs no server: it is plain text built from the model in the browser. */
+  const downloadDxf = () => {
+    const blob = new Blob([floorPlansDxf(currentEstate(timeline))], { type: 'application/dxf' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `house-project-floor-plans-${new Date().toISOString().slice(0, 10)}.dxf`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
   const downloadPdf = async () => {
     setDownloading(true)
     const res = await requestSheetsPdf(currentEstate(timeline), revisionNumber)
@@ -247,6 +257,7 @@ export function App() {
                 <button className="primary" onClick={() => void downloadPdf()} disabled={downloading || !!proposal} title={proposal ? 'Apply or discard the proposal first' : 'Download all floor plan sheets as one PDF'}>
                   {downloading ? 'Drawing PDF…' : 'Download PDF set'}
                 </button>
+                <button onClick={downloadDxf} disabled={!!proposal} title="Floor plans for CAD, in inches, one layer set per level">Download DXF</button>
               </div>
               <SheetView sheet={shownSheet} />
             </>

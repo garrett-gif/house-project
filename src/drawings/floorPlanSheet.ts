@@ -4,6 +4,7 @@ import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import { openingMarks } from './marks'
+import { sectionCuts } from './sectionCuts'
 import type { Mark, Sheet } from './sheet'
 
 /** 1/8 inch on paper per foot: 9 points per foot, 0.75 points per model inch. */
@@ -73,6 +74,23 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     const small = r.rect.w < 14 * 12 || r.rect.d < 10 * 12
     marks.push({ t: 'text', x: cx, y: cy - (small ? 0 : 2), text: r.name.toUpperCase(), size: small ? 5 : 7, anchor: 'middle', bold: true })
     if (!small) marks.push({ t: 'text', x: cx, y: cy + 8, text: `${ftIn(r.rect.w)} × ${ftIn(r.rect.d)}`, size: 6, anchor: 'middle' })
+  }
+
+  // Section cut lines, keyed to sheet A-401, with the arrow showing which way the section looks.
+  for (const cut of sectionCuts(e.house)) {
+    const pad = 9 * 12
+    const [x1, y1, x2, y2] = cut.axis === 'x'
+      ? [X(cut.at), Y(b.y - pad), X(cut.at), Y(b.y + b.d + pad)]
+      : [X(b.x - pad), Y(cut.at), X(b.x + b.w + pad), Y(cut.at)]
+    marks.push({ t: 'line', x1, y1, x2, y2, w: 0.7, dash: [14, 4, 3, 4] })
+    for (const [px, py] of [[x1, y1], [x2, y2]]) {
+      // Looking west for a north-south cut, north for an east-west cut.
+      const [ax, ay] = cut.axis === 'x' ? [px - 14, py] : [px, py - 14]
+      marks.push({ t: 'path', d: `M ${px - 9} ${py} A 9 9 0 1 0 ${px + 9} ${py} A 9 9 0 1 0 ${px - 9} ${py} Z`, fill: '#fff', stroke: '#000', sw: 0.8 })
+      marks.push({ t: 'path', d: cut.axis === 'x' ? `M ${px - 9} ${py - 5} L ${ax} ${ay} L ${px - 9} ${py + 5} Z` : `M ${px - 5} ${py - 9} L ${ax} ${ay} L ${px + 5} ${py - 9} Z`, fill: '#000' })
+      marks.push({ t: 'text', x: px, y: py - 1, text: cut.id, size: 7, anchor: 'middle', bold: true })
+      marks.push({ t: 'text', x: px, y: py + 6, text: 'A-401', size: 3.8, anchor: 'middle' })
+    }
   }
 
   // Dimension strings: a chain and an overall dimension on the north and west sides.
