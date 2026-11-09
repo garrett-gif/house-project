@@ -14,6 +14,10 @@ import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
 import { outwardSide } from '../model/walls'
 import type { Palette } from '../model/materials'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { box as lookBox, makeLook, partModel, worldUV } from './look3d'
+import type { Look, Quality, Surface } from './look3d'
+import type { RoomType } from '../model/types'
 import type { P3, Poly3 } from '../model/roofs'
 import { flyoverKeyframes, step, walkStart } from '../ui/tour'
 
@@ -28,30 +32,34 @@ function rng(seed: number) {
   }
 }
 
-function addBox(group: THREE.Object3D, x: number, y: number, z: number, w: number, h: number, d: number, color: number | string, opacity = 1) {
-  const mat = new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity })
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
+function addBox(group: THREE.Object3D, x: number, y: number, z: number, w: number, h: number, d: number, color: number | string, opacity = 1, surface: Surface = 'plain', look?: Look) {
+  const mesh = look
+    ? lookBox(look, w, h, d, surface, typeof color === 'number' ? color : undefined, opacity)
+    : new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity }))
   mesh.position.set(x, y, z)
   group.add(mesh)
   return mesh
 }
 
+/** Floor finish by room type. */
+const floorSurface = (t: RoomType): Surface => t === 'bath' || t === 'wellness' || t === 'pool' ? 'tile' : t === 'garage' || t === 'service' ? 'slab' : t === 'outdoor' ? 'stone' : 'floor'
+
 /** A straight timber from a to b (scene feet), w wide and d deep, its depth kept in the vertical plane through it. */
-function addTimber(group: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, w: number, d: number, color: number) {
+function addTimber(group: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, w: number, d: number, color: number, look?: Look) {
   const dir = b.clone().sub(a), len = dir.length()
   if (len < 0.05) return
   dir.normalize()
   const up = new THREE.Vector3(0, 1, 0)
   const across = Math.abs(dir.dot(up)) > 0.99 ? new THREE.Vector3(1, 0, 0) : dir.clone().cross(up).normalize()
   const depth = across.clone().cross(dir).normalize()
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, len), new THREE.MeshLambertMaterial({ color }))
+  const mesh = look ? lookBox(look, w, d, len, 'timber', color) : new THREE.Mesh(new THREE.BoxGeometry(w, d, len), new THREE.MeshLambertMaterial({ color }))
   mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, depth, dir))
   mesh.position.copy(a.clone().add(b).multiplyScalar(0.5))
   group.add(mesh)
 }
 
 /** Flat polygons as one mesh. With `facing` 'down', each is wound to face down, so a ceiling shows from inside only. */
-function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => number[], color: number, facing: 'down' | 'both', opacity = 1) {
+function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => number[], color: number, facing: 'down' | 'both', opacity = 1, surface: Surface = 'plain', look?: Look) {
   const verts: number[] = []
   for (const poly of polys) {
     let v = poly.pts.map(toScene)
@@ -66,7 +74,17 @@ function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => num
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
   g.computeVertexNormals()
-  group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: facing === 'down' ? THREE.FrontSide : THREE.DoubleSide, transparent: opacity < 1, opacity })))
+  const side = facing === 'down' ? THREE.FrontSide : THREE.DoubleSide
+  if (look) {
+    if (look.detailed) worldUV(g, surface)
+    const m = look.mat(surface, color, opacity).clone()
+    m.side = side
+    const mesh = new THREE.Mesh(g, m)
+    if (look.detailed) { mesh.castShadow = opacity >= 1; mesh.receiveShadow = true }
+    group.add(mesh)
+    return
+  }
+  group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side, transparent: opacity < 1, opacity })))
 }
 
 function buildSite(scene: THREE.Scene, estate: Estate) {
@@ -144,22 +162,29 @@ function buildSite(scene: THREE.Scene, estate: Estate) {
 }
 
 /** Roof planes and gable walls as flat polygons, fanned into triangles. Plan x east, y north, z up; scene y is up. */
-function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number, pal: Palette = paletteOf(estate.house)) {
+function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number, pal: Palette = paletteOf(estate.house), look?: Look) {
   const roofVerts: number[] = [], gableVerts: number[] = []
   for (const roof of estate.house.roofs) for (const poly of roofPolygons(estate.house, roof)) {
     const v = poly.pts.map(([x, y, z]) => [toFt(x) - cx, toFt(z), cy - toFt(y)])
     const out = poly.kind === 'roof' ? roofVerts : gableVerts
     for (let i = 1; i < v.length - 1; i++) out.push(...v[0], ...v[i], ...v[i + 1])
   }
-  for (const [verts, color] of [[roofVerts, pal.roof], [gableVerts, pal.siding]] as const) {
+  for (const [verts, color, surface] of [[roofVerts, pal.roof, 'roof'], [gableVerts, pal.siding, 'siding']] as const) {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
     g.computeVertexNormals()
-    scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })))
+    if (look?.detailed) {
+      worldUV(g, surface)
+      const m = look.mat(surface, color).clone()
+      m.side = THREE.DoubleSide
+      const mesh = new THREE.Mesh(g, m)
+      mesh.castShadow = true; mesh.receiveShadow = true
+      scene.add(mesh)
+    } else scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })))
   }
 }
 
-function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThisLevel = false) {
+function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThisLevel = false, look: Look = makeLook('fast', paletteOf(estate.house))) {
   const levels = estate.house.levels
   const top = levels.findIndex(l => l.id === levelId)
   const visible = onlyThisLevel ? [levels[top < 0 ? 0 : top]] : levels.slice(0, (top < 0 ? 1 : top) + 1)
@@ -167,7 +192,7 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const b = houseBounds(estate.house)
   const pal = paletteOf(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
-  addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
+  addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, look.detailed ? 0x6f8f4a : 0xa9bb8c, 1, 'grass', look)
   // Each wing is a group turned about its pivot; inside it, rooms, walls, and furniture use the wing's own inches.
   const frames = new Map<string, THREE.Object3D>()
   const frame = (wingId?: string): THREE.Object3D => {
@@ -186,7 +211,8 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
     const base = toFt(level.elevation)
     for (const room of level.rooms) {
       const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
-      addBox(frame(room.wingId), x + w / 2, base, z, w, 0.4, d, floorColor(pal, room.type))
+      const lawn = room.type === 'outdoor' && /lawn/i.test(room.name)
+      addBox(frame(room.wingId), x + w / 2, base, z, w, 0.4, d, lawn ? 0x6f8f4a : floorColor(pal, room.type), 1, lawn ? 'grass' : floorSurface(room.type), look)
     }
     // Walls follow the derived segments, with doors and windows cut out of them.
     const openings = placeOpenings(estate.house).filter(o => o.levelId === level.id && o.wall && !o.problem)
@@ -200,20 +226,20 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
       const tall = seg.sides.some(id => level.rooms.find(r => r.id === id)?.twoStory) && levels[index + 1] && visible.includes(levels[index + 1])
       const wall = toFt(level.floorHeight + (tall ? levels[index + 1].floorHeight : 0))
       // A piece of wall between positions a and b along the segment (inches), from height y0 to y1 (feet above the floor).
-      const slab = (a: number, b: number, y0: number, y1: number, off: number, thick: number, tint: number, opacity = 1) => {
+      const slab = (a: number, b: number, y0: number, y1: number, off: number, thick: number, tint: number, opacity = 1, surface: Surface = 'interior') => {
         if (b - a < 0.5 || y1 - y0 < 0.05) return
         const len = toFt(b - a), m = (a + b) / 2, h = y1 - y0
-        if (seg.orientation === 'h') addBox(g, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at) - off, len, h, thick, tint, opacity)
-        else addBox(g, toFt(seg.at) - cx + off, base + y0 + h / 2, cy - toFt(m), thick, h, len, tint, opacity)
+        if (seg.orientation === 'h') addBox(g, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at) - off, len, h, thick, tint, opacity, surface, look)
+        else addBox(g, toFt(seg.at) - cx + off, base + y0 + h / 2, cy - toFt(m), thick, h, len, tint, opacity, surface, look)
       }
-      const piece = (a: number, b: number, y0: number, y1: number, tint?: number, opacity = 1) => {
-        if (tint !== undefined || !out) return slab(a, b, y0, y1, 0, t, tint ?? pal.interior, opacity)
+      const piece = (a: number, b: number, y0: number, y1: number, tint?: number, opacity = 1, surface: Surface = 'interior') => {
+        if (tint !== undefined || !out) return slab(a, b, y0, y1, 0, t, tint ?? pal.interior, opacity, surface)
         // slab() moves a positive offset north (scene -z) or east (+x), so the outer half sits at +t/4 on the outside.
         const o = sign * t / 4
         slab(a, b, y0, y1, -o, t / 2, pal.interior)
-        const outer = seg.kind === 'foundation' || level.elevation < 0 ? pal.stone : pal.siding
-        slab(a, b, Math.max(y0, Math.min(y1, stoneTop)), y1, o, t / 2, outer)
-        slab(a, b, y0, Math.min(y1, stoneTop), o, t / 2, pal.stone)
+        const stoneOut = seg.kind === 'foundation' || level.elevation < 0
+        slab(a, b, Math.max(y0, Math.min(y1, stoneTop)), y1, o, t / 2, stoneOut ? pal.stone : pal.siding, 1, stoneOut ? 'stone' : 'siding')
+        slab(a, b, y0, Math.min(y1, stoneTop), o, t / 2, pal.stone, 1, 'stone')
       }
       const holes = openings.filter(o => o.wall!.id === seg.id).sort((a, b) => a.from - b.from)
       let cursor = seg.from
@@ -223,10 +249,10 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
         piece(o.from, o.to, 0, sill)
         piece(o.from, o.to, head, wall)
         if (o.kind === 'window' && !o.bay) {
-          piece(o.from, o.to, sill, head, pal.glass, 0.35)
+          piece(o.from, o.to, sill, head, pal.glass, 0.35, 'glass')
           // Wide glass reads as panels: dark mullions about every 4 ft, as black window frames.
           const panels = Math.round((o.to - o.from) / 48)
-          for (let j = 1; j < panels; j++) { const m = o.from + (o.to - o.from) * j / panels; piece(m - 1.5, m + 1.5, sill, head, pal.frame) }
+          for (let j = 1; j < panels; j++) { const m = o.from + (o.to - o.from) * j / panels; piece(m - 1.5, m + 1.5, sill, head, pal.frame, 1, 'frame') }
         }
         cursor = o.to
       }
@@ -241,15 +267,15 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
       const toBay = (p: P3) => [toFt(p[0]) - cx, base + toFt(p[2]), cy - toFt(p[1])]
       const flat = (z: number): Poly3 => ({ kind: 'roof', pts: pts.map(p => [p.x, p.y, z] as P3) })
       const head = o.sill + o.height
-      addPolys(g, [flat(2)], toBay, 0xefe3cb, 'both')
-      addPolys(g, [flat(head + 2)], toBay, pal.roof, 'both')
+      addPolys(g, [flat(2)], toBay, pal.floor, 'both', 1, 'floor', look)
+      addPolys(g, [flat(head + 2)], toBay, pal.roof, 'both', 1, 'roof', look)
       for (let i = 0; i < pts.length - 1; i++) {
         const p = pts[i], q = pts[i + 1]
         const face = (z0: number, z1: number): Poly3 => ({ kind: 'gable', pts: [[p.x, p.y, z0], [q.x, q.y, z0], [q.x, q.y, z1], [p.x, p.y, z1]] })
-        addPolys(g, [face(0, o.sill)], toBay, pal.siding, 'both')
-        addPolys(g, [face(o.sill, head)], toBay, pal.glass, 'both', 0.35)
+        addPolys(g, [face(0, o.sill)], toBay, pal.siding, 'both', 1, 'siding', look)
+        addPolys(g, [face(o.sill, head)], toBay, pal.glass, 'both', 0.35, 'glass', look)
       }
-      if (o.bay!.seat) addPolys(g, [flat(Math.min(o.sill, SEAT.height))], toBay, pal.timber, 'both')
+      if (o.bay!.seat) addPolys(g, [flat(Math.min(o.sill, SEAT.height))], toBay, pal.timber, 'both', 1, 'timber', look)
     }
   }
   // Furniture and machines as plain blocks at their real heights.
@@ -259,9 +285,16 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
     const ids = new Set(level.rooms.map(r => r.id))
     for (const item of (estate.house.furniture ?? []).filter(i => ids.has(i.roomId) && CATALOG[i.kind])) {
       const c = CATALOG[item.kind], g = frame(level.rooms.find(r => r.id === item.roomId)?.wingId)
+      const color = item.kind === 'pool-basin' ? 0x4a9cc4 : c.material ? pal[c.material] : FURNITURE_COLOR[c.category] ?? 0x8d7b68
+      // Each piece's back, in scene x and z: it faces north at rotation 0, so its back is south (+z).
+      const back: [number, number] = item.rotation === 0 ? [0, 1] : item.rotation === 180 ? [0, -1] : item.rotation === 90 ? [1, 0] : [-1, 0]
       for (const q of parts(item)) {
         const h = Math.max(0.1, toFt(q.h))
-        addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : c.material ? pal[c.material] : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
+        if (look.detailed) {
+          const m = partModel(look, { w: toFt(q.w), d: toFt(q.d), h, name: q.name, kind: item.kind, entry: c, back, color })
+          m.position.set(toFt(q.x + q.w / 2) - cx, base, cy - toFt(q.y + q.d / 2))
+          g.add(m)
+        } else addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), color)
       }
     }
   }
@@ -269,16 +302,17 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const toScene = (p: P3) => [toFt(p[0]) - cx, toFt(p[2]), cy - toFt(p[1])]
   for (const level of visible) for (const room of level.rooms.filter(r => r.ceiling)) {
     const g = frame(room.wingId), polys = ceilingPolygons(estate.house, room)
-    addPolys(g, polys.filter(p => p.kind === 'roof'), toScene, pal.ceiling, 'down')
+    addPolys(g, polys.filter(p => p.kind === 'roof'), toScene, pal.ceiling, 'down', 1, 'ceiling', look)
     const glass = new Set(ceilingOf(estate.house, room).glassEnds ?? [])
-    addPolys(g, polys.filter(p => p.kind === 'gable' && !(p.side && glass.has(p.side))), toScene, pal.interior, 'both')
-    addPolys(g, polys.filter(p => p.kind === 'gable' && p.side && glass.has(p.side)), toScene, pal.glass, 'both', 0.35)
+    addPolys(g, polys.filter(p => p.kind === 'gable' && !(p.side && glass.has(p.side))), toScene, pal.interior, 'both', 1, 'interior', look)
+    addPolys(g, polys.filter(p => p.kind === 'gable' && p.side && glass.has(p.side)), toScene, pal.glass, 'both', 0.35, 'glass', look)
     for (const t of ceilingTimber(estate.house, room)) {
       const [a, b] = [t.a, t.b].map(p => new THREE.Vector3(...toScene(p)))
-      addTimber(g, a, b, toFt(t.w), toFt(t.d), pal.timber)
+      addTimber(g, a, b, toFt(t.w), toFt(t.d), pal.timber, look)
     }
   }
-  if (showRoofs) addRoofs(scene, estate, cx, cy, pal)
+  if (showRoofs) addRoofs(scene, estate, cx, cy, pal, look)
+  return { w: toFt(b.w), d: toFt(b.d) }
 }
 
 type Tour = 'none' | 'fly' | 'walk'
@@ -289,6 +323,8 @@ const WALK_FT_PER_S = 6
 export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site' | 'house'; levelId: string }) {
   const host = useRef<HTMLDivElement>(null)
   const [tour, setTour] = useState<Tour>('none')
+  const [quality, setQuality] = useState<Quality>(() => { try { return localStorage.getItem('house3d-quality') === 'fast' ? 'fast' : 'detailed' } catch { return 'detailed' } })
+  const pickQuality = (q: Quality) => { setQuality(q); try { localStorage.setItem('house3d-quality', q) } catch { /* storage may be off */ } }
   useEffect(() => { setTour('none') }, [mode])
 
   useEffect(() => {
@@ -297,12 +333,32 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     el.appendChild(renderer.domElement)
+    const cleanups: (() => void)[] = []
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0xdfe7ea)
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x6b6250, 1.7))
-    const sun = new THREE.DirectionalLight(0xfff4df, 2.1)
+    const detailed = mode === 'house' && quality === 'detailed'
+    scene.background = new THREE.Color(detailed ? 0xc4d6e4 : 0xdfe7ea)
+    // Detailed views get a brighter sky fill when walking, standing in for light bouncing around the rooms.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7d66, detailed ? (tour === 'walk' ? 1.6 : 1.0) : 1.7))
+    const sun = new THREE.DirectionalLight(0xfff1d6, detailed ? 3.2 : 2.1)
     sun.position.set(-2, 3, 2)
     scene.add(sun)
+    if (detailed) {
+      // Soft afternoon sun from the southwest with shadows, filmic tone, and soft reflections from a studio environment.
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.05
+      const pmrem = new THREE.PMREMGenerator(renderer)
+      const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+      scene.environment = env
+      scene.environmentIntensity = 0.45
+      cleanups.push(() => { env.dispose(); pmrem.dispose() })
+      sun.castShadow = true
+      sun.shadow.mapSize.set(4096, 4096)
+      sun.shadow.bias = -0.0004
+      sun.shadow.normalBias = 0.4
+      scene.add(sun.target)
+    }
 
     const walking = mode === 'house' && tour === 'walk'
     const camera = new THREE.PerspectiveCamera(walking ? 70 : 42, 1, walking ? 0.3 : mode === 'site' ? 10 : 1, mode === 'site' ? 40000 : 3000)
@@ -311,7 +367,6 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
     controls.maxPolarAngle = Math.PI * 0.49
     /** Runs every frame during a tour. */
     let animate: ((dt: number) => void) | null = null
-    const cleanups: (() => void)[] = []
 
     if (mode === 'site') {
       const S = buildSite(scene, estate)
@@ -336,7 +391,14 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
         }
       }
     } else {
-      buildHouse(scene, estate, levelId, walking)
+      const size = buildHouse(scene, estate, levelId, walking, makeLook(detailed ? 'detailed' : 'fast', paletteOf(estate.house)))
+      if (detailed) {
+        // The shadow camera covers the house and its yard.
+        const r = Math.max(size.w, size.d) * 0.75 + 20
+        sun.position.set(-r * 0.8, r * 1.4, r * 0.9)
+        Object.assign(sun.shadow.camera, { left: -r, right: r, top: r, bottom: -r, near: 1, far: r * 5 })
+        sun.shadow.camera.updateProjectionMatrix()
+      }
       camera.position.set(-90, 210, 290)
       controls.target.set(0, 0, 0)
       if (walking) {
@@ -407,7 +469,7 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [estate, mode, levelId, tour])
+  }, [estate, mode, levelId, tour, quality])
 
   return (
     <div className="scene-wrap">
@@ -415,6 +477,12 @@ export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site
       <div className="scene-tools">
         {mode === 'site' && <button className={tour === 'fly' ? 'active' : ''} onClick={() => setTour(t => t === 'fly' ? 'none' : 'fly')}>{tour === 'fly' ? 'Stop flyover' : 'Fly over'}</button>}
         {mode === 'house' && <button className={tour === 'walk' ? 'active' : ''} onClick={() => setTour(t => t === 'walk' ? 'none' : 'walk')}>{tour === 'walk' ? 'Stop walking' : 'Walk through'}</button>}
+        {mode === 'house' && (
+          <span role="group" aria-label="3D quality">
+            <button className={quality === 'detailed' ? 'active' : ''} aria-pressed={quality === 'detailed'} onClick={() => pickQuality('detailed')} title="Materials, textures, shaped furniture, sun and shadows">Detailed</button>
+            <button className={quality === 'fast' ? 'active' : ''} aria-pressed={quality === 'fast'} onClick={() => pickQuality('fast')} title="Plain blocks, quick on any computer">Fast</button>
+          </span>
+        )}
         {tour === 'walk' && <span>W A S D or arrows to move, Shift to hurry, drag to look. Pick a floor above to change levels.</span>}
       </div>
     </div>
