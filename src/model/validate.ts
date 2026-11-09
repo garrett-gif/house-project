@@ -1,5 +1,6 @@
 import type { Building, Check, CheckStatus, Estate } from './types'
 import { wallChecks } from './wallChecks'
+import { programChecks } from './programChecks'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
@@ -114,6 +115,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(check('baths', 'Every bedroom has its own bathroom', noBath.length === 0, noBath.map(r => r.name).join(', ') || `${bedrooms.length} bedrooms matched`, 'fail', noBath.map(r => r.id)))
 
   checks.push(...wallChecks(e))
+  checks.push(...programChecks(e))
   return checks
 }
 

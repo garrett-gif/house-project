@@ -75,9 +75,9 @@ describe('proposeEdits', () => {
 
   it('tells Claude what a widened kitchen collides with, then accepts a valid fix', async () => {
     const { create, calls } = scripted(
-      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 60, depthFt: 24, anchor: 'w' })], 'tool_use'),
+      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 58, depthFt: 24, anchor: 'w' })], 'tool_use'),
       reply([
-        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 60, depthFt: 24, anchor: 'w' }),
+        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 58, depthFt: 24, anchor: 'w' }),
         tool('c', 'resizeRoom', { roomId: 'great', widthFt: 38, depthFt: 24, anchor: 'e' }),
       ], 'tool_use'),
       reply([text('Widened the kitchen 10 ft east and took the space from the great room.')]),
@@ -85,7 +85,7 @@ describe('proposeEdits', () => {
     const out = await proposeEdits(create, request('Make the kitchen 10 feet wider.'))
     const first = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaToolResultBlockParam[]
     expect(first[0]).toMatchObject({ is_error: true })
-    expect(first[0].content).toContain('Great room (great) would overlap by 10 ft × 24 ft')
+    expect(first[0].content).toContain('Great room, two story (great) would overlap by 10 ft × 24 ft')
     expect(out.ok && out.ops.map(o => o.op)).toEqual(['resizeRoom', 'resizeRoom'])
   })
 

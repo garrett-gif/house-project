@@ -79,6 +79,19 @@ export interface Opening {
 /** A stair from a stair room on one level up to a stair room on the next. */
 export interface Stair { id: string; roomId: string; toRoomId: string; shape: 'straight' | 'u-shaped'; width: Inches; tread: Inches }
 
+/**
+ * One line of the design brief the layout is checked against. Areas are square feet and widths are feet,
+ * measured to wall centerlines like the plans. `near` lists rooms it must share a wall with.
+ */
+export interface ProgramItem {
+  roomId: string
+  need: string
+  levelId?: string
+  minArea?: number
+  minWidth?: number
+  near?: string[]
+}
+
 export interface HouseModel {
   buildingId: string
   origin: Pt
@@ -87,6 +100,8 @@ export interface HouseModel {
   wallThickness: WallThickness
   openings: Opening[]
   stairs: Stair[]
+  /** The brief as checkable requirements. Optional so older saves still load. */
+  program?: ProgramItem[]
 }
 
 export interface Estate {

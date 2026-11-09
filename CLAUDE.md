@@ -40,7 +40,8 @@ npm run build   # type-check src and server, vite build, then scan dist/ for cre
 
 ## Other notes
 
-- The main house is placeholder massing, not a finished floor plan.
+- The main house is the first real layout (v1) from the brief, still a concept. Its bearing lines are listed at the top of `src/model/house.ts`; keep new walls on them where possible so floors stack.
+- `house.program` holds the brief as checkable requirements (`src/model/programChecks.ts`): rooms, levels, minimum areas and widths, and rooms that must share a wall. Update it when Garrett changes the brief.
 - API keys stay on the server. The Anthropic key lives in `server/.env` (git-ignored; see `server/.env.example`). Nothing under `src/` may import `@anthropic-ai/sdk`, read a key, or import from `server/`; `src/keyIsolation.test.ts` and `scripts/check-bundle.mjs` enforce this. Vite is configured to refuse serving `server/` and `.env` files.
 - Chat edits are proposals: the browser previews them, shows check changes, and commits only when the owner clicks Apply. Edits that make checks fail can still be applied, flagged in red. Overlaps are the exception: they are rejected before they become a proposal, and Claude must fix or explain them.
 - Everything is local only for now. The chat server binds to 127.0.0.1 and rejects requests from other origins.

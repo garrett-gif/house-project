@@ -48,7 +48,7 @@ describe('floor plan sheets', () => {
     const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(10) }])
     if (!r.ok) throw new Error(r.error)
     const t = texts(floorPlanSheets(r.estate, info)[1].marks)
-    expect(t).toContain(`60'-0" × 24'-0"`)
+    expect(t).toContain(`58'-0" × 24'-0"`)
     expect(t).toContain(`38'-0" × 24'-0"`)
   })
 

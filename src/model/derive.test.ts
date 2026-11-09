@@ -38,7 +38,8 @@ describe('checks name what they are about', () => {
   })
 
   it('names the misplaced rooms', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'resizeRoom', roomId: 'library', w: ft(53), d: ft(24), anchor: 's' }]))
+    // Pushing the lounge past the north face leaves the front door no longer the northmost wall.
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'lounge', side: 'n', distance: ft(4) }]))
     expect(validateEstate(e).find(c => c.id === 'house-placement')).toMatchObject({ status: 'fail', elements: ['foyer'] })
   })
 
