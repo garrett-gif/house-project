@@ -2,6 +2,7 @@ import type { HouseModel, Inches, Opening, Room, Side, Stair } from './types'
 import { ft } from './geometry'
 import { DEFAULT_WALL_THICKNESS, doorGraph, enclosedRooms, levelWalls, mustAvoidBedrooms, outwardSide, reachableFromOutside, sideLine } from './walls'
 import type { WallSegment } from './walls'
+import { firstPassRoofs } from './roofs'
 
 /**
  * A rule-based starting set of doors, windows, and stairs, so circulation and escape checks have something to work
@@ -149,8 +150,9 @@ export function firstPassStairs(house: HouseModel): Stair[] {
 }
 
 /** Fills in walls, openings, and stairs for a house saved before they existed. */
-export function withHouseDefaults(house: Omit<HouseModel, 'wallThickness' | 'openings' | 'stairs'> & Partial<HouseModel>): HouseModel {
-  const base: HouseModel = { ...house, wallThickness: house.wallThickness ?? { ...DEFAULT_WALL_THICKNESS }, openings: [], stairs: [] }
+export function withHouseDefaults(house: Omit<HouseModel, 'wallThickness' | 'openings' | 'stairs' | 'roofs'> & Partial<HouseModel>): HouseModel {
+  const base: HouseModel = { ...house, wallThickness: house.wallThickness ?? { ...DEFAULT_WALL_THICKNESS }, openings: [], stairs: [], roofs: [] }
   const stairs = house.stairs ?? firstPassStairs(base)
-  return { ...base, stairs, openings: house.openings ?? firstPassOpenings({ ...base, stairs }) }
+  const roofs = house.roofs ?? firstPassRoofs(base)
+  return { ...base, stairs, roofs, openings: house.openings ?? firstPassOpenings({ ...base, stairs, roofs }) }
 }

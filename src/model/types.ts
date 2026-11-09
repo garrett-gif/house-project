@@ -39,7 +39,8 @@ export interface Road { id: string; name: string; kind: RoadKind; points: Pt[]; 
 export interface Walkway { id: string; name: string; points: Pt[]; from?: string; to?: string }
 
 export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool' | 'outdoor'
-export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string }
+/** `twoStory` rooms are open to the floor above, so their walls rise through it to the roof. */
+export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean }
 /** A side of a rectangle: north, south, east, or west. */
 export type Side = 'n' | 's' | 'e' | 'w'
 
@@ -76,6 +77,25 @@ export interface Opening {
   swing?: 'in' | 'out'
 }
 
+export type RoofForm = 'gable' | 'hip' | 'shed'
+
+/**
+ * A roof over part of the house. `rect` is the area it covers to wall centerlines, in house-local inches, before
+ * overhang. The eave sits on top of the walls of `levelId`. Gable and hip roofs run their ridge east-west ('ew') or
+ * north-south ('ns'); a shed roof slopes down toward its `low` side. Pitch is rise in inches per 12 of run.
+ */
+export interface Roof {
+  id: string
+  name: string
+  rect: Rect
+  levelId: string
+  form: RoofForm
+  pitch: number
+  ridge: 'ew' | 'ns'
+  low: Side
+  overhang: Inches
+}
+
 /** A stair from a stair room on one level up to a stair room on the next. */
 export interface Stair { id: string; roomId: string; toRoomId: string; shape: 'straight' | 'u-shaped'; width: Inches; tread: Inches }
 
@@ -100,6 +120,7 @@ export interface HouseModel {
   wallThickness: WallThickness
   openings: Opening[]
   stairs: Stair[]
+  roofs: Roof[]
   /** The brief as checkable requirements. Optional so older saves still load. */
   program?: ProgramItem[]
 }

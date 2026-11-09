@@ -2,6 +2,7 @@ import type { Estate, Rect } from './types'
 import { pathLength, toFt } from './geometry'
 import { validateEstate } from './validate'
 import { placeOpenings } from './walls'
+import { ridgeHeight } from './roofs'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
@@ -40,6 +41,7 @@ export function summarizeEstate(e: Estate): string {
     }
   }
 
+  if (e.house.roofs.length) lines.push('', `Roofs (id: name, over, form, pitch, ridge or low side, overhang; heights above the main floor): ${e.house.roofs.map(r => `${r.id}: ${r.name}, over ${box(r.rect)} on ${r.levelId}, ${r.form} ${r.pitch}:12, ${r.form === 'shed' ? `low side ${r.low}` : `ridge ${r.ridge}`}, ${f(r.overhang)} ft overhang, top at ${f(ridgeHeight(e.house, r))} ft`).join('; ')}.`)
   if (e.house.stairs.length) lines.push('', `Stairs: ${e.house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
   lines.push('', "This app's planning checks right now (these are planning aids, not code compliance):")
   for (const c of validateEstate(e)) lines.push(`- ${c.status.toUpperCase()} ${c.label}: ${c.detail}`)

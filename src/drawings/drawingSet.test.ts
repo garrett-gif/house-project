@@ -13,9 +13,9 @@ const texts = (marks: Mark[]) => marks.flatMap(m => m.t === 'text' ? [m.text] : 
 const sheet = (n: string) => set.find(s => s.number === n)!
 
 describe('drawing set', () => {
-  it('has a cover, a plan per level, and schedules, numbered in order', () => {
-    expect(set.map(s => s.number)).toEqual(['G-001', 'A-101', 'A-102', 'A-103', 'A-601'])
-    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 5`))
+  it('has a cover, plans, elevations, a roof plan, and schedules, numbered in order', () => {
+    expect(set.map(s => s.number)).toEqual(['G-001', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-601'])
+    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 8`))
   })
 
   it('lists every sheet on the cover, with floor areas and the draft statement', () => {

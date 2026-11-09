@@ -7,14 +7,21 @@ import type { Mark, Sheet } from './sheet'
 import { MARGIN, TITLE_W, drawTitleBlock, floorPlanSheets, levelsInOrder } from './floorPlanSheet'
 import type { SetPosition, SheetInfo } from './floorPlanSheet'
 import { openingMarks } from './marks'
+import { elevationSheet, roofPlanSheet } from './elevations'
 
-/** The full draft set: cover and index, one plan per level, then door and window schedules. */
+/** The full draft set: cover and index, one plan per level, elevations, roof plan, then door and window schedules. */
 export function drawingSet(e: Estate, info: SheetInfo): Sheet[] {
-  const count = e.house.levels.length + 2
+  const levels = e.house.levels.length
+  const count = levels + 5
   const plans = floorPlanSheets(e, info, 2, count)
-  const schedules = scheduleSheet(e, info, { index: count, count })
-  const index = [{ number: 'G-001', title: 'Cover and sheet index' }, ...plans, schedules].map(s => ({ number: s.number, title: s.title }))
-  return [coverSheet(e, info, index, { index: 1, count }), ...plans, schedules]
+  let n = levels + 2
+  const ns = elevationSheet(e, ['north', 'south'], 'A-201', 'North and south elevations', info, { index: n++, count })
+  const ew = elevationSheet(e, ['east', 'west'], 'A-202', 'East and west elevations', info, { index: n++, count })
+  const roof = roofPlanSheet(e, info, { index: n++, count })
+  const schedules = scheduleSheet(e, info, { index: n, count })
+  const rest = [...plans, ns, ew, roof, schedules]
+  const index = [{ number: 'G-001', title: 'Cover and sheet index' }, ...rest].map(s => ({ number: s.number, title: s.title }))
+  return [coverSheet(e, info, index, { index: 1, count }), ...rest]
 }
 
 interface Column { label: string; w: number; align?: 'start' | 'middle' }

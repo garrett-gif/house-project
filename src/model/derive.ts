@@ -1,5 +1,6 @@
 import type { Estate, HouseModel, Rect } from './types'
 import { bounds, mergeRects, translate } from './geometry'
+import { houseHeight } from './roofs'
 
 const rooms = (house: HouseModel) => house.levels.flatMap(l => l.rooms)
 
@@ -29,6 +30,7 @@ export function withDerivedGeometry(e: Estate): Estate {
   const footprint = place(houseFootprint(e.house))
   return {
     ...e,
-    buildings: e.buildings.map(b => b.id === e.house.buildingId ? { ...b, rect: bounds(footprint), parts, footprint } : b),
+    // Height above the main floor comes from the roofs, so the site 3D view matches the house.
+    buildings: e.buildings.map(b => b.id === e.house.buildingId ? { ...b, rect: bounds(footprint), parts, footprint, height: Math.round(houseHeight(e.house)) } : b),
   }
 }

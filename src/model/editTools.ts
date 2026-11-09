@@ -1,5 +1,6 @@
 import type { EditOp } from './edits'
 import { ANCHORS, DOOR_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
+import { ROOF_FORMS } from './roofs'
 
 /**
  * Tool definitions for the chat editor. Claude works in feet, which it handles more reliably;
@@ -114,6 +115,18 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     description: 'Set the default thickness of one kind of wall for the whole house, in inches.',
     input_schema: object({ kind: { type: 'string', enum: WALL_KINDS, description: 'exterior, interior, or foundation.' }, thicknessIn: num('Thickness in inches, for example 8 for 2x6 framing with siding.') }),
   },
+  {
+    name: 'setRoof',
+    description: 'Change the shape of an existing roof: gable, hip, or shed, its pitch, which way the ridge runs, and the overhang. The area it covers stays the same.',
+    input_schema: object({
+      roofId: str('Roof id from the model summary.'),
+      form: { type: 'string', enum: [...ROOF_FORMS], description: 'gable, hip, or shed.' },
+      pitch: num('Rise in inches per 12 inches of run, for example 8 for an 8:12 roof.'),
+      ridge: { type: 'string', enum: ['ew', 'ns'], description: 'For gable and hip roofs: ridge runs east-west (ew) or north-south (ns). Keep the current value for a shed.' },
+      low: { type: 'string', enum: SIDES, description: 'For a shed roof: the side it slopes down toward. Keep the current value for gable and hip.' },
+      overhangFt: num('Overhang past the walls in feet.'),
+    }),
+  },
 ]
 
 /** Feet to inches, rounded to 1/8 inch so repeated edits do not collect float noise. */
@@ -177,5 +190,6 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeOpening': return { ok: true, op: { op: 'removeOpening', openingId: s('openingId') } }
     case 'moveWall': return { ok: true, op: { op: 'moveWall', roomId: s('roomId'), side: s('side') as never, distance: inches(n('distanceFt')) } }
     case 'setWallThickness': return { ok: true, op: { op: 'setWallThickness', kind: s('kind') as never, thickness: n('thicknessIn') } }
+    case 'setRoof': return { ok: true, op: { op: 'setRoof', roofId: s('roofId'), form: s('form') as never, pitch: n('pitch'), ridge: s('ridge') as never, low: s('low') as never, overhang: inches(n('overhangFt')) } }
   }
 }

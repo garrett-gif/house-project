@@ -7,6 +7,7 @@ import { ft, partsOf, samplePath, toFt } from '../model/geometry'
 import { ROOM_COLOR } from './HousePlan'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
+import { roofPolygons } from '../model/roofs'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
 
@@ -101,16 +102,32 @@ function buildSite(scene: THREE.Scene, estate: Estate) {
   return S
 }
 
+/** Roof planes and gable walls as flat polygons, fanned into triangles. Plan x east, y north, z up; scene y is up. */
+function addRoofs(scene: THREE.Scene, estate: Estate, cx: number, cy: number) {
+  const roofVerts: number[] = [], gableVerts: number[] = []
+  for (const roof of estate.house.roofs) for (const poly of roofPolygons(estate.house, roof)) {
+    const v = poly.pts.map(([x, y, z]) => [toFt(x) - cx, toFt(z), cy - toFt(y)])
+    const out = poly.kind === 'roof' ? roofVerts : gableVerts
+    for (let i = 1; i < v.length - 1; i++) out.push(...v[0], ...v[i], ...v[i + 1])
+  }
+  for (const [verts, color] of [[roofVerts, 0x5b5f63], [gableVerts, 0xe9e3d6]] as const) {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    g.computeVertexNormals()
+    scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })))
+  }
+}
+
 function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
   const levels = estate.house.levels
   const top = levels.findIndex(l => l.id === levelId)
   const visible = levels.slice(0, (top < 0 ? 1 : top) + 1)
+  const showRoofs = top === levels.length - 1
   const b = houseBounds(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
   addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
   for (const level of visible) {
     const base = toFt(level.elevation)
-    const wall = toFt(level.floorHeight)
     for (const room of level.rooms) {
       const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
       addBox(scene, x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
@@ -120,6 +137,10 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
     const WALL_COLOR = { exterior: 0xe9e3d6, interior: 0xf6f2ea, foundation: 0xc9c2b4 }
     for (const seg of levelWalls(estate.house, level)) {
       const t = toFt(seg.thickness), color = WALL_COLOR[seg.kind]
+      // Walls of two-story rooms rise through the floor above, up to the roof.
+      const index = levels.indexOf(level)
+      const tall = seg.sides.some(id => level.rooms.find(r => r.id === id)?.twoStory) && levels[index + 1] && visible.includes(levels[index + 1])
+      const wall = toFt(level.floorHeight + (tall ? levels[index + 1].floorHeight : 0))
       // A piece of wall between positions a and b along the segment (inches), from height y0 to y1 (feet above the floor).
       const piece = (a: number, b: number, y0: number, y1: number, tint = color, opacity = 1) => {
         if (b - a < 0.5 || y1 - y0 < 0.05) return
@@ -140,6 +161,7 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string) {
       piece(cursor, seg.to, 0, wall)
     }
   }
+  if (showRoofs) addRoofs(scene, estate, cx, cy)
 }
 
 export function Scene3D({ estate, mode, levelId }: { estate: Estate; mode: 'site' | 'house'; levelId: string }) {

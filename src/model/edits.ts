@@ -1,4 +1,5 @@
-import type { Estate, Inches, Opening, OpeningKind, Rect, Room, RoomType, Side, WallKind, WindowOperation } from './types'
+import type { Estate, Inches, Opening, OpeningKind, Rect, RoofForm, Room, RoomType, Side, WallKind, WindowOperation } from './types'
+import { ROOF_FORMS } from './roofs'
 import { SIDE_WORD, placeOpenings, sideLine } from './walls'
 import { footprintOf, overlaps, toFt, translate } from './geometry'
 import { withDerivedGeometry } from './derive'
@@ -29,6 +30,8 @@ export type EditOp =
   /** Moves one side of a room by `distance` (positive is outward). Rooms on the other side of that wall give or take the same space. */
   | { op: 'moveWall'; roomId: string; side: Side; distance: Inches }
   | { op: 'setWallThickness'; kind: WallKind; thickness: Inches }
+  /** Changes how a roof is shaped. Its extent stays the same. */
+  | { op: 'setRoof'; roofId: string; form: RoofForm; pitch: number; ridge: 'ew' | 'ns'; low: Side; overhang: Inches }
 
 export const SIDES: Side[] = ['n', 's', 'e', 'w']
 export const WALL_KINDS: WallKind[] = ['exterior', 'interior', 'foundation']
@@ -249,6 +252,17 @@ function run(e: Estate, op: EditOp): string {
       e.house.wallThickness = { ...e.house.wallThickness, [op.kind]: op.thickness }
       return ''
     }
+    case 'setRoof': {
+      const roof = e.house.roofs.find(r => r.id === op.roofId)
+      if (!roof) return `No roof with id "${op.roofId}". Roofs: ${e.house.roofs.map(r => r.id).join(', ')}.`
+      if (!ROOF_FORMS.includes(op.form)) return `Roof form must be one of: ${ROOF_FORMS.join(', ')}.`
+      if (op.ridge !== 'ew' && op.ridge !== 'ns') return 'Ridge must run ew or ns.'
+      if (!SIDES.includes(op.low)) return `Low side must be one of: ${SIDES.join(', ')}.`
+      if (!finite(op.pitch) || op.pitch < 0.25 || op.pitch > 24) return 'Pitch must be between 1/4:12 and 24:12.'
+      if (!finite(op.overhang) || op.overhang < 0 || op.overhang > 12 * 8) return 'Overhang must be between 0 and 8 ft.'
+      Object.assign(roof, { form: op.form, pitch: op.pitch, ridge: op.ridge, low: op.low, overhang: op.overhang })
+      return ''
+    }
     default:
       return `Unknown edit "${(op as { op: string }).op}".`
   }
@@ -340,6 +354,11 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeOpening': return `Remove ${op.openingId}`
     case 'moveWall': return `Move the ${SIDE_WORD[op.side]} wall of ${room(op.roomId)} ${feet(op.distance)} ${op.distance > 0 ? 'out' : 'in'}`
     case 'setWallThickness': return `Make ${op.kind} walls ${op.thickness} in thick`
+    case 'setRoof': {
+      const name = e.house.roofs.find(r => r.id === op.roofId)?.name ?? op.roofId
+      const shape = op.form === 'shed' ? `shed sloping down to the ${SIDE_WORD[op.low]}` : `${op.form} with its ridge running ${op.ridge === 'ew' ? 'east-west' : 'north-south'}`
+      return `Make the ${name.toLowerCase()} a ${op.pitch}:12 ${shape}, ${feet(op.overhang)} overhang`
+    }
   }
 }
 

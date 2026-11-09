@@ -1,4 +1,4 @@
-import type { HouseModel, ProgramItem, Room, RoomType } from './types'
+import type { HouseModel, ProgramItem, Roof, Room, RoomType } from './types'
 import { ft, p } from './geometry'
 import { withHouseDefaults } from './firstPass'
 
@@ -60,7 +60,7 @@ const main: Room[] = [
   r('mudroom', 'Mudroom, lockers, bench, and dog wash', 'service', 0, 64, 24, 24),
   r('dining', 'Formal dining', 'living', 24, 64, 24, 24),
   r('kitchen', 'Eat-in party kitchen, island and table', 'living', 48, 64, 48, 24),
-  r('great', 'Great room, two story', 'living', 96, 64, 48, 24),
+  { ...r('great', 'Great room, two story', 'living', 96, 64, 48, 24), twoStory: true },
   r('east-hall', 'Hall to primary suite', 'circulation', 144, 64, 6, 24),
   r('library', 'Library', 'living', 150, 64, 40, 24),
   // Gallery and north band: entry, service, vertical circulation.
@@ -157,12 +157,27 @@ const program: ProgramItem[] = [
   { roomId: 'w-elevator', need: 'Elevator serving every floor', levelId: 'walkout' },
 ]
 
+/**
+ * Roofs: simple gables at 8:12 with 2 ft overhangs, which shed snow and suit the mountain-minimalist, European look.
+ * The north bar's ridge runs east-west over the kids floor and the two-story great room. Each wing and the garage
+ * get a gable whose ridge runs along the block and dies into the taller bar.
+ */
+const gable = (id: string, name: string, levelId: string, x: number, y: number, w: number, d: number, ridge: 'ew' | 'ns'): Roof =>
+  ({ id, name, levelId, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, form: 'gable', pitch: 8, ridge, low: 's', overhang: ft(2) })
+const roofs: Roof[] = [
+  gable('roof-bar', 'North bar roof', 'upper', 0, 64, 190, 44, 'ew'),
+  gable('roof-west', 'West wing roof', 'main', 0, 0, 46, 64, 'ns'),
+  gable('roof-east', 'East wing roof', 'main', 144, 0, 46, 64, 'ns'),
+  gable('roof-garage', 'Garage roof', 'main', -38, 64, 38, 26, 'ew'),
+]
+
 /** First real layout of the main house, from the brief. A starting point to react to, not a finished design. */
 export const mainHouse: HouseModel = withHouseDefaults({
   buildingId: 'main-house',
   origin: p(1060, 5360),
   concept: true,
   program,
+  roofs,
   levels: [
     { id: 'walkout', name: 'Walkout level', elevation: ft(-11), floorHeight: ft(11), exposed: ['s'], rooms: walkout },
     { id: 'main', name: 'Main floor', elevation: 0, floorHeight: ft(11), rooms: main },
