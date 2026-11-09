@@ -4,6 +4,8 @@ import { applyOperations } from '../model/edits'
 import { placeOpenings } from '../model/walls'
 import { drawingSet } from './drawingSet'
 import { openingMarks } from './marks'
+import { siteKeys } from './sitePlanSheet'
+import { MARGIN, TITLE_W } from './floorPlanSheet'
 import { ARCH_D } from './sheet'
 import type { Mark } from './sheet'
 
@@ -14,8 +16,8 @@ const sheet = (n: string) => set.find(s => s.number === n)!
 
 describe('drawing set', () => {
   it('has a cover, plans, elevations, a roof plan, and schedules, numbered in order', () => {
-    expect(set.map(s => s.number)).toEqual(['G-001', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
-    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 9`))
+    expect(set.map(s => s.number)).toEqual(['G-001', 'AS-101', 'A-101', 'A-102', 'A-103', 'A-201', 'A-202', 'A-301', 'A-401', 'A-601'])
+    set.forEach((s, i) => expect(texts(s.marks)).toContain(`Sheet ${i + 1} of 10`))
   })
 
   it('lists every sheet on the cover, with floor areas and the draft statement', () => {
@@ -71,5 +73,35 @@ describe('drawing set', () => {
         expect(y).toBeLessThanOrEqual(ARCH_D.height)
       }
     }
+  })
+})
+
+describe('site plan sheet', () => {
+  const sheet = drawingSet(sampleEstate, { revision: 0, date: '2026-11-09', projectName: 'House Project' }).find(s => s.number === 'AS-101')!
+  const texts = sheet.marks.flatMap(m => m.t === 'text' ? [m.text] : [])
+
+  it('keys every building and utility on the plan and in the schedules', () => {
+    const keys = siteKeys(sampleEstate)
+    for (const id of [...sampleEstate.buildings.map(b => b.id), ...sampleEstate.utilities!.map(u => u.id)]) {
+      expect(texts.filter(t => t === keys.get(id)).length, id).toBeGreaterThanOrEqual(2)
+    }
+    expect(texts).toContain('ESTATE GATE')
+    expect(texts).toContain('WORK GATE')
+    expect(texts).toContain('2,400 gallons a day')
+  })
+
+  it('keeps the plan and schedules clear of the title block and on the sheet', () => {
+    const titleX = sheet.width - MARGIN / 2 - TITLE_W
+    // Everything drawn before the title block's left rule is the plan and its schedules.
+    const block = sheet.marks.findIndex(m => m.t === 'line' && m.x1 === titleX && m.x2 === titleX)
+    expect(block).toBeGreaterThan(0)
+    for (const m of sheet.marks.slice(0, block)) {
+      if (m.t === 'text' && m.anchor !== 'middle') expect(m.x, m.text).toBeLessThan(titleX)
+      if (m.t === 'rect') { expect(m.x).toBeGreaterThanOrEqual(0); expect(m.y + m.h).toBeLessThanOrEqual(sheet.height) }
+    }
+  })
+
+  it('leaves cameras and lights off the sheet', () => {
+    expect(texts.join(' ')).not.toMatch(/cam-|camera,/)
   })
 })

@@ -3,7 +3,7 @@ import { sampleEstate } from '../model/sampleEstate'
 import { applyOperations } from '../model/edits'
 import { placeOpenings } from '../model/walls'
 import { ft } from '../model/geometry'
-import { buildingDragOp, grabRoom, openingDragOp, roomDragOp, snap } from './dragOps'
+import { buildingDragOp, deviceDragOp, grabRoom, openingDragOp, roomDragOp, snap, utilityDragOp } from './dragOps'
 
 const room = (id: string) => sampleEstate.house.levels.flatMap(l => l.rooms).find(r => r.id === id)!
 
@@ -53,5 +53,15 @@ describe('drag to edit', () => {
   it('moves a building on the site by whole feet', () => {
     const shop = sampleEstate.buildings.find(b => b.id === 'forestry-shop')!
     expect(buildingDragOp(shop, ft(40) + 5, ft(-12) - 3)).toEqual({ op: 'moveBuilding', buildingId: 'forestry-shop', dx: ft(40), dy: ft(-12) })
+  })
+
+  it('moves utilities, cameras, and lights by whole feet, through edits the checks see', () => {
+    const well = sampleEstate.utilities!.find(u => u.id === 'estate-well')!
+    const op = utilityDragOp(well, ft(-15) + 4, 3)!
+    expect(op).toEqual({ op: 'moveUtility', utilityId: 'estate-well', dx: ft(-15), dy: 0 })
+    expect(applyOperations(sampleEstate, [op]).ok).toBe(true)
+    const cam = sampleEstate.security!.find(d => d.id === 'cam-estate-gate')!
+    expect(deviceDragOp(cam, 5, 5)).toBeNull()
+    expect(deviceDragOp(cam, ft(-3), ft(20))).toEqual({ op: 'moveDevice', deviceId: 'cam-estate-gate', dx: ft(-3), dy: ft(20) })
   })
 })

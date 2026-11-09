@@ -220,7 +220,7 @@ function drawScaleBar(marks: Mark[], x: number, y: number, k: number) {
 }
 
 /** The title block every sheet shares, down the right edge. */
-export function drawTitleBlock(marks: Mark[], e: Estate, sheet: { title: string; scale: string; number: string }, info: SheetInfo, position: SetPosition) {
+export function drawTitleBlock(marks: Mark[], e: Estate, sheet: { title: string; scale: string; number: string; subject?: string }, info: SheetInfo, position: SetPosition) {
   const { width: W, height: H } = ARCH_D
   const x = W - MARGIN / 2 - TITLE_W, top = MARGIN / 2, bottom = H - MARGIN / 2, pad = 10
   const textW = TITLE_W - 2 * pad
@@ -248,7 +248,7 @@ export function drawTitleBlock(marks: Mark[], e: Estate, sheet: { title: string;
 
   s = box(78)
   text(info.projectName.toUpperCase(), s + 20, 12, true)
-  text('MAIN HOUSE', s + 36, 10, true)
+  text(sheet.subject ?? 'MAIN HOUSE', s + 36, 10, true)
   para('Concept. Placeholder massing used to test the model, not a finished design.', 7.5, s + 52)
 
   s = box(170)
