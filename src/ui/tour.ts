@@ -1,6 +1,7 @@
 import type { Estate, HouseModel } from '../model/types'
 import { toFt } from '../model/geometry'
 import { levelWalls, placeOpenings } from '../model/walls'
+import { toHouse, toWing } from '../model/wings'
 import { pathLength } from '../model/geometry'
 
 /** A camera stop on the flyover: where the camera is and what it looks at, in site feet, z above the ground. */
@@ -52,7 +53,7 @@ export function walkStart(house: HouseModel, levelId: string): { x: number; y: n
   const level = house.levels.find(l => l.id === levelId) ?? house.levels[0]
   const entry = placeOpenings(house).find(o => o.levelId === level.id && o.kind === 'door' && o.leadsTo === 'outside' && level.rooms.find(r => r.id === o.roomId)?.type === 'circulation')
   const room = (entry && level.rooms.find(r => r.id === entry.roomId)) ?? level.rooms.find(r => r.type === 'circulation') ?? level.rooms[0]
-  return { x: room.rect.x + room.rect.w / 2, y: room.rect.y + room.rect.d / 2 }
+  return toHouse(house, room.wingId, { x: room.rect.x + room.rect.w / 2, y: room.rect.y + room.rect.d / 2 })
 }
 
 /**
@@ -64,7 +65,9 @@ export function canStand(house: HouseModel, levelId: string, x: number, y: numbe
   if (!level) return true
   const gaps = placeOpenings(house).filter(o => o.levelId === levelId && o.wall && !o.problem && o.kind !== 'window')
   for (const s of levelWalls(house, level)) {
-    const across = s.orientation === 'h' ? y : x, along = s.orientation === 'h' ? x : y
+    // Walls in a wing are tested in the wing's own frame.
+    const p = toWing(house, s.wingId, { x, y })
+    const across = s.orientation === 'h' ? p.y : p.x, along = s.orientation === 'h' ? p.x : p.y
     if (Math.abs(across - s.at) > s.thickness / 2 + radius) continue
     if (along < s.from - radius || along > s.to + radius) continue
     const through = gaps.some(o => o.wall!.id === s.id && along > o.from + radius * 0.5 && along < o.to - radius * 0.5)

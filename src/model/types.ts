@@ -156,7 +156,13 @@ export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation'
  * `twoStory` rooms are open to the floor above, so their walls rise through it to the roof. `safeRoom` marks a room
  * built to shelter in.
  */
-export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean; safeRoom?: boolean }
+export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean; safeRoom?: boolean
+  /** The wing the room belongs to; its rect is then in the wing's own coordinates. */
+  wingId?: string
+}
+
+/** A wing of a house, turned `angle` degrees counterclockwise about `pivot` (house-local inches). See src/model/wings.ts. */
+export interface Wing { id: string; name: string; pivot: Pt; angle: number }
 /** A side of a rectangle: north, south, east, or west. */
 export type Side = 'n' | 's' | 'e' | 'w'
 
@@ -191,6 +197,8 @@ export interface Opening {
   operation?: WindowOperation
   /** Doors: swings into the host room, or out of it. */
   swing?: 'in' | 'out'
+  /** At a joint between wings: the room on the other side, which is in another frame. */
+  through?: string
 }
 
 export type RoofForm = 'gable' | 'hip' | 'shed'
@@ -210,6 +218,8 @@ export interface Roof {
   ridge: 'ew' | 'ns'
   low: Side
   overhang: Inches
+  /** The wing whose frame the roof's rect is in. */
+  wingId?: string
 }
 
 export type BeamMaterial = 'lvl' | 'glulam' | 'steel'
@@ -223,6 +233,8 @@ export interface Beam {
   id: string; levelId: string; orientation: 'h' | 'v'; at: Inches; from: Inches; to: Inches; material: BeamMaterial
   /** Posts under the beam, as positions along its line between `from` and `to`. They shorten its spans. */
   posts?: Inches[]
+  /** The wing whose frame the beam's line is in. */
+  wingId?: string
 }
 
 /**
@@ -261,6 +273,8 @@ export interface HouseModel {
   openings: Opening[]
   stairs: Stair[]
   roofs: Roof[]
+  /** Wings turned at angles. Rooms, roofs, and beams name their wing. */
+  wings?: Wing[]
   /** Beams carrying upper walls over open floor. Optional so older saves still load; they get the first pass. */
   beams?: Beam[]
   /** Furniture, fixtures, appliances, and machines. Optional so older saves still load; they get the first pass. */

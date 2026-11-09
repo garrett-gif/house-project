@@ -12,11 +12,13 @@ export function roofChecks(e: Estate): Check[] {
   const roofs = house.roofs ?? []
   const uncovered = new Map<string, number>()
   levels.forEach((level, i) => {
-    const above = levels.slice(i + 1).flatMap(l => l.rooms.filter(r => r.type !== 'outdoor').map(r => r.rect))
     for (const room of level.rooms.filter(r => r.type !== 'outdoor')) {
+      const f = room.wingId ?? ''
+      const above = levels.slice(i + 1).flatMap(l => l.rooms.filter(r => r.type !== 'outdoor' && (r.wingId ?? '') === f).map(r => r.rect))
+      const mine = roofs.filter(r => (r.wingId ?? '') === f)
       for (const p of samplePoints(room.rect)) {
         if (above.some(a => onOrIn(p, a))) continue
-        if (!roofs.some(r => onOrIn(p, r.rect))) uncovered.set(room.id, (uncovered.get(room.id) ?? 0) + 1)
+        if (!mine.some(r => onOrIn(p, r.rect))) uncovered.set(room.id, (uncovered.get(room.id) ?? 0) + 1)
       }
     }
   })

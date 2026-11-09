@@ -1,4 +1,4 @@
-import type { Building, Check, CheckStatus, Estate, Rect } from './types'
+import type { Building, Check, CheckStatus, Estate, Rect, Room } from './types'
 import { wallChecks } from './wallChecks'
 import { programChecks } from './programChecks'
 import { roofChecks } from './roofChecks'
@@ -10,6 +10,7 @@ import { allHouses, checksForEachHouse } from './houses'
 import { beamChecks } from './beams'
 import { furnitureChecks } from './furniture'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
+import { JOINT_WEDGE_SQFT, crossFrameOverlapSqFt, roomBoxInHouse } from './wings'
 
 const QUARTER_MILE = ft(1320)
 const ROAD_REACH = ft(350)
@@ -92,13 +93,15 @@ export function validateEstate(e: Estate): Check[] {
   const room = (id: string) => e.house.levels.flatMap(l => l.rooms).find(r => r.id === id)
   const foyer = room('foyer'), garage = room('garage'), primary = room('primary'), kitchen = room('kitchen'), terrace = room('terrace')
   const allRooms = e.house.levels.flatMap(l => l.rooms)
-  const midX = (Math.min(...allRooms.filter(r => r.type !== 'garage').map(r => r.rect.x)) + Math.max(...allRooms.map(r => r.rect.x + r.rect.w))) / 2
-  const north = Math.max(...allRooms.map(r => r.rect.y + r.rect.d))
+  // Placement is judged in the house's frame, so rooms in turned wings count by the box around them.
+  const box = (r: Room) => roomBoxInHouse(e.house, r)
+  const midX = (Math.min(...allRooms.filter(r => r.type !== 'garage').map(r => box(r).x)) + Math.max(...allRooms.map(r => box(r).x + box(r).w))) / 2
+  const north = Math.max(...allRooms.map(r => box(r).y + box(r).d))
   const placement: [boolean | undefined, string, string[]][] = [
-    [foyer && foyer.rect.y + foyer.rect.d === north, 'Formal door is not on the north side', ['foyer']],
-    [garage && center(garage.rect).x < midX, 'Garage is not on the west side', ['garage']],
-    [primary && center(primary.rect).x > midX, 'Primary suite is not on the east side', ['primary']],
-    [kitchen && terrace && rectDistance(kitchen.rect, terrace.rect) === 0, 'Kitchen does not reach the terrace', ['kitchen', 'terrace']],
+    [foyer && box(foyer).y + box(foyer).d === north, 'Formal door is not on the north side', ['foyer']],
+    [garage && center(box(garage)).x < midX, 'Garage is not on the west side', ['garage']],
+    [primary && center(box(primary)).x > midX, 'Primary suite is not on the east side', ['primary']],
+    [kitchen && terrace && rectDistance(box(kitchen), box(terrace)) === 0, 'Kitchen does not reach the terrace', ['kitchen', 'terrace']],
   ]
   const misplaced = placement.filter(([ok]) => !ok)
   checks.push(check('house-placement', 'North door, west garage, east primary, kitchen to terrace', misplaced.length === 0,
@@ -109,8 +112,10 @@ export function validateEstate(e: Estate): Check[] {
     e.walkways.map(w => `${n(toFt(pathLength(w.points)))} ft`).join(', '), 'fail', longWalks.map(w => w.id)))
 
   const overlapsInHouse: string[] = [], overlappingRooms: string[] = []
-  for (const level of allHouses(e).flatMap(h => h.levels)) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {
-    if (overlaps(a.rect, c.rect)) { overlapsInHouse.push(`${level.name}: ${a.name} and ${c.name}`); overlappingRooms.push(a.id, c.id) }
+  for (const h of allHouses(e)) for (const level of h.levels) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(c => {
+    // Same frame: plain rectangles. Different frames (a turned wing): the ground they share, past the joint wedge.
+    const clash = (a.wingId ?? '') === (c.wingId ?? '') ? overlaps(a.rect, c.rect) : crossFrameOverlapSqFt(h, a, c) > JOINT_WEDGE_SQFT
+    if (clash) { overlapsInHouse.push(`${level.name}: ${a.name} and ${c.name}`); overlappingRooms.push(a.id, c.id) }
   }))
   checks.push(check('house-rooms', 'House rooms do not overlap', overlapsInHouse.length === 0, overlapsInHouse.join('; ') || 'No overlaps', 'fail', overlappingRooms))
 

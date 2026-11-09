@@ -147,7 +147,8 @@ export function wallChecks(e: Estate): Check[] {
     const lower = levels[i - 1], upper = levels[i]
     const lowerWalls = levelWalls(house, lower), lowerRooms = enclosedRooms(lower)
     for (const s of levelWalls(house, upper)) {
-      const u = unsupported(s, lowerWalls, lowerRooms, (house.beams ?? []).filter(b => b.levelId === upper.id))
+      const same = <T extends { wingId?: string }>(x: T) => (x.wingId ?? '') === (s.wingId ?? '')
+      const u = unsupported(s, lowerWalls.filter(same), lowerRooms.filter(same), (house.beams ?? []).filter(b => b.levelId === upper.id && same(b)))
       if (u.length < 12) continue
       const item = { text: `${upper.name}: ${wallName(house, s)}, ${n(toFt(u.length))} ft over ${u.under.join(' and ')}`, ids: s.sides.filter((x): x is string => !!x), length: u.length }
       if (s.kind === 'interior') inner.push(item); else exterior.push(item)

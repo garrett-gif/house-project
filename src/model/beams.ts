@@ -26,7 +26,7 @@ function bearsAt(lower: WallSegment[], b: Pick<Beam, 'orientation' | 'at'>, p: n
 /** The span between bearing points, and whether each end sits on a wall below or needs a post. */
 export function beamBearing(house: HouseModel, b: Beam) {
   const lower = below(house, b.levelId)
-  const walls = lower ? levelWalls(house, lower) : []
+  const walls = lower ? levelWalls(house, lower).filter(w => (w.wingId ?? '') === (b.wingId ?? '')) : []
   return { span: longestSpan(b), start: bearsAt(walls, b, b.from), end: bearsAt(walls, b, b.to) }
 }
 
@@ -85,13 +85,14 @@ export function firstPassBeams(house: HouseModel): Beam[] {
   const beams: Beam[] = []
   for (let i = 1; i < levels.length; i++) {
     const lower = levels[i - 1], upper = levels[i]
-    const lowerWalls = levelWalls(house, lower), lowerRooms = enclosedRooms(lower)
-    const lines = new Map<string, { orientation: 'h' | 'v'; at: number; runs: [number, number][] }>()
+    const allLower = levelWalls(house, lower), allLowerRooms = enclosedRooms(lower)
+    const lines = new Map<string, { orientation: 'h' | 'v'; at: number; wingId?: string; runs: [number, number][] }>()
     for (const s of levelWalls(house, upper).filter(s => s.kind === 'interior')) {
-      for (const r of openRuns(s, lowerWalls, lowerRooms)) {
+      const same = <T extends { wingId?: string }>(x: T) => (x.wingId ?? '') === (s.wingId ?? '')
+      for (const r of openRuns(s, allLower.filter(same), allLowerRooms.filter(same))) {
         if (r[1] - r[0] < 12) continue
-        const key = `${s.orientation}:${s.at}`
-        const line = lines.get(key) ?? { orientation: s.orientation, at: s.at, runs: [] }
+        const key = `${s.wingId ?? ''}:${s.orientation}:${s.at}`
+        const line = lines.get(key) ?? { orientation: s.orientation, at: s.at, wingId: s.wingId, runs: [] }
         line.runs.push(r)
         lines.set(key, line)
       }
@@ -103,6 +104,7 @@ export function firstPassBeams(house: HouseModel): Beam[] {
         return out
       }, [])
       // Where walls below cross this line, so beams can stop on them.
+      const lowerWalls = allLower.filter(w => (w.wingId ?? '') === (line.wingId ?? '')), lowerRooms = allLowerRooms.filter(r => (r.wingId ?? '') === (line.wingId ?? ''))
       const crossings = lowerWalls.filter(w => w.orientation !== line.orientation && w.from - 6 <= line.at && line.at <= w.to + 6).map(w => w.at).sort((a, b) => a - b)
       for (const [a, b] of runs) {
         // Bear on the nearest wall below at each end, and break the beam over any wall it crosses on the way.
@@ -110,7 +112,7 @@ export function firstPassBeams(house: HouseModel): Beam[] {
         const to = crossings.find(c => c >= b - 6) ?? b
         const stops = [from, ...crossings.filter(c => c > from + 12 && c < to - 12), to]
         for (let k = 0; k < stops.length - 1; k++) {
-          const beam: Beam = { id: `beam-${upper.id}-${beams.length + 1}`, levelId: upper.id, orientation: line.orientation, at: line.at, from: stops[k], to: stops[k + 1], material: 'lvl' }
+          const beam: Beam = { id: `beam-${upper.id}-${beams.length + 1}`, levelId: upper.id, orientation: line.orientation, at: line.at, from: stops[k], to: stops[k + 1], material: 'lvl', ...(line.wingId ? { wingId: line.wingId } : {}) }
           // A long beam over a room that can take a column, such as a shop or storage room, gets a post at mid-span.
           const mid = (beam.from + beam.to) / 2
           const [mx, my] = beam.orientation === 'h' ? [mid, beam.at] : [beam.at, mid]

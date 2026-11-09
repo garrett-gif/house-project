@@ -4,6 +4,7 @@ import { levelWalls, outwardSide, placeOpenings } from '../model/walls'
 import { eaveHeight, ridgeHeight, roofPolygons } from '../model/roofs'
 import type { P3 } from '../model/roofs'
 import { houseBounds } from '../model/derive'
+import { sideInHouse, toHouse } from '../model/wings'
 import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
 import type { Mark, Sheet } from './sheet'
 import { MARGIN, TITLE_W, drawTitleBlock, scaleFor } from './floorPlanSheet'
@@ -50,11 +51,13 @@ export function elevationMarks(e: Estate, view: ElevationView, sx: number, sy: n
   const faces: { pts: P3[]; depth: number; openings: P3[][]; kinds: string[] }[] = []
   levels.forEach((level, i) => {
     for (const s of levelWalls(house, level)) {
-      if (outwardSide(s) !== FACING[view]) continue
+      // A wing's walls are drawn on the elevation they face most nearly, turned into place (seen a little foreshortened).
+      const out = outwardSide(s)
+      if (!out || sideInHouse(house, s.wingId, out) !== FACING[view]) continue
       const room = house.levels.flatMap(l => l.rooms).find(r => r.id === (s.sides[0] ?? s.sides[1]))
       const top = eaveHeight(level) + (room?.twoStory && levels[i + 1] ? levels[i + 1].floorHeight : 0)
       const bottom = level.elevation
-      const pt = (a: number, z: number): P3 => s.orientation === 'h' ? [a, s.at, z] : [s.at, a, z]
+      const pt = (a: number, z: number): P3 => { const q = toHouse(house, s.wingId, s.orientation === 'h' ? { x: a, y: s.at } : { x: s.at, y: a }); return [q.x, q.y, z] }
       const ops = placed.filter(o => o.wall?.id === s.id && !o.problem)
       faces.push({
         pts: [pt(s.from, bottom), pt(s.to, bottom), pt(s.to, top), pt(s.from, top)],
@@ -241,7 +244,8 @@ export function roofPlanSheet(e: Estate, info: SheetInfo, position: SetPosition)
 
   // Outside walls of every level, dashed, for reference under the roofs.
   for (const level of house.levels) for (const s of levelWalls(house, level).filter(s => s.kind !== 'interior')) {
-    const [x1, y1, x2, y2] = s.orientation === 'h' ? [X(s.from), Y(s.at), X(s.to), Y(s.at)] : [X(s.at), Y(s.from), X(s.at), Y(s.to)]
+    const ends = (s.orientation === 'h' ? [{ x: s.from, y: s.at }, { x: s.to, y: s.at }] : [{ x: s.at, y: s.from }, { x: s.at, y: s.to }]).map(p => toHouse(house, s.wingId, p))
+    const [x1, y1, x2, y2] = [X(ends[0].x), Y(ends[0].y), X(ends[1].x), Y(ends[1].y)]
     marks.push({ t: 'line', x1, y1, x2, y2, w: 0.4, dash: [6, 4] })
   }
   // Lower roofs first, so higher ones overlap them where they meet.
@@ -262,7 +266,8 @@ export function roofPlanSheet(e: Estate, info: SheetInfo, position: SetPosition)
     marks.push({ t: 'text', x: ax, y: ay - 6, text: `${r.pitch}:12`, size: 7, anchor: 'middle', bold: true })
   }
   for (const r of house.roofs) {
-    marks.push({ t: 'text', x: X(r.rect.x + r.rect.w / 2), y: Y(r.rect.y + r.rect.d / 2) + 16, text: `${r.name.toUpperCase()}, ${r.form.toUpperCase()}, TOP ${ftIn(ridgeHeight(house, r))}`, size: 6, anchor: 'middle' })
+    const rc = toHouse(house, r.wingId, { x: r.rect.x + r.rect.w / 2, y: r.rect.y + r.rect.d / 2 })
+    marks.push({ t: 'text', x: X(rc.x), y: Y(rc.y) + 16, text: `${r.name.toUpperCase()}, ${r.form.toUpperCase()}, TOP ${ftIn(ridgeHeight(house, r))}`, size: 6, anchor: 'middle' })
   }
   const ty = Y(b.y) + 1.1 * PT_PER_IN
   marks.push({ t: 'text', x: MARGIN + 0.6 * PT_PER_IN, y: ty, text: 'ROOF PLAN', size: 16, bold: true })

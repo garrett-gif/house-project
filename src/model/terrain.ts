@@ -2,6 +2,7 @@ import type { Building, Estate, HouseModel, Pt, Rect, Road } from './types'
 import { Terrain } from './parcel'
 import { bounds, center, footprintOf, ft, samplePath, toFt } from './geometry'
 import { gradeAt } from './designGrade'
+import { roomBoxInHouse, toWing } from './wings'
 
 /**
  * Existing ground from the parcel's terrain. Elevations are inches above sea level. The sample parcel's terrain is
@@ -41,7 +42,7 @@ export function siteSlope(e: Estate, r: Rect) {
 /** The house datum: the main floor (elevation 0) is set at existing ground at the middle of the house's footprint. */
 export function houseDatum(e: Estate, house: HouseModel) {
   const rooms = house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor')
-  const c = center(bounds(rooms.map(r => r.rect)))
+  const c = center(bounds(rooms.map(r => roomBoxInHouse(house, r))))
   return groundAt(e, { x: house.origin.x + c.x, y: house.origin.y + c.y })
 }
 
@@ -56,12 +57,12 @@ export const existingGrade = (e: Estate, house: HouseModel, x: number, y: number
  */
 export function earthwork(e: Estate, house: HouseModel) {
   const rooms = house.levels.flatMap(l => l.rooms.filter(r => r.type !== 'outdoor').map(r => ({ r, z: l.elevation })))
-  const box = bounds(rooms.map(x => x.r.rect))
+  const box = bounds(rooms.map(x => roomBoxInHouse(house, x.r)))
   const step = ft(5), pad = ft(30)
   let cut = 0, fill = 0
   for (let x = box.x - pad; x < box.x + box.w + pad; x += step) for (let y = box.y - pad; y < box.y + box.d + pad; y += step) {
     const px = x + step / 2, py = y + step / 2
-    const under = rooms.filter(({ r }) => px > r.rect.x && px < r.rect.x + r.rect.w && py > r.rect.y && py < r.rect.y + r.rect.d)
+    const under = rooms.filter(({ r }) => { const q = toWing(house, r.wingId, { x: px, y: py }); return q.x > r.rect.x && q.x < r.rect.x + r.rect.w && q.y > r.rect.y && q.y < r.rect.y + r.rect.d })
     const design = under.length ? Math.min(...under.map(u => u.z)) : gradeAt(house, px, py)
     const diff = existingGrade(e, house, px, py) - design
     if (diff > 0) cut += diff * step * step; else fill -= diff * step * step

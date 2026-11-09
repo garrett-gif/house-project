@@ -9,6 +9,7 @@ import { houseBounds } from '../model/derive'
 import { CATALOG, parts } from '../model/furniture'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
+import { wingById } from '../model/wings'
 import { flyoverKeyframes, step, walkStart } from '../ui/tour'
 
 const COLORS = { private: 0x2f6f62, work: 0xa65a35, visitor: 0xa65a35, shared: 0x66635c }
@@ -128,17 +129,31 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const b = houseBounds(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
   addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, 0xa9bb8c)
+  // Each wing is a group turned about its pivot; inside it, rooms, walls, and furniture use the wing's own inches.
+  const frames = new Map<string, THREE.Object3D>()
+  const frame = (wingId?: string): THREE.Object3D => {
+    const w = wingById(estate.house, wingId)
+    if (!w) return scene
+    if (!frames.has(w.id)) {
+      const outer = new THREE.Group(), inner = new THREE.Group()
+      outer.position.set(toFt(w.pivot.x) - cx, 0, cy - toFt(w.pivot.y))
+      outer.rotation.y = w.angle * Math.PI / 180
+      inner.position.set(cx, 0, -cy)
+      outer.add(inner); scene.add(outer); frames.set(w.id, inner)
+    }
+    return frames.get(w.id)!
+  }
   for (const level of visible) {
     const base = toFt(level.elevation)
     for (const room of level.rooms) {
       const x = toFt(room.rect.x) - cx, w = toFt(room.rect.w), d = toFt(room.rect.d), z = cy - toFt(room.rect.y) - d / 2
-      addBox(scene, x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
+      addBox(frame(room.wingId), x + w / 2, base, z, w, 0.4, d, ROOM_COLOR[room.type])
     }
     // Walls follow the derived segments, with doors and windows cut out of them.
     const openings = placeOpenings(estate.house).filter(o => o.levelId === level.id && o.wall && !o.problem)
     const WALL_COLOR = { exterior: 0xe9e3d6, interior: 0xf6f2ea, foundation: 0xc9c2b4 }
     for (const seg of levelWalls(estate.house, level)) {
-      const t = toFt(seg.thickness), color = WALL_COLOR[seg.kind]
+      const t = toFt(seg.thickness), color = WALL_COLOR[seg.kind], g = frame(seg.wingId)
       // Walls of two-story rooms rise through the floor above, up to the roof.
       const index = levels.indexOf(level)
       const tall = seg.sides.some(id => level.rooms.find(r => r.id === id)?.twoStory) && levels[index + 1] && visible.includes(levels[index + 1])
@@ -147,8 +162,8 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
       const piece = (a: number, b: number, y0: number, y1: number, tint = color, opacity = 1) => {
         if (b - a < 0.5 || y1 - y0 < 0.05) return
         const len = toFt(b - a), m = (a + b) / 2, h = y1 - y0
-        if (seg.orientation === 'h') addBox(scene, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at), len, h, t, tint, opacity)
-        else addBox(scene, toFt(seg.at) - cx, base + y0 + h / 2, cy - toFt(m), t, h, len, tint, opacity)
+        if (seg.orientation === 'h') addBox(g, toFt(m) - cx, base + y0 + h / 2, cy - toFt(seg.at), len, h, t, tint, opacity)
+        else addBox(g, toFt(seg.at) - cx, base + y0 + h / 2, cy - toFt(m), t, h, len, tint, opacity)
       }
       const holes = openings.filter(o => o.wall!.id === seg.id).sort((a, b) => a.from - b.from)
       let cursor = seg.from
@@ -169,10 +184,10 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
     const base = toFt(level.elevation) + 0.2
     const ids = new Set(level.rooms.map(r => r.id))
     for (const item of (estate.house.furniture ?? []).filter(i => ids.has(i.roomId) && CATALOG[i.kind])) {
-      const c = CATALOG[item.kind]
+      const c = CATALOG[item.kind], g = frame(level.rooms.find(r => r.id === item.roomId)?.wingId)
       for (const q of parts(item)) {
         const h = Math.max(0.1, toFt(q.h))
-        addBox(scene, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
+        addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), item.kind === 'pool-basin' ? 0x4a9cc4 : FURNITURE_COLOR[c.category] ?? 0x8d7b68)
       }
     }
   }

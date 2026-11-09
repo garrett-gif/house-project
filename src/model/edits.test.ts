@@ -225,7 +225,7 @@ describe('edit tools', () => {
   })
 
   it('maps a null bathId to no bath', () => {
-    const r = toEditOp('addRoom', { levelId: 'main', id: 'den', name: 'Den', type: 'living', xFt: 0, yFt: 0, widthFt: 10, depthFt: 12, bathId: null })
+    const r = toEditOp('addRoom', { levelId: 'main', id: 'den', name: 'Den', type: 'living', xFt: 0, yFt: 0, widthFt: 10, depthFt: 12, bathId: null, wingId: null })
     expect(r.ok && r.op.op === 'addRoom' && !('bathId' in r.op.room)).toBe(true)
   })
 })

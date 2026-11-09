@@ -12,6 +12,7 @@ import { planLabel } from './planLabel'
 import { CATALOG, parts as furnitureParts } from '../model/furniture'
 import type { FurnitureItem } from '../model/types'
 import type { PlacedOpening, WallSegment } from '../model/walls'
+import { toWing, wingById } from '../model/wings'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -60,17 +61,29 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
     const p = pt.matrixTransform(el.getScreenCTM()!.inverse())
     return [ft(p.x), ft(top - p.y)]
   }
+  const roomWing = (roomId: string) => level.rooms.find(r => r.id === roomId)?.wingId
+  const frameOfGrab = (g: Grabbed) => g.kind === 'room' ? g.room.wingId : g.kind === 'opening' ? g.opening.wall?.wingId : roomWing(g.item.roomId)
+  /** A house-local point in a wing's own frame. */
+  const inFrame = ([x, y]: [number, number], wingId?: string): [number, number] => { const q = toWing(house, wingId, { x, y }); return [q.x, q.y] }
+  /** The SVG transform that draws a wing's own coordinates turned into place. */
+  const frameTransform = (wingId: string) => {
+    const w = wingById(house, wingId)
+    if (!w) return undefined
+    const [px, py] = P(w.pivot.x, w.pivot.y)
+    return `translate(${px} ${py}) rotate(${-w.angle}) translate(0 ${-top})`
+  }
+  const frames = [...new Set(level.rooms.map(r => r.wingId ?? ''))]
   const begin = (e: ReactPointerEvent, what: Grabbed) => {
     if (!editable || e.button !== 0) return
     e.preventDefault(); e.stopPropagation()
-    drag.current = { start: toModel(e), what, op: null }
+    drag.current = { start: inFrame(toModel(e), frameOfGrab(what)), what, op: null }
     setFrozen(houseBounds(house))
     svg.current!.setPointerCapture(e.pointerId)
   }
   const move = (e: ReactPointerEvent) => {
     const d = drag.current
     if (!d) return
-    const [x, y] = toModel(e), dx = x - d.start[0], dy = y - d.start[1]
+    const [x, y] = inFrame(toModel(e), frameOfGrab(d.what)), dx = x - d.start[0], dy = y - d.start[1]
     d.op = d.what.kind === 'room' ? roomDragOp(d.what.room, d.what.grab, dx, dy) : d.what.kind === 'furniture' ? furnitureDragOp(d.what.item, dx, dy) : openingDragOp(d.what.opening, dx, dy)
     onDrag!(d.op)
   }
@@ -148,20 +161,25 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
       </div>
       <svg ref={svg} viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}
         onPointerMove={move} onPointerUp={() => end(false)} onPointerCancel={() => end(true)} style={{ touchAction: editable ? 'none' : undefined }}>
-        {level.rooms.map(room => {
+        {frames.map(f => {
+        const inF = (wingId?: string) => (wingId ?? '') === f
+        const fRooms = level.rooms.filter(r => inF(r.wingId))
+        return (
+        <g key={`frame-${f}`} transform={f ? frameTransform(f) : undefined}>
+        {fRooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           return (
             <g key={room.id} onMouseEnter={() => setHover(`${room.name}, ${w}′ × ${d}′`)} onMouseLeave={() => setHover(null)}>
               <rect x={x} y={y} width={w} height={d} fill={ROOM_COLOR[room.type]} stroke={room.type === 'outdoor' ? '#8c8473' : 'none'} strokeWidth={0.2} strokeDasharray={room.type === 'outdoor' ? '0.8 0.6' : undefined}
-                onPointerMove={editable && !drag.current ? e => { const [mx, my] = toModel(e); (e.currentTarget as SVGRectElement).style.cursor = cursorFor(grabRoom(room, mx, my)) } : undefined}
-                onPointerDown={editable ? e => { const [mx, my] = toModel(e); begin(e, { kind: 'room', room, grab: grabRoom(room, mx, my) }) } : undefined} />
+                onPointerMove={editable && !drag.current ? e => { const [mx, my] = inFrame(toModel(e), room.wingId); (e.currentTarget as SVGRectElement).style.cursor = cursorFor(grabRoom(room, mx, my)) } : undefined}
+                onPointerDown={editable ? e => { const [mx, my] = inFrame(toModel(e), room.wingId); begin(e, { kind: 'room', room, grab: grabRoom(room, mx, my) }) } : undefined} />
               {flagged.has(room.id) && <rect x={x + 0.7} y={y + 0.7} width={Math.max(0, w - 1.4)} height={Math.max(0, d - 1.4)} fill="none" stroke={FLAG[flagged.get(room.id)!]} strokeWidth={flagged.get(room.id) === 'fail' ? 0.6 : 0.35} strokeDasharray={flagged.get(room.id) === 'fail' ? undefined : '1 0.6'} />}
             </g>
           )
         })}
-        {walls.map(wallRect)}
-        {openings.map(opening)}
-        {showFurniture && (house.furniture ?? []).filter(i => level.rooms.some(r => r.id === i.roomId) && CATALOG[i.kind]).map(item => (
+        {walls.filter(s => inF(s.wingId)).map(wallRect)}
+        {openings.filter(o => inF(o.wall?.wingId)).map(opening)}
+        {showFurniture && (house.furniture ?? []).filter(i => fRooms.some(r => r.id === i.roomId) && CATALOG[i.kind]).map(item => (
           <g key={item.id} onMouseEnter={() => setHover(`${CATALOG[item.kind].name} (${item.id})`)} onMouseLeave={() => setHover(null)}
             onPointerDown={editable ? e => begin(e, { kind: 'furniture', item }) : undefined} style={editable ? { cursor: 'move' } : undefined}>
             {furnitureParts(item).map((q, i) => (
@@ -170,7 +188,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
             ))}
           </g>
         ))}
-        {beams.map(bm => {
+        {beams.filter(bm => inF(bm.wingId)).map(bm => {
           const [a, c] = bm.orientation === 'h' ? [P(bm.from, bm.at), P(bm.to, bm.at)] : [P(bm.at, bm.from), P(bm.at, bm.to)]
           const color = flagged.has(bm.id) ? FLAG[flagged.get(bm.id)!] : '#7a3b1d'
           return (
@@ -181,7 +199,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
             </g>
           )
         })}
-        {level.rooms.map(room => {
+        {fRooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           const label = planLabel(room.name, w, d)
           if (!label) return null
@@ -193,6 +211,9 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
               {label.showSize && <text x={x + w / 2} y={top0 + label.lines.length * label.size * 1.25} fontSize={label.size * 0.75} textAnchor="middle" className="room-size">{w}′ × {d}′</text>}
             </g>
           )
+        })}
+        </g>
+        )
         })}
         <text x={mid} y={top - y1 - 2} fontSize={2.2} textAnchor="middle" className="room-size">North</text>
         <text x={mid} y={top - y0 + 6} fontSize={2.2} textAnchor="middle" className="room-size">South</text>

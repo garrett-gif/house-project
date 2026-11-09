@@ -53,6 +53,7 @@ export function summarizeEstate(e: Estate): string {
   const { origin } = house
   lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.${house.excavated ? ` Its site is excavated to the walkout by design, about ${Math.round(earthwork(e, house).cutCy / 100) * 100} cubic yards of cut.` : ''}`)
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
+  if (house.wings?.length) lines.push(`Wings (id: name, turned counterclockwise about a house-local pivot): ${house.wings.map(w => `${w.id}: ${w.name}, ${w.angle} degrees about ${f(w.pivot.x)},${f(w.pivot.y)} ft`).join('; ')}. A room marked with a wing has its position in that wing's own coordinates, before the turn; walls only join rooms in the same wing, and a joint opening names the room beyond.`)
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
   lines.push('Furniture is listed under its room as id, catalog kind, center in house-local feet, and rotation (0 faces north, 90 west, 180 south, 270 east).')
@@ -62,7 +63,7 @@ export function summarizeEstate(e: Estate): string {
   for (const level of house.levels) {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
-      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}`)
+      lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}${r.wingId ? `, in wing ${r.wingId}` : ''}`)
       const furniture = furnitureLine(house, r)
       if (furniture) lines.push(furniture)
       // Rows of overhead doors in a shop's bays read as one line.

@@ -268,6 +268,7 @@ function runInHouse(e: Estate, op: EditOp): string {
       if (!/^[a-z0-9][a-z0-9-]*$/.test(room.id)) return 'Room ids use lowercase letters, numbers, and hyphens.'
       if (findRoom(e, room.id)) return `A room with id "${room.id}" already exists.`
       if (!room.name.trim()) return 'A new room needs a name.'
+      if (room.wingId && !e.house.wings?.some(w => w.id === room.wingId)) return `No wing with id "${room.wingId}".`
       if (!ROOM_TYPES.includes(room.type)) return `Unknown room type "${room.type}".`
       if (!finite(room.rect.x, room.rect.y)) return 'Room position must be numbers.'
       const bad = checkSize(room.rect.w, room.rect.d, e.parcel.size)
@@ -648,7 +649,7 @@ function intersection(a: Rect, b: Rect) {
 function collisions(e: Estate): Map<string, string> {
   const found = new Map<string, string>()
   for (const level of allHouses(e).flatMap(h => h.levels)) level.rooms.forEach((a, i) => level.rooms.slice(i + 1).forEach(b => {
-    if (overlaps(a.rect, b.rect)) found.set(`room:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(a.rect, b.rect)} on the ${level.name.toLowerCase()}`)
+    if ((a.wingId ?? '') === (b.wingId ?? '') && overlaps(a.rect, b.rect)) found.set(`room:${[a.id, b.id].sort().join('|')}`, `${a.name} (${a.id}) and ${b.name} (${b.id}) would overlap by ${intersection(a.rect, b.rect)} on the ${level.name.toLowerCase()}`)
   }))
   e.buildings.forEach((a, i) => e.buildings.slice(i + 1).forEach(b => {
     for (const pa of footprintOf(a)) for (const pb of footprintOf(b)) {

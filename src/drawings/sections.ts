@@ -50,7 +50,8 @@ export function sectionMarks(e: Estate, cut: SectionCut, sx: number, sy: number)
   }
 
   levels.forEach((level, i) => {
-    const rooms = level.rooms.filter(inSpan)
+    // Cuts run in the house's frame; turned wings are left off the sections for now.
+    const rooms = level.rooms.filter(r => !r.wingId && inSpan(r))
     for (const r of rooms) {
       const [a, b] = span(r)
       // Floor structure: a 12 in slab or framed floor under each room on the cut.
@@ -65,7 +66,7 @@ export function sectionMarks(e: Estate, cut: SectionCut, sx: number, sy: number)
     // Walls the cut passes through, drawn solid at their thickness.
     for (const s of levelWalls(house, level)) {
       const perpendicular = cut.axis === 'x' ? s.orientation === 'h' : s.orientation === 'v'
-      if (!perpendicular || !(s.from < cut.at && cut.at < s.to)) continue
+      if (s.wingId || !perpendicular || !(s.from < cut.at && cut.at < s.to)) continue
       const room = level.rooms.find(r => s.sides.includes(r.id) && r.twoStory)
       const top = eaveHeight(level) + (room && levels[i + 1] ? levels[i + 1].floorHeight : 0)
       box(s.at - s.thickness / 2, s.at + s.thickness / 2, level.elevation, top, '#000')

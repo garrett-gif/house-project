@@ -1,5 +1,6 @@
 import type { HouseModel, Level, Rect, Roof } from './types'
 import { mergeRects } from './geometry'
+import { toHouse } from './wings'
 
 /** A point in house-local inches: x east, y north, z up from the main floor. */
 export type P3 = [number, number, number]
@@ -26,6 +27,13 @@ export function ridgeHeight(house: HouseModel, roof: Roof) {
  * gable walls stop at the wall line.
  */
 export function roofPolygons(house: HouseModel, roof: Roof): Poly3[] {
+  const polys = localRoofPolygons(house, roof)
+  if (!roof.wingId) return polys
+  // A wing's roof is drawn in its own frame, then turned into the house's.
+  return polys.map(p => ({ ...p, pts: p.pts.map(([x, y, z]) => { const q = toHouse(house, roof.wingId, { x, y }); return [q.x, q.y, z] as P3 }) }))
+}
+
+function localRoofPolygons(house: HouseModel, roof: Roof): Poly3[] {
   const level = levelById(house, roof.levelId)
   if (!level) return []
   const e = eaveHeight(level), k = roof.pitch / 12, ov = roof.overhang

@@ -17,6 +17,8 @@ export interface WallSegment {
   sides: [string | null, string | null]
   kind: WallKind
   thickness: Inches
+  /** The wing whose frame the wall is in. */
+  wingId?: string
 }
 
 export const DEFAULT_WALL_THICKNESS = { exterior: 8, interior: 4.5, foundation: 10 } as const
@@ -44,6 +46,12 @@ export const outwardSide = (s: WallSegment): Side | null =>
   : (s.sides[1] ? 'w' : 'e')
 
 export function levelWalls(house: HouseModel, level: Level): WallSegment[] {
+  // Walls come from rooms in the same frame; a wing's walls never meet the house's.
+  const frames = [...new Set(enclosedRooms(level).map(r => r.wingId ?? ''))]
+  return frames.flatMap(f => frameWalls(house, level, enclosedRooms(level).filter(r => (r.wingId ?? '') === f), f || undefined))
+}
+
+function frameWalls(house: HouseModel, level: Level, rooms: Room[], wingId?: string): WallSegment[] {
   const thickness = house.wallThickness ?? DEFAULT_WALL_THICKNESS
   const out: WallSegment[] = []
   for (const orientation of ['h', 'v'] as const) {
@@ -53,7 +61,7 @@ export function levelWalls(house: HouseModel, level: Level): WallSegment[] {
       list.push({ from, to, room, index })
       lines.set(at, list)
     }
-    for (const r of enclosedRooms(level)) {
+    for (const r of rooms) {
       const { x, y, w, d } = r.rect
       if (orientation === 'h') { add(y, x, x + w, r.id, 1); add(y + d, x, x + w, r.id, 0) }
       else { add(x, y, y + d, r.id, 1); add(x + w, y, y + d, r.id, 0) }
@@ -67,7 +75,7 @@ export function levelWalls(house: HouseModel, level: Level): WallSegment[] {
         for (const e of edges) if (e.from < mid && mid < e.to && !sides[e.index]) sides[e.index] = e.room
         if (!sides[0] && !sides[1]) { current = null; continue }
         if (current && current.sides[0] === sides[0] && current.sides[1] === sides[1] && Math.abs(current.to - a) < EPS) { current.to = b; continue }
-        current = { id: `${level.id}:${orientation}${Math.round(at)}:${Math.round(a)}`, levelId: level.id, orientation, at, from: a, to: b, sides, kind: 'interior', thickness: thickness.interior }
+        current = { id: `${level.id}:${wingId ? `${wingId}:` : ''}${orientation}${Math.round(at)}:${Math.round(a)}`, levelId: level.id, orientation, at, from: a, to: b, sides, kind: 'interior', thickness: thickness.interior, ...(wingId ? { wingId } : {}) }
         out.push(current)
       }
     }
@@ -110,11 +118,12 @@ export function placeOpenings(house: HouseModel, walls = allWalls(house)): Place
     const base = { ...o, levelId: level.id, orientation: line.orientation, at: line.at, from, to }
     if (room.type === 'outdoor') return { ...base, problem: `${room.name} is outdoors and has no walls` }
     if (from < line.from - EPS || to > line.to + EPS) return { ...base, problem: `it runs past the end of the ${SIDE_WORD[o.side]} side of ${room.name}` }
-    const wall = walls.find(s => s.levelId === level.id && s.orientation === line.orientation && Math.abs(s.at - line.at) < EPS && s.from - EPS <= from && to <= s.to + EPS)
+    const wall = walls.find(s => s.levelId === level.id && (s.wingId ?? '') === (room.wingId ?? '') && s.orientation === line.orientation && Math.abs(s.at - line.at) < EPS && s.from - EPS <= from && to <= s.to + EPS)
     if (!wall) return { ...base, problem: `it straddles a corner where walls meet on the ${SIDE_WORD[o.side]} side of ${room.name}` }
     const own = wall.sides.indexOf(room.id)
     const other = wall.sides[own === 0 ? 1 : 0]
-    const leadsTo = other ?? 'outside'
+    // At a joint between wings the wall is outside in this frame, and the opening names the room beyond.
+    const leadsTo = other ?? (o.through && roomById(house, o.through) ? o.through : 'outside')
     if ((o.kind === 'window' || o.kind === 'garage-door') && other) return { ...base, wall, leadsTo, problem: `it is on an interior wall` }
     if (o.kind !== 'door' && o.kind !== 'opening' && o.kind !== 'window' && o.kind !== 'garage-door') return { ...base, wall, leadsTo, problem: 'unknown kind' }
     return { ...base, wall, leadsTo }

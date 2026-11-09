@@ -27,7 +27,7 @@ export function programChecks(e: Estate): Check[] {
     if (item.minWidth && Math.min(room.rect.w, room.rect.d) / 12 < item.minWidth) issues.push(`${Math.round(Math.min(room.rect.w, room.rect.d) / 12)} ft wide, brief wants ${item.minWidth}`)
     for (const other of item.near ?? []) {
       const o = roomById(e.house, other)
-      if (!o || levelOf(e.house, other)?.id !== level?.id || !touches(room.rect, o.rect)) issues.push(`not beside ${o?.name ?? other}`)
+      if (!o || levelOf(e.house, other)?.id !== level?.id || (room.wingId ?? '') !== (o.wingId ?? '') || !touches(room.rect, o.rect)) issues.push(`not beside ${o?.name ?? other}`)
     }
     if (issues.length) unmet.push({ text: `${room.name}: ${issues.join(', ')}`, id: room.id })
   }

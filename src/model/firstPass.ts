@@ -144,7 +144,7 @@ export function firstPassStairs(house: HouseModel): Stair[] {
   for (let i = 0; i < levels.length - 1; i++) {
     const isStair = (r: Room) => r.type === 'circulation' && /stair/i.test(r.name)
     for (const lower of levels[i].rooms.filter(isStair)) {
-      const upper = levels[i + 1].rooms.filter(isStair).find(u => u.rect.x < lower.rect.x + lower.rect.w && lower.rect.x < u.rect.x + u.rect.w && u.rect.y < lower.rect.y + lower.rect.d && lower.rect.y < u.rect.y + u.rect.d)
+      const upper = levels[i + 1].rooms.filter(isStair).find(u => (u.wingId ?? '') === (lower.wingId ?? '') && u.rect.x < lower.rect.x + lower.rect.w && lower.rect.x < u.rect.x + u.rect.w && u.rect.y < lower.rect.y + lower.rect.d && lower.rect.y < u.rect.y + u.rect.d)
       if (upper) stairs.push({ id: `stair-${lower.id}`, roomId: lower.id, toRoomId: upper.id, shape: 'u-shaped', width: 42, tread: 11 })
     }
   }

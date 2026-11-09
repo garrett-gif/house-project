@@ -59,6 +59,7 @@ export const EDIT_TOOLS: EditToolSpec[] = [
       widthFt: num('East-west width in feet.'),
       depthFt: num('North-south depth in feet.'),
       bathId: { type: ['string', 'null'], description: 'For a bedroom, the id of its own bathroom. Otherwise null.' },
+      wingId: { type: ['string', 'null'], description: 'Wing id from the model summary when the room belongs to a turned wing; its position is then in that wing’s own feet. Otherwise null.' },
     }),
   },
   {
@@ -290,6 +291,7 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
           id: s('id'), name: s('name'), type: s('type') as never,
           rect: { x: inches(n('xFt')), y: inches(n('yFt')), w: inches(n('widthFt')), d: inches(n('depthFt')) },
           ...(v.bathId ? { bathId: s('bathId') } : {}),
+          ...(v.wingId ? { wingId: s('wingId') } : {}),
         },
       },
     }

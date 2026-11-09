@@ -2,7 +2,8 @@ import type { Estate, Level, Side, HouseModel } from '../model/types'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
-import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
+import { ARCH_D, PT_PER_IN, ftIn, turnMarks } from './sheet'
+import { toHouse } from '../model/wings'
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
 import { beamMarks, beamsAbove } from '../model/beams'
@@ -66,48 +67,59 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
   // Border.
   marks.push({ t: 'rect', x: MARGIN / 2, y: MARGIN / 2, w: W - MARGIN, h: H - MARGIN, stroke: '#000', sw: 1.5 })
 
-  // Outdoor rooms dashed, as they have no walls.
-  for (const r of level.rooms.filter(r => r.type === 'outdoor')) {
-    marks.push({ t: 'rect', x: X(r.rect.x), y: Y(r.rect.y + r.rect.d), w: r.rect.w * k, h: r.rect.d * k, stroke: '#000', sw: 0.5, dash: [4, 3] })
-  }
+  const tags = openingMarks(e.house), beamTags = beamMarks(e.house)
+  // Each wing is drawn in its own frame, then turned into place on the sheet. Names stay upright.
+  for (const f of [...new Set(level.rooms.map(r => r.wingId ?? ''))]) {
+    const inF = (wingId?: string) => (wingId ?? '') === f
+    const rooms = level.rooms.filter(r => inF(r.wingId))
+    const fOpenings = openings.filter(o => inF(o.wall?.wingId))
+    const out: Mark[] = f ? [] : marks
+    // Outdoor rooms dashed, as they have no walls.
+    for (const r of rooms.filter(r => r.type === 'outdoor')) {
+      out.push({ t: 'rect', x: X(r.rect.x), y: Y(r.rect.y + r.rect.d), w: r.rect.w * k, h: r.rect.d * k, stroke: '#000', sw: 0.5, dash: [4, 3] })
+    }
 
-  // Walls, solid at their real thickness.
-  const wallBox = (s: WallSegment) => {
-    const half = s.thickness / 2
-    return s.orientation === 'h'
-      ? { x: X(s.from - half), y: Y(s.at + half), w: (s.to - s.from + s.thickness) * k, h: s.thickness * k }
-      : { x: X(s.at - half), y: Y(s.to + half), w: s.thickness * k, h: (s.to - s.from + s.thickness) * k }
-  }
-  for (const s of walls) marks.push({ t: 'rect', ...wallBox(s), fill: s.kind === 'foundation' ? '#555' : s.kind === 'exterior' ? '#000' : '#333' })
+    // Walls, solid at their real thickness.
+    const wallBox = (s: WallSegment) => {
+      const half = s.thickness / 2
+      return s.orientation === 'h'
+        ? { x: X(s.from - half), y: Y(s.at + half), w: (s.to - s.from + s.thickness) * k, h: s.thickness * k }
+        : { x: X(s.at - half), y: Y(s.to + half), w: s.thickness * k, h: (s.to - s.from + s.thickness) * k }
+    }
+    for (const s of walls.filter(s => inF(s.wingId))) out.push({ t: 'rect', ...wallBox(s), fill: s.kind === 'foundation' ? '#555' : s.kind === 'exterior' ? '#000' : '#333' })
 
-  // Openings cut through the walls, then their symbols and the marks that key them to the schedule.
-  const tags = openingMarks(e.house)
-  for (const o of openings) drawOpening(marks, o, X, Y, k)
-  for (const o of openings) drawTag(marks, o, tags.get(o.id), X, Y)
+    // Openings cut through the walls, then their symbols and the marks that key them to the schedule.
+    for (const o of fOpenings) drawOpening(out, o, X, Y, k)
+    for (const o of fOpenings) drawTag(out, o, tags.get(o.id), X, Y)
 
-  // Furniture and fixtures in thin outline, as plans show them.
-  const here = new Set(level.rooms.map(r => r.id))
-  for (const item of (e.house.furniture ?? []).filter(i => here.has(i.roomId) && CATALOG[i.kind])) {
-    for (const q of furnitureParts(item)) marks.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#6b6b6b', sw: 0.35 })
-  }
+    // Furniture and fixtures in thin outline, as plans show them.
+    const here = new Set(rooms.map(r => r.id))
+    for (const item of (e.house.furniture ?? []).filter(i => here.has(i.roomId) && CATALOG[i.kind])) {
+      for (const q of furnitureParts(item)) out.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#6b6b6b', sw: 0.35 })
+    }
 
-  // Beams in this level's ceiling, dashed as "above", with posts as small squares and a schedule mark.
-  const beamTags = beamMarks(e.house)
-  for (const bm of beamsAbove(e.house, level.id)) {
-    const [x1, y1, x2, y2] = bm.orientation === 'h' ? [X(bm.from), Y(bm.at), X(bm.to), Y(bm.at)] : [X(bm.at), Y(bm.from), X(bm.at), Y(bm.to)]
-    marks.push({ t: 'line', x1, y1, x2, y2, w: 1.6, dash: [9, 3, 2, 3] })
-    for (const p of bm.posts ?? []) { const [px, py] = bm.orientation === 'h' ? [X(p), Y(bm.at)] : [X(bm.at), Y(p)]; marks.push({ t: 'rect', x: px - 3, y: py - 3, w: 6, h: 6, fill: '#000' }) }
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
-    // Only the mark goes on the plan; the size and span are on the A-602 schedule.
-    marks.push({ t: 'text', x: mx + (bm.orientation === 'v' ? 3 : 0), y: my + (bm.orientation === 'h' ? -3 : 0), text: beamTags.get(bm.id)!, size: 4.5, anchor: bm.orientation === 'h' ? 'middle' : 'start', bold: true })
-  }
+    // Beams in this level's ceiling, dashed as "above", with posts as small squares and a schedule mark.
+    for (const bm of beamsAbove(e.house, level.id).filter(bm => inF(bm.wingId))) {
+      const [x1, y1, x2, y2] = bm.orientation === 'h' ? [X(bm.from), Y(bm.at), X(bm.to), Y(bm.at)] : [X(bm.at), Y(bm.from), X(bm.at), Y(bm.to)]
+      out.push({ t: 'line', x1, y1, x2, y2, w: 1.6, dash: [9, 3, 2, 3] })
+      for (const p of bm.posts ?? []) { const [px, py] = bm.orientation === 'h' ? [X(p), Y(bm.at)] : [X(bm.at), Y(p)]; out.push({ t: 'rect', x: px - 3, y: py - 3, w: 6, h: 6, fill: '#000' }) }
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+      // Only the mark goes on the plan; the size and span are on the A-602 schedule.
+      out.push({ t: 'text', x: mx + (bm.orientation === 'v' ? 3 : 0), y: my + (bm.orientation === 'h' ? -3 : 0), text: beamTags.get(bm.id)!, size: 4.5, anchor: bm.orientation === 'h' ? 'middle' : 'start', bold: true })
+    }
 
-  // Room names and centerline sizes.
-  for (const r of level.rooms) {
-    const cx = X(r.rect.x + r.rect.w / 2), cy = Y(r.rect.y + r.rect.d / 2)
-    const small = r.rect.w < 14 * 12 || r.rect.d < 10 * 12
-    marks.push({ t: 'text', x: cx, y: cy - (small ? 0 : 2), text: r.name.toUpperCase(), size: small ? 5 : 7, anchor: 'middle', bold: true })
-    if (!small) marks.push({ t: 'text', x: cx, y: cy + 8, text: `${ftIn(r.rect.w)} × ${ftIn(r.rect.d)}`, size: 6, anchor: 'middle' })
+    // Room names and centerline sizes.
+    for (const r of rooms) {
+      const cx = X(r.rect.x + r.rect.w / 2), cy = Y(r.rect.y + r.rect.d / 2)
+      const small = r.rect.w < 14 * 12 || r.rect.d < 10 * 12
+      out.push({ t: 'text', x: cx, y: cy - (small ? 0 : 2), text: r.name.toUpperCase(), size: small ? 5 : 7, anchor: 'middle', bold: true })
+      if (!small) out.push({ t: 'text', x: cx, y: cy + 8, text: `${ftIn(r.rect.w)} × ${ftIn(r.rect.d)}`, size: 6, anchor: 'middle' })
+    }
+
+    if (f) {
+      const back = (sx: number, sy: number) => ({ x: (sx - ox) / k + b.x, y: b.y + b.d - (sy - oy) / k })
+      marks.push(...turnMarks(out, (sx, sy) => { const q = toHouse(e.house, f, back(sx, sy)); return [X(q.x), Y(q.y)] }))
+    }
   }
 
   // Section cut lines, keyed to sheet A-401, with the arrow showing which way the section looks.
