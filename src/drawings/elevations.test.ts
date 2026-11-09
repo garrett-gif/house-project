@@ -20,11 +20,11 @@ describe('elevation projection', () => {
 
 describe('assumed grade', () => {
   const h = sampleEstate.house
-  it('is at the main floor north of the bar, at the walkout in the courtyard, and slopes beside the wings', () => {
-    expect(gradeAt(h, ft(100), ft(100))).toBe(0)
-    expect(gradeAt(h, ft(100), ft(30))).toBe(ft(-11))
+  it('is at the main floor beside and north of the house, and dug down to the walkout along the south', () => {
+    expect(gradeAt(h, ft(100), ft(50))).toBe(0)
+    expect(gradeAt(h, ft(100), ft(10))).toBe(ft(-11))
     expect(gradeAt(h, ft(-10), ft(0))).toBeCloseTo(ft(-11))
-    expect(gradeAt(h, ft(-10), ft(32))).toBeCloseTo(ft(-5.5))
+    expect(gradeAt(h, ft(-10), ft(20))).toBeCloseTo(0)
   })
 })
 
@@ -38,7 +38,7 @@ describe('elevation sheets', () => {
     expect(t).toContain('SOUTH ELEVATION')
     expect(t).toContain(`MAIN FLOOR 0'-0"`)
     expect(t).toContain(`WALKOUT LEVEL -11'-0"`)
-    expect(t).toContain(`TOP OF HIGHEST RIDGE 35'-8"`)
+    expect(t).toContain(`TOP OF HIGHEST RIDGE 43'-0"`)
     expect(texts(ew.marks)).toEqual(expect.arrayContaining(['EAST ELEVATION', 'WEST ELEVATION']))
   })
 
@@ -53,14 +53,14 @@ describe('elevation sheets', () => {
   })
 
   it('draws more roof when a wing gets a hip roof, since its ends slope too', () => {
-    const r = applyOperations(sampleEstate, [{ op: 'setRoof', roofId: 'roof-west', form: 'hip', pitch: 8, ridge: 'ns', low: 's', overhang: ft(2) }])
+    const r = applyOperations(sampleEstate, [{ op: 'setRoof', roofId: 'roof-primary', form: 'hip', pitch: 8, ridge: 'ns', low: 's', overhang: ft(2) }])
     if (!r.ok) throw new Error(r.error)
     const count = (e: typeof sampleEstate) => elevationMarks(e, 'south', 0, 0).marks.filter(m => m.t === 'path' && m.fill === '#d9d9d9').length
     expect(count(r.estate)).toBeGreaterThan(count(sampleEstate))
   })
 
   it('labels pitch on the roof plan', () => {
-    expect(texts(roofPlan.marks).filter(t => t === '8:12').length).toBe(8)
+    expect(texts(roofPlan.marks).filter(t => t === '8:12').length).toBe(10)
     expect(texts(roofPlan.marks)).toContain('ROOF PLAN')
   })
 })

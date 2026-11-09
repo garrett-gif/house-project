@@ -10,9 +10,9 @@ const total = (rects: { w: number; d: number }[]) => rects.reduce((s, r) => s + 
 const ok = (r: ReturnType<typeof applyOperations>) => { if (!r.ok) throw new Error(r.error); return r.estate }
 
 describe('below-grade rooms', () => {
-  // A cellar under the courtyard (house-local 46,48, 30 x 16 ft). The v1 house already has a wine cellar, so this uses another id.
+  // A cellar under the kitchen terrace (house-local 0,0, 30 x 16 ft), south of the walkout. The house already has a wine cellar.
   const cellar = ok(applyOperations(sampleEstate, [
-    { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(46), y: ft(48), w: ft(30), d: ft(16) } } },
+    { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: 0, y: 0, w: ft(30), d: ft(16) } } },
   ]))
 
   it('is not drawn or extruded as above-grade mass', () => {
@@ -23,9 +23,9 @@ describe('below-grade rooms', () => {
     expect(total(footprintOf(house(cellar)))).toBe(total(footprintOf(house(sampleEstate))) + ft(30) * ft(16))
   })
 
-  it('cannot be placed under another building', () => {
+  it('cannot be placed under another building, here the pool house south of the terraces', () => {
     const r = applyOperations(sampleEstate, [
-      { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(46), y: ft(40), w: ft(30), d: ft(24) } } },
+      { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(60), y: ft(-20), w: ft(30), d: ft(20) } } },
     ])
     expect(r.ok).toBe(false)
   })
@@ -38,8 +38,8 @@ describe('checks name what they are about', () => {
   })
 
   it('names the misplaced rooms', () => {
-    // Pushing the lounge past the north face leaves the front door no longer the northmost wall.
-    const e = ok(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'lounge', side: 'n', distance: ft(4) }]))
+    // Pushing the guest bedroom past the north face leaves the front door no longer the northmost wall.
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'guest-bed', side: 'n', distance: ft(4) }]))
     expect(validateEstate(e).find(c => c.id === 'house-placement')).toMatchObject({ status: 'fail', elements: ['foyer'] })
   })
 

@@ -32,11 +32,11 @@ describe('wildfire checks on the sample estate', () => {
     expect(c.elements).not.toContain('main-house')
   })
 
-  it('flag the main house when its fire lane is removed', () => {
+  it('flag the car building when the house fire lane is removed', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'removeRoad', roadId: 'house-fire-lane' }]))
     const c = check(e, 'hose-pull')
     expect(c.status).toBe('warn')
-    expect(c.elements).toContain('main-house')
+    expect(c.elements).toContain('car-building')
     expect(c.elements).not.toContain('hangars')
   })
 

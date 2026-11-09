@@ -15,15 +15,15 @@ describe('drag to edit', () => {
   })
 
   it('grabs a wall near an edge and the room elsewhere', () => {
-    const k = room('kitchen') // x 48..96 ft, y 64..88 ft
-    expect(grabRoom(k, ft(95.5), ft(76))).toEqual({ kind: 'wall', side: 'e' })
-    expect(grabRoom(k, ft(60), ft(64.5))).toEqual({ kind: 'wall', side: 's' })
-    expect(grabRoom(k, ft(70), ft(76))).toEqual({ kind: 'room' })
+    const k = room('kitchen') // x 36..66 ft, y 16..46 ft
+    expect(grabRoom(k, ft(65.5), ft(31))).toEqual({ kind: 'wall', side: 'e' })
+    expect(grabRoom(k, ft(50), ft(16.5))).toEqual({ kind: 'wall', side: 's' })
+    expect(grabRoom(k, ft(50), ft(31))).toEqual({ kind: 'room' })
   })
 
-  it('turns a drag on the kitchen east wall into moveWall, which the great room makes room for', () => {
-    const op = roomDragOp(room('kitchen'), { kind: 'wall', side: 'e' }, ft(10) + 2, 0)!
-    expect(op).toEqual({ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(10) })
+  it('turns a drag on the kitchen west wall into moveWall, which the scullery makes room for', () => {
+    const op = roomDragOp(room('kitchen'), { kind: 'wall', side: 'w' }, -(ft(2) + 2), 0)!
+    expect(op).toEqual({ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(2) })
     expect(applyOperations(sampleEstate, [op]).ok).toBe(true)
   })
 
@@ -44,9 +44,10 @@ describe('drag to edit', () => {
   })
 
   it('slides a door along its wall', () => {
-    const door = placeOpenings(sampleEstate.house).find(o => o.roomId === 'kitchen' && o.leadsTo === 'm-hall')!
-    const op = openingDragOp(door, ft(6) + 1, ft(3))!
-    expect(op).toEqual({ op: 'moveOpening', openingId: door.id, side: door.side, offset: door.offset + ft(6) })
+    const door = placeOpenings(sampleEstate.house).find(o => o.roomId === 'kitchen' && o.leadsTo === 'back-hall')!
+    // The door runs north-south along the kitchen's west wall, so only the northward part of the drag counts.
+    const op = openingDragOp(door, ft(3), ft(1) + 1)!
+    expect(op).toEqual({ op: 'moveOpening', openingId: door.id, side: door.side, offset: door.offset + ft(1) })
     expect(applyOperations(sampleEstate, [op]).ok).toBe(true)
   })
 

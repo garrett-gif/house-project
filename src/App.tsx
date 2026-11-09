@@ -4,7 +4,7 @@ import type { EditOp } from './model/edits'
 import { applyOperations, describeEdit, describeEdits } from './model/edits'
 import { sampleEstate } from './model/sampleEstate'
 import { diffChecks, validateEstate } from './model/validate'
-import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
+import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, resumeProject, saveProject, startTimeline, undo } from './model/history'
 import type { ChatTurn } from './chat/protocol'
 import { checkServer, requestEdits, requestSheetsPdf } from './chat/client'
 import { drawingSet } from './drawings/drawingSet'
@@ -66,7 +66,7 @@ export function App() {
     Promise.all([store.load(), store.loadChat()]).then(([data, chat]) => {
       if (!live) return
       if (data) {
-        const r = loadProject(data)
+        const r = resumeProject(data, sampleEstate)
         if (r.ok) setTimeline(r.timeline)
         else setNotice(`The saved project could not be restored (${r.error}). Starting from the sample estate.`)
       }

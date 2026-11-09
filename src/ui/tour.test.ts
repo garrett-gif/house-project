@@ -34,25 +34,25 @@ describe('walkthrough', () => {
   })
 
   it('cannot walk through the wall between the kitchen and the great room', () => {
-    // Middle of that wall, away from any door.
-    expect(canStand(house, 'main', ft(96), ft(70))).toBe(false)
-    const from = { x: ft(94), y: ft(70) }
+    // North end of that wall, past the wide opening and short of the dining room's.
+    expect(canStand(house, 'main', ft(66), ft(43))).toBe(false)
+    const from = { x: ft(64), y: ft(43) }
     let p = from
     for (let i = 0; i < 20; i++) p = step(house, 'main', p, 6, 0)
-    expect(p.x).toBeLessThan(ft(96))
+    expect(p.x).toBeLessThan(ft(66))
   })
 
-  it('walks through a door', () => {
-    const door = placeOpenings(house).find(o => o.roomId === 'kitchen' && o.leadsTo === 'm-hall')!
-    const mid = (door.from + door.to) / 2
-    // From the kitchen, north through its door into the gallery.
-    let p = { x: mid, y: ft(85) }
-    for (let i = 0; i < 20; i++) p = step(house, 'main', p, 0, 6)
-    expect(p.y).toBeGreaterThan(ft(89))
+  it('walks through an opening', () => {
+    const open = placeOpenings(house).find(o => o.id === 'kitchen-great')!
+    const mid = (open.from + open.to) / 2
+    // From the kitchen, east through the wide opening into the great room.
+    let p = { x: ft(60), y: mid }
+    for (let i = 0; i < 20; i++) p = step(house, 'main', p, 6, 0)
+    expect(p.x).toBeGreaterThan(ft(68))
   })
 
   it('slides along a wall instead of stopping dead', () => {
-    const p = step(house, 'main', { x: ft(94), y: ft(70) }, 24, 6)
-    expect(p).toEqual({ x: ft(94), y: ft(70) + 6 })
+    const p = step(house, 'main', { x: ft(64), y: ft(43) }, 24, 6)
+    expect(p).toEqual({ x: ft(64), y: ft(43) + 6 })
   })
 })

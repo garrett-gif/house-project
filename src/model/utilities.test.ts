@@ -128,7 +128,7 @@ describe('utility edits', () => {
   })
 
   it('reject a utility on a building or on another utility', () => {
-    const onHouse = applyOperations(sampleEstate, [{ op: 'addUtility', utility: { ...tank, rect: { x: ft(1100), y: ft(5400), w: ft(20), d: ft(6) } } }])
+    const onHouse = applyOperations(sampleEstate, [{ op: 'addUtility', utility: { ...tank, rect: { x: ft(1100), y: ft(5420), w: ft(20), d: ft(6) } } }])
     expect(onHouse).toMatchObject({ ok: false, error: expect.stringMatching(/would sit on Main house/) })
     const onWell = applyOperations(sampleEstate, [{ op: 'addUtility', utility: { ...tank, rect: { x: ft(865), y: ft(5625), w: ft(10), d: ft(10) } } }])
     expect(onWell).toMatchObject({ ok: false, error: expect.stringMatching(/Estate well \(estate-well\) and New tank \(new-tank\) would overlap/) })

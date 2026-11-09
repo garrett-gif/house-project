@@ -159,7 +159,8 @@ const laidOut: Estate = withDerivedGeometry({
   buildings: [
     // The U-shaped outline is derived from the house rooms and origin by withDerivedGeometry.
     { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
-    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5388, 80, 40, 14),
+    // South of the house, below the terraces.
+    b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5370, 80, 40, 14),
     b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
     b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
     // Outline derived from the guest house rooms.
@@ -203,8 +204,8 @@ const laidOut: Estate = withDerivedGeometry({
   ],
   roads,
   walkways: [
-    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1250, 5430], [1466, 5430]), from: 'main-house', to: 'car-building' },
-    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1230, 5360], [1230, 5130]), from: 'main-house', to: 'entertainment' },
+    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1230, 5445], [1466, 5445]), from: 'main-house', to: 'car-building' },
+    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1220, 5395], [1220, 5130]), from: 'main-house', to: 'entertainment' },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   waterSources,

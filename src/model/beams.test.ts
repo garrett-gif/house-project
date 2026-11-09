@@ -32,20 +32,19 @@ describe('the first pass of beams', () => {
     }
   })
 
-  it('puts a post in the woodshop but not in the pool', () => {
-    const shop = beams(sampleEstate).find(bm => bm.levelId === 'main' && bm.orientation === 'h' && bm.at === ft(12))!
-    expect(shop.posts).toEqual([ft(23)])
-    expect(longestSpan(shop)).toBe(ft(23))
-    const pool = beams(sampleEstate).filter(bm => bm.levelId === 'main' && bm.from >= ft(0) && bm.orientation === 'v' && bm.at >= ft(150) && bm.to === ft(64))
-    expect(pool.length).toBe(3)
-    expect(pool.every(bm => !bm.posts && bm.material === 'steel')).toBe(true)
+  it('puts a post under long beams over rooms that can take one, and keeps every span within 32 ft', () => {
+    const posted = beams(sampleEstate).filter(bm => bm.posts?.length)
+    expect(posted.length).toBeGreaterThan(0)
+    for (const bm of posted) expect(longestSpan(bm)).toBeLessThan(bm.to - bm.from)
+    expect(Math.max(...beams(sampleEstate).map(longestSpan))).toBeLessThanOrEqual(ft(32))
+    expect(check(sampleEstate, 'beam-span').status).toBe('pass')
   })
 
-  it('flags the long spans over the indoor pool', () => {
-    const c = check(sampleEstate, 'beam-span')
+  it('flags spans longer than the rule allows', () => {
+    const e = ok(applyOperations(sampleEstate, [{ op: 'setUtilityRule', rule: 'maxBeamSpanFt', value: 20 }]))
+    const c = check(e, 'beam-span')
     expect(c.status).toBe('warn')
-    expect(c.detail).toMatch(/64 ft over Indoor pool, laps and play, about a W27 steel/)
-    expect(c.elements!.length).toBe(5)
+    expect(c.detail).toMatch(/Main house: beam-[\w-]+: [\d.]+ ft over /)
   })
 })
 
@@ -62,18 +61,18 @@ describe('beam sizes', () => {
 })
 
 describe('beam edits', () => {
-  const pool = 'beam-main-8'
+  // The longest beam without a post.
+  const longest = [...beams(sampleEstate)].filter(bm => !bm.posts).sort((a, b) => (b.to - b.from) - (a.to - a.from))[0]
+  const pool = longest.id
 
   it('a post shortens a span and clears its warning', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'setBeam', beamId: pool, material: 'steel', posts: [ft(32)] }]))
-    expect(longestSpan(beam(e, pool))).toBe(ft(32))
-    expect(check(e, 'beam-span').elements).not.toContain(pool)
-    expect(applyOperations(sampleEstate, [{ op: 'setBeam', beamId: pool, material: 'steel', posts: [ft(100)] }])).toMatchObject({ ok: false })
-  })
-
-  it('the owner can accept long spans by raising the rule', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'setUtilityRule', rule: 'maxBeamSpanFt', value: 70 }]))
-    expect(check(e, 'beam-span').status).toBe('pass')
+    const tight = ok(applyOperations(sampleEstate, [{ op: 'setUtilityRule', rule: 'maxBeamSpanFt', value: 20 }]))
+    expect(check(tight, 'beam-span').elements).toContain(pool)
+    const mid = (longest.from + longest.to) / 2
+    const e = ok(applyOperations(tight, [{ op: 'setBeam', beamId: pool, material: 'glulam', posts: [mid] }]))
+    expect(longestSpan(beam(e, pool))).toBe((longest.to - longest.from) / 2)
+    expect(check(e, 'beam-span').elements ?? []).not.toContain(pool)
+    expect(applyOperations(sampleEstate, [{ op: 'setBeam', beamId: pool, material: 'steel', posts: [longest.to + ft(10)] }])).toMatchObject({ ok: false })
   })
 
   it('removing a beam brings back the stacking warning; fitting beams again clears it', () => {
@@ -92,7 +91,7 @@ describe('beam edits', () => {
   })
 
   it('convert from the chat tools in feet', () => {
-    expect(toEditOp('setBeam', { beamId: pool, material: 'steel', postsFt: [32] })).toEqual({ ok: true, op: { op: 'setBeam', beamId: pool, material: 'steel', posts: [ft(32)] } })
+    expect(toEditOp('setBeam', { beamId: 'beam-x', material: 'steel', postsFt: [32] })).toEqual({ ok: true, op: { op: 'setBeam', beamId: 'beam-x', material: 'steel', posts: [ft(32)] } })
     expect(toEditOp('fitBeams', { buildingId: 'main-house' })).toEqual({ ok: true, op: { op: 'fitBeams', buildingId: 'main-house' } })
   })
 })
@@ -102,11 +101,11 @@ describe('beams in drawings, views, and saves', () => {
     const set = drawingSet(sampleEstate, { revision: 0, date: '2026-11-09', projectName: 'House Project' })
     const texts = (n: string) => set.find(s => s.number === n)!.marks.flatMap(m => m.t === 'text' ? [m.text] : [])
     const walkoutPlan = texts('A-101')
-    expect(walkoutPlan.some(t => /^BM\d+ W27 STEEL ABOVE$/.test(t))).toBe(true)
+    expect(walkoutPlan.some(t => /^BM\d+ .+ ABOVE$/.test(t))).toBe(true)
     const schedule = texts('A-602')
     expect(schedule).toContain('BEAM SCHEDULE')
     expect(schedule.filter(t => /^BM\d+$/.test(t)).length).toBe(beams(sampleEstate).length)
-    expect(schedule).toContain('W27 steel')
+    expect(schedule.some(t => /(LVL|glulam|steel)$/.test(t))).toBe(true)
     expect(beamMarks(sampleEstate.house).get(beams(sampleEstate)[0].id)).toBe('BM1')
     expect(beamsAbove(sampleEstate.house, 'walkout').every(bm => bm.levelId === 'main')).toBe(true)
   })
@@ -117,6 +116,6 @@ describe('beams in drawings, views, and saves', () => {
   })
 
   it('are listed for Claude', () => {
-    expect(summarizeEstate(sampleEstate)).toMatch(/Beams \(id: .*beam-main-8: main, north-south at x 150, 0 to 64, steel, W27 steel/)
+    expect(summarizeEstate(sampleEstate)).toMatch(/Beams \(id: .*beam-main-1: main, (east-west at y|north-south at x) [\d.]+, [\d.]+ to [\d.]+, (lvl|glulam|steel)/)
   })
 })

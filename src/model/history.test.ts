@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { sampleEstate } from './sampleEstate'
-import { canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './history'
+import { canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo, resumeProject } from './history'
 import type { Timeline } from './history'
 import type { EditOp } from './edits'
 import { ft } from './geometry'
@@ -55,5 +55,24 @@ describe('history', () => {
     expect(loaded.timeline.index).toBe(1)
     expect(fuelX(redo(loaded.timeline))).toBe(x0 + ft(30))
     expect(loadProject({ hello: 'world' }).ok).toBe(false)
+  })
+})
+
+describe('resuming the browser session', () => {
+  it('follows the current sample when the saved project has no edits of its own', () => {
+    const old = structuredClone(sampleEstate)
+    old.house = { ...old.house, origin: { x: old.house.origin.x + 120, y: old.house.origin.y } }
+    const saved = saveProject(startTimeline(old))
+    const r = resumeProject(JSON.parse(JSON.stringify(saved)), sampleEstate)
+    if (!r.ok) throw new Error(r.error)
+    expect(r.timeline.states[0].house.origin).toEqual(sampleEstate.house.origin)
+  })
+
+  it('keeps a project that has edits', () => {
+    const t = commit(startTimeline(sampleEstate), [{ op: 'renameRoom', roomId: 'office', name: 'Reading room' }], 'owner')
+    if (!t.ok) throw new Error(t.error)
+    const r = resumeProject(JSON.parse(JSON.stringify(saveProject(t.timeline))), sampleEstate)
+    if (!r.ok) throw new Error(r.error)
+    expect(r.timeline.revisions).toHaveLength(1)
   })
 })

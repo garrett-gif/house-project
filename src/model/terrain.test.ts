@@ -45,24 +45,24 @@ describe('terrain checks', () => {
   it('accept the main house walkout because its site is excavated, and estimate the earthwork', () => {
     const c = check(sampleEstate, 'walkout-grade')
     expect(c.status).toBe('pass')
-    expect(c.detail).toMatch(/Main house: excavated by design, about 11\.8 ft of cut along the south face with retaining walls, roughly [\d,]+ cubic yards of cut/)
+    expect(c.detail).toMatch(/Main house: excavated by design, about 11 ft of cut along the south face with retaining walls, roughly [\d,]+ cubic yards of cut/)
     const w = earthwork(sampleEstate, sampleEstate.house)
-    // At least the walkout level dug out: about 14,000 sq ft, 11 ft deep, over 27 cubic feet per yard.
-    expect(w.cutCy).toBeGreaterThan(14000 * 11 / 27 * 0.8)
+    // At least the walkout level dug out: about 9,500 sq ft, 11 ft deep, over 27 cubic feet per yard.
+    expect(w.cutCy).toBeGreaterThan(9000 * 11 / 27 * 0.8)
   })
 
   it('find that the walkout faces the wrong way on this land without the excavation', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'setExcavated', buildingId: 'main-house', excavated: false }]))
     const c = check(e, 'walkout-grade')
     expect(c).toMatchObject({ status: 'warn', elements: ['main-house'] })
-    expect(c.detail).toMatch(/about 11\.8 ft of cut along the south face\. The land falls most toward the east, 8\.4 ft/)
+    expect(c.detail).toMatch(/about 11 ft of cut along the south face\. The land falls most toward the east, 7\.4 ft/)
   })
 
   it('show how much cut an east-facing walkout would need instead', () => {
     const e = structuredClone(sampleEstate)
     e.house.levels.find(l => l.id === 'walkout')!.exposed = ['e']
     e.house.excavated = false
-    expect(check(e, 'walkout-grade').detail).toMatch(/falls 8\.4 ft toward the east side, .* about 2\.6 ft of cut along the east face/)
+    expect(check(e, 'walkout-grade').detail).toMatch(/falls 7\.4 ft toward the east side, .* about 3\.6 ft of cut along the east face/)
   })
 
   it('pass building sites on gentle ground, and flag them under a stricter rule', () => {

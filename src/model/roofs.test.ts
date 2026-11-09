@@ -15,19 +15,19 @@ const ok = (r: ReturnType<typeof applyOperations>) => { if (!r.ok) throw new Err
 const rejected = (r: ReturnType<typeof applyOperations>) => { if (r.ok) throw new Error('expected a rejection'); return r.error }
 
 describe('roofs', () => {
-  it('puts 8:12 gables on the bar, wings, and garage at the expected heights', () => {
+  it('puts 8:12 gables on the kids wing, great room, entry, hearth room, and primary wing at the expected heights', () => {
     expect(house.roofs.map(r => [r.id, r.form, r.pitch, r.ridge])).toEqual([
-      ['roof-bar', 'gable', 8, 'ew'], ['roof-west', 'gable', 8, 'ns'], ['roof-east', 'gable', 8, 'ns'], ['roof-garage', 'gable', 8, 'ew'],
+      ['roof-kids', 'gable', 8, 'ns'], ['roof-great', 'gable', 8, 'ns'], ['roof-entry', 'gable', 8, 'ew'], ['roof-hearth', 'gable', 8, 'ns'], ['roof-primary', 'gable', 8, 'ns'],
     ])
-    // Bar: eave at 21 ft on the kids floor; half of a 44 ft span at 8:12 rises 14 ft 8 in.
-    expect(ridgeHeight(house, roof(sampleEstate, 'roof-bar'))).toBeCloseTo(ft(21) + ft(22) * 8 / 12)
-    expect(ridgeHeight(house, roof(sampleEstate, 'roof-west'))).toBeCloseTo(ft(11) + ft(23) * 8 / 12)
-    expect(houseHeight(house)).toBeCloseTo(ridgeHeight(house, roof(sampleEstate, 'roof-bar')))
+    // Kids wing: eave at 21 ft on the kids floor; half of a 66 ft span at 8:12 rises 22 ft.
+    expect(ridgeHeight(house, roof(sampleEstate, 'roof-kids'))).toBeCloseTo(ft(21) + ft(33) * 8 / 12)
+    expect(ridgeHeight(house, roof(sampleEstate, 'roof-primary'))).toBeCloseTo(ft(11) + ft(23) * 8 / 12)
+    expect(houseHeight(house)).toBeCloseTo(ridgeHeight(house, roof(sampleEstate, 'roof-kids')))
     expect(sampleEstate.buildings.find(b => b.id === 'main-house')!.height).toBe(Math.round(houseHeight(house)))
   })
 
   it('builds two planes and two gable walls for a gable, four planes for a hip, one plane and three walls for a shed', () => {
-    const r = roof(sampleEstate, 'roof-west')
+    const r = roof(sampleEstate, 'roof-primary')
     const kinds = (form: 'gable' | 'hip' | 'shed') => roofPolygons(house, { ...r, form }).map(p => p.kind).sort()
     expect(kinds('gable')).toEqual(['gable', 'gable', 'roof', 'roof'])
     expect(kinds('hip')).toEqual(['roof', 'roof', 'roof', 'roof'])
@@ -40,8 +40,8 @@ describe('roofs', () => {
 
   it('fails coverage when a roof is missing', () => {
     const e = structuredClone(sampleEstate)
-    e.house.roofs = e.house.roofs.filter(r => r.id !== 'roof-garage')
-    expect(check(e, 'roof-coverage')).toMatchObject({ status: 'fail', elements: ['garage'] })
+    e.house.roofs = e.house.roofs.filter(r => r.id !== 'roof-hearth')
+    expect(check(e, 'roof-coverage')).toMatchObject({ status: 'fail', elements: ['hearth', 'lounge'] })
   })
 
   it('first pass roofs cover a house saved without them', () => {
@@ -53,14 +53,14 @@ describe('roofs', () => {
 })
 
 describe('setRoof', () => {
-  const hip: EditOp = { op: 'setRoof', roofId: 'roof-west', form: 'hip', pitch: 6, ridge: 'ns', low: 's', overhang: ft(3) }
+  const hip: EditOp = { op: 'setRoof', roofId: 'roof-primary', form: 'hip', pitch: 6, ridge: 'ns', low: 's', overhang: ft(3) }
 
   it('reshapes a roof without changing the estate it was given', () => {
     const before = JSON.stringify(sampleEstate)
     const e = ok(applyOperations(sampleEstate, [hip]))
     expect(JSON.stringify(sampleEstate)).toBe(before)
-    expect(roof(e, 'roof-west')).toMatchObject({ form: 'hip', pitch: 6, overhang: ft(3) })
-    expect(ridgeHeight(e.house, roof(e, 'roof-west'))).toBeLessThan(ridgeHeight(house, roof(sampleEstate, 'roof-west')))
+    expect(roof(e, 'roof-primary')).toMatchObject({ form: 'hip', pitch: 6, overhang: ft(3) })
+    expect(ridgeHeight(e.house, roof(e, 'roof-primary'))).toBeLessThan(ridgeHeight(house, roof(sampleEstate, 'roof-primary')))
   })
 
   it('rejects unknown roofs and bad values', () => {
@@ -73,7 +73,7 @@ describe('setRoof', () => {
 
   it('warns about a very low pitch', () => {
     const e = ok(applyOperations(sampleEstate, [{ ...hip, pitch: 2 } as EditOp]))
-    expect(check(e, 'roof-pitch')).toMatchObject({ status: 'warn', elements: ['roof-west'] })
+    expect(check(e, 'roof-pitch')).toMatchObject({ status: 'warn', elements: ['roof-primary'] })
   })
 
   it('converts the chat tool, overhang in feet', () => {

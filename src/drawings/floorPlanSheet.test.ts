@@ -40,16 +40,16 @@ describe('floor plan sheets', () => {
 
   it('dimensions the overall house on the main floor', () => {
     const t = texts(sheets[1].marks)
-    expect(t).toContain(`228'-0"`)
-    expect(t).toContain(`108'-0"`)
+    expect(t).toContain(`170'-0"`)
+    expect(t).toContain(`68'-0"`)
   })
 
   it('follows edits, because sheets are drawn from the model', () => {
-    const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(10) }])
+    const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(2) }])
     if (!r.ok) throw new Error(r.error)
     const t = texts(floorPlanSheets(r.estate, info)[1].marks)
-    expect(t).toContain(`58'-0" × 24'-0"`)
-    expect(t).toContain(`38'-0" × 24'-0"`)
+    expect(t).toContain(`32'-0" × 30'-0"`)
+    expect(t).toContain(`14'-0" × 24'-0"`)
   })
 
   it('keeps the plan on the paper and clear of the title block', () => {

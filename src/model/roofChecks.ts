@@ -1,7 +1,8 @@
 import type { Check, Estate, Rect } from './types'
 import { samplePoints } from './roofs'
 
-const inside = ([x, y]: [number, number], r: Rect) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.d
+/** On or inside: a point on a wall between two rooms bears on that wall. */
+const onOrIn = ([x, y]: [number, number], r: Rect) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.d
 const sqft = (n: number) => Math.round(n * 4).toLocaleString('en-US')
 
 /** Every room open to the sky has a roof over it, and every roof sits on rooms. */
@@ -14,8 +15,8 @@ export function roofChecks(e: Estate): Check[] {
     const above = levels.slice(i + 1).flatMap(l => l.rooms.filter(r => r.type !== 'outdoor').map(r => r.rect))
     for (const room of level.rooms.filter(r => r.type !== 'outdoor')) {
       for (const p of samplePoints(room.rect)) {
-        if (above.some(a => inside(p, a))) continue
-        if (!roofs.some(r => inside(p, r.rect))) uncovered.set(room.id, (uncovered.get(room.id) ?? 0) + 1)
+        if (above.some(a => onOrIn(p, a))) continue
+        if (!roofs.some(r => onOrIn(p, r.rect))) uncovered.set(room.id, (uncovered.get(room.id) ?? 0) + 1)
       }
     }
   })
@@ -33,7 +34,7 @@ export function roofChecks(e: Estate): Check[] {
     const level = levels[i]
     const bearing = [...(level?.rooms ?? []), ...(i > 0 ? levels[i - 1].rooms.filter(r => r.twoStory) : [])].map(r => r.rect)
     const pts = samplePoints(roof.rect)
-    const unsupported = pts.filter(p => !bearing.some(b => inside(p, b))).length
+    const unsupported = pts.filter(p => !bearing.some(b => onOrIn(p, b))).length
     if (!level || unsupported > pts.length * 0.05) floating.push(roof.id)
   }
   checks.push(floating.length

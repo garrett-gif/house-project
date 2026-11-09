@@ -81,3 +81,12 @@ export function loadProject(data: unknown): CommitResult {
   const index = typeof p.index === 'number' ? Math.max(0, Math.min(Math.trunc(p.index), t.revisions.length)) : t.revisions.length
   return { ok: true, timeline: { ...t, index } }
 }
+
+/**
+ * Restores the session saved in the browser. A project with no edits of its own follows the current sample, so a
+ * new sample layout reaches it instead of the copy saved before; one with edits loads as saved.
+ */
+export function resumeProject(data: unknown, sample: Estate): CommitResult {
+  const r = loadProject(data)
+  return r.ok && r.timeline.revisions.length === 0 ? { ok: true, timeline: startTimeline(sample) } : r
+}

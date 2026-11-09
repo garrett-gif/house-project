@@ -1,4 +1,4 @@
-import type { HouseModel, ProgramItem, Roof, Room, RoomType } from './types'
+import type { HouseModel, Opening, ProgramItem, Roof, Room, RoomType } from './types'
 import { ft, p } from './geometry'
 import { withHouseDefaults } from './firstPass'
 
@@ -6,119 +6,121 @@ const r = (id: string, name: string, type: RoomType, x: number, y: number, w: nu
   id, name, type, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, bathId,
 })
 
-/** Overall plan: 190 ft wide U opening south. West and east wings are 46 by 64 ft; the north bar is 190 by 44 ft. */
-export const HOUSE_WIDTH = 190
-export const HOUSE_DEPTH = 108
-export const WING_WIDTH = 46
-export const WING_DEPTH = 64
-export const GARAGE_WIDTH = 38
-export const GARAGE_DEPTH = 26
-
 /*
- * Main house, first layout (v1). Room coordinates are house-local feet: 0,0 is the southwest corner of the west wing.
+ * Main house, second layout (v2): open and homey rather than a compound. Room coordinates are house-local feet:
+ * 0,0 is the southwest corner of the south terrace; the house itself runs from y = 16 to the north door at y = 84.
  *
- * Bearing lines shared by all three floors, so walls stack where they can:
- *   North bar: y = 64 (south face), 88 and 94 (the gallery), 108 (north face).
- *   Bar cross walls: x = 24, 48, 96, 106, 114, 130, 144 on every floor that has a wall there.
- *   Wings: x = 24 in the west wing, y = 24 in both wings.
- * The great room is two stories, so the kids floor leaves the space above it open.
- * The ground falls south: the walkout opens to the pool courtyard, and its other outside walls are foundation.
+ * - An open core: the two-story great room is the middle of the house. The kitchen opens to it on the west, the
+ *   hearth room and bar on the east, the foyer and den on the north. There is no entry gallery: the front door
+ *   opens straight into the great room and the view south.
+ * - Outdoor rooms all along the south: the kitchen terrace, a porch off the great room, the hearth terrace, and the
+ *   primary deck.
+ * - Cozy spots mixed with the big rooms: the hearth room with a window seat, the den, the library, and the kids'
+ *   homework and art room.
+ * - Wings stay short: service and garage to the west, the primary and guest suites to the east, the kids' floor
+ *   over the kitchen side, and the walkout below with the indoor pool directly under the great room, so no walls
+ *   stand over it.
+ *
+ * Bearing lines shared by the floors: y = 16, 40, 62, 84 and x = 36, 52, 66, 110, 124.
  */
-
 const walkout: Room[] = [
-  // North bar, south band.
-  r('craft', 'Family craft room (paper, 3D printing, sewing)', 'living', 0, 64, 24, 24),
-  r('lower-lobby', 'Lower lobby', 'circulation', 24, 64, 24, 24),
-  r('gym', 'Gym (free weights, machines, mats, Pilates)', 'wellness', 48, 64, 48, 24),
-  r('spa-lounge', 'Spa lounge and showers', 'wellness', 96, 64, 24, 24),
-  r('steam', 'Steam room', 'wellness', 120, 64, 10, 12),
-  r('sauna', 'Sauna', 'wellness', 120, 76, 10, 12),
-  r('hair-nail', 'Hair and nail', 'wellness', 130, 64, 14, 12),
-  r('massage', 'Massage room', 'wellness', 130, 76, 14, 12),
-  r('pool-deck', 'Hot tub and cold plunge', 'wellness', 144, 64, 46, 24),
-  // Gallery and north band.
-  r('w-hall', 'Lower gallery', 'circulation', 0, 88, 190, 6),
-  r('mech', 'Mechanical', 'service', 0, 94, 24, 14),
-  r('pool-equip', 'Pool equipment', 'service', 24, 94, 24, 14),
-  r('w-storage', 'Storage', 'service', 48, 94, 24, 14),
-  r('locker', 'Locker room and showers', 'bath', 72, 94, 24, 14),
-  r('w-powder', 'Powder', 'bath', 96, 94, 10, 14),
-  r('w-elevator', 'Elevator', 'service', 106, 94, 8, 14),
-  r('w-stair', 'Stairs', 'circulation', 114, 94, 16, 14),
-  r('wine-cellar', 'Wine cellar', 'service', 130, 94, 24, 14),
-  r('w-storage-2', 'Storage', 'service', 154, 94, 20, 14),
-  // Safe room in the buried northeast corner: two concrete foundation walls, no windows, one door from the gallery.
-  { ...r('safe-room', 'Safe room', 'service', 174, 94, 16, 14), safeRoom: true },
-  // West wing: theater with its lobby and candy wall, and the woodshop opening to the courtyard.
-  r('woodshop', 'Dust-controlled woodshop', 'service', 0, 0, 46, 24),
-  r('theater', '20-seat theater', 'living', 0, 24, 24, 40),
-  r('theater-lobby', 'Theater lobby, candy wall, popcorn and soda', 'circulation', 24, 24, 22, 40),
-  // East wing: the indoor pool, opening south to the outdoor pool.
-  r('indoor-pool', 'Indoor pool, laps and play', 'pool', 144, 0, 46, 64),
+  // West: theater and its lobby, woodshop, mechanical.
+  r('theater', '20-seat theater', 'living', 0, 16, 36, 24),
+  r('theater-lobby', 'Theater lobby, candy wall, popcorn and soda', 'circulation', 0, 40, 36, 14),
+  r('woodshop', 'Dust-controlled woodshop', 'service', 0, 54, 20, 30),
+  r('mech', 'Mechanical', 'service', 20, 54, 16, 14),
+  r('pool-equip', 'Pool equipment', 'service', 20, 68, 16, 16),
+  // Middle: gym and craft room open to the south, the lower lobby at the stair.
+  r('gym', 'Gym (free weights, machines, mats, Pilates)', 'wellness', 36, 16, 30, 30),
+  r('craft', 'Family craft room (paper, 3D printing, sewing)', 'living', 36, 46, 30, 16),
+  r('lower-lobby', 'Lower lobby', 'circulation', 36, 62, 16, 22),
+  r('w-stair', 'Stairs', 'circulation', 52, 62, 14, 14),
+  r('w-elevator', 'Elevator', 'service', 52, 76, 8, 8),
+  r('w-storage', 'Storage', 'service', 60, 76, 6, 8),
+  // Under the great room: the indoor pool, with the lower family room and bar beside it.
+  r('indoor-pool', 'Indoor pool, laps and play', 'pool', 66, 16, 44, 46),
+  r('w-lounge', 'Lower family room and bar', 'living', 66, 62, 20, 22),
+  r('w-hall', 'Pool hall', 'circulation', 86, 62, 24, 6),
+  r('locker', 'Locker room and showers', 'bath', 86, 68, 12, 16),
+  r('w-powder', 'Powder', 'bath', 98, 68, 6, 16),
+  r('wine-cellar', 'Wine cellar', 'service', 104, 68, 6, 16),
+  r('pool-deck', 'Hot tub and cold plunge', 'wellness', 110, 16, 14, 22),
+  r('w-storage-2', 'Pool storage', 'service', 110, 38, 14, 24),
+  // Safe room in the buried north side: concrete foundation walls, no windows, one door from the pool hall.
+  { ...r('safe-room', 'Safe room', 'service', 110, 62, 14, 22), safeRoom: true },
+  // East: the spa, under the primary suite.
+  r('spa-lounge', 'Spa lounge and showers', 'wellness', 124, 16, 22, 24),
+  r('steam', 'Steam room', 'wellness', 146, 16, 12, 8),
+  r('sauna', 'Sauna', 'wellness', 158, 16, 12, 8),
+  r('massage', 'Massage room', 'wellness', 146, 24, 12, 10),
+  r('hair-nail', 'Hair and nail', 'wellness', 158, 24, 12, 10),
+  r('spa-hall', 'Spa hall', 'circulation', 146, 34, 24, 6),
 ]
 
 const main: Room[] = [
-  // North bar, south band: everyday rooms facing the courtyard.
-  r('mudroom', 'Mudroom, lockers, bench, and dog wash', 'service', 0, 64, 24, 24),
-  r('dining', 'Formal dining', 'living', 24, 64, 24, 24),
-  r('kitchen', 'Eat-in party kitchen, island and table', 'living', 48, 64, 48, 24),
-  { ...r('great', 'Great room, two story', 'living', 96, 64, 48, 24), twoStory: true },
-  r('east-hall', 'Hall to primary suite', 'circulation', 144, 64, 6, 24),
-  r('library', 'Library', 'living', 150, 64, 40, 24),
-  // Gallery and north band: entry, service, vertical circulation.
-  r('m-hall', 'Gallery', 'circulation', 0, 88, 190, 6),
-  r('laundry', 'Laundry', 'service', 0, 94, 20, 14),
-  r('pantry', 'Pantry', 'service', 20, 94, 28, 14),
-  r('scullery', 'Scullery, full second kitchen', 'service', 48, 94, 24, 14),
-  r('foyer', 'Formal foyer, north door', 'circulation', 72, 94, 24, 14),
-  r('powder', 'Powder', 'bath', 96, 94, 10, 14),
-  r('m-elevator', 'Elevator', 'service', 106, 94, 8, 14),
-  r('m-stair', 'Stairs', 'circulation', 114, 94, 16, 14),
-  r('office', 'Home office', 'living', 130, 94, 24, 14),
-  r('lounge', 'Bar and lounge', 'living', 154, 94, 36, 14),
-  // West wing: family room by the kitchen side, then a guest or in-law suite with its own sitting room.
-  r('family', 'Family room', 'living', 0, 40, 46, 24),
-  r('guest-sitting', 'Guest suite sitting room', 'living', 0, 24, 24, 16),
-  r('guest-kitchenette', 'Guest kitchenette', 'service', 24, 24, 22, 16),
-  r('guest-bed', 'Guest or in-law bedroom', 'bedroom', 0, 0, 24, 24, 'guest-bath'),
-  r('guest-bath', 'Guest bath', 'bath', 24, 0, 22, 12),
-  r('guest-closet', 'Guest closet', 'service', 24, 12, 22, 12),
-  // West garage, side entry, off the mudroom.
-  r('garage', '3-car garage, side entry', 'garage', -38, 64, 38, 26),
-  // East wing: primary suite, with the bedroom and sitting area on the courtyard and a private deck to the south.
-  r('primary', 'Primary bedroom, fireplace', 'bedroom', 144, 0, 28, 24, 'bath-his'),
-  r('primary-sitting', 'Primary sitting area, fireplace', 'living', 172, 0, 18, 24),
-  r('primary-hall', 'Primary hall', 'circulation', 144, 24, 6, 40),
-  r('bath-his', 'His bath', 'bath', 150, 24, 12, 14),
-  r('vanity', 'Vanity and makeup', 'service', 162, 24, 10, 14),
-  r('bath-hers', 'Her bath', 'bath', 172, 24, 18, 14),
-  r('closet-his', 'His closet', 'service', 150, 38, 12, 26),
-  r('closet-hers', 'Her closet', 'service', 162, 38, 28, 26),
-  // Outdoor rooms: no walls.
-  r('terrace', 'Covered terrace, steps to pool', 'outdoor', 46, 52, 98, 12),
-  r('primary-deck', 'Primary private deck', 'outdoor', 144, -16, 46, 16),
+  // West: pantry and scullery behind the kitchen, the family entry through the mudroom from the garage.
+  r('pantry', 'Pantry and cold storage', 'service', 0, 16, 20, 24),
+  r('scullery', 'Scullery, full second kitchen', 'service', 20, 16, 16, 24),
+  r('mudroom', 'Mudroom, lockers, bench, and dog wash', 'service', 0, 40, 22, 14),
+  r('back-hall', 'Back hall', 'circulation', 22, 40, 14, 6),
+  r('laundry', 'Laundry', 'service', 22, 46, 14, 8),
+  r('garage', '3-car garage, side entry', 'garage', 0, 54, 36, 30),
+  // The open core.
+  r('kitchen', 'Eat-in party kitchen, island and table', 'living', 36, 16, 30, 30),
+  r('dining', 'Formal dining', 'living', 36, 46, 30, 16),
+  r('office', 'Library and home office', 'living', 36, 62, 16, 22),
+  r('m-stair', 'Stairs', 'circulation', 52, 62, 14, 14),
+  r('m-elevator', 'Elevator', 'service', 52, 76, 8, 8),
+  r('coat', 'Coat closet', 'service', 60, 76, 6, 8),
+  { ...r('great', 'Great room, two story, fireplace', 'living', 66, 16, 44, 46), twoStory: true },
+  r('foyer', 'Formal foyer, north door', 'circulation', 66, 62, 20, 22),
+  r('powder', 'Powder', 'bath', 86, 62, 8, 22),
+  r('den', 'Den with a window seat', 'living', 94, 62, 16, 22),
+  r('hearth', 'Hearth room, fireplace and window seat', 'living', 110, 16, 14, 22),
+  r('lounge', 'Bar and lounge', 'living', 110, 38, 14, 24),
+  r('guest-hall', 'Guest entry', 'circulation', 110, 62, 14, 22),
+  // East: the primary suite to the south, the guest suite to the north.
+  r('primary', 'Primary bedroom, fireplace', 'bedroom', 124, 16, 26, 24, 'bath-his'),
+  r('primary-sitting', 'Primary sitting area, fireplace', 'living', 150, 16, 20, 24),
+  r('primary-hall', 'Primary entry', 'circulation', 124, 40, 10, 22),
+  r('bath-hers', 'Her bath', 'bath', 134, 40, 18, 12),
+  r('vanity', 'Vanity and makeup', 'service', 152, 40, 8, 12),
+  r('closet-hers', 'Her closet', 'service', 160, 40, 10, 16),
+  r('bath-his', 'His bath', 'bath', 134, 52, 14, 10),
+  r('closet-his', 'His closet', 'service', 148, 52, 12, 10),
+  r('linen', 'Linen', 'service', 160, 56, 10, 6),
+  r('guest-sitting', 'Guest suite sitting room', 'living', 124, 62, 18, 22),
+  r('guest-bed', 'Guest or in-law bedroom', 'bedroom', 142, 62, 18, 22, 'guest-bath'),
+  r('guest-bath', 'Guest bath', 'bath', 160, 62, 10, 22),
+  // Outdoor rooms all along the south.
+  r('terrace', 'Kitchen terrace and outdoor kitchen', 'outdoor', 0, 0, 66, 16),
+  r('great-porch', 'Covered porch off the great room', 'outdoor', 66, 0, 44, 16),
+  r('hearth-terrace', 'Hearth terrace and fire pit', 'outdoor', 110, 0, 14, 16),
+  r('primary-deck', 'Primary private deck', 'outdoor', 124, 0, 46, 16),
 ]
 
 const upper: Room[] = [
-  // South band: four kids' rooms, each with its own bath. Open to the great room below between x 96 and 144.
-  ...[0, 24, 48, 72].flatMap((x, i) => [
-    r(`kid-${i + 1}`, `Kid bedroom ${i + 1}`, 'bedroom', x, 64, 16, 24, `kid-${i + 1}-bath`),
-    r(`kid-${i + 1}-bath`, `Bath ${i + 1}`, 'bath', x + 16, 64, 8, 24),
+  // South row: four kids' rooms, each with its own bath, on the view side.
+  ...[0, 16.5, 33, 49.5].flatMap((x, i) => [
+    r(`kid-${i + 1}`, `Kid bedroom ${i + 1}`, 'bedroom', x, 16, 11, 17, `kid-${i + 1}-bath`),
+    r(`kid-${i + 1}-bath`, `Bath ${i + 1}`, 'bath', x + 11, 16, 5.5, 17),
   ]),
-  r('kids-living', 'Kids living area', 'living', 144, 64, 46, 24),
-  r('u-hall', 'Hall', 'circulation', 0, 88, 190, 6),
-  // North band: three more kids' rooms, homework, laundry, the extra bedroom, playroom.
-  ...[[0, 14, 6], [20, 14, 14], [48, 14, 10]].flatMap(([x, w, bw], i) => [
-    r(`kid-${i + 5}`, `Kid bedroom ${i + 5}`, 'bedroom', x, 94, w, 14, `kid-${i + 5}-bath`),
-    r(`kid-${i + 5}-bath`, `Bath ${i + 5}`, 'bath', x + w, 94, bw, 14),
-  ]),
-  r('homework', 'Homework room', 'living', 72, 94, 24, 14),
-  r('kids-laundry', 'Kids laundry', 'service', 96, 94, 10, 14),
-  r('u-elevator', 'Elevator', 'service', 106, 94, 8, 14),
-  r('u-stair', 'Stairs', 'circulation', 114, 94, 16, 14),
-  r('extra-bed', 'Extra bedroom', 'bedroom', 130, 94, 20, 14, 'extra-bath'),
-  r('extra-bath', 'Extra bedroom bath', 'bath', 150, 94, 8, 14),
-  r('playroom', 'Playroom', 'living', 158, 94, 32, 14),
+  r('kids-gallery', 'Kids gallery, built-in desks and window seats', 'circulation', 0, 33, 66, 8),
+  r('kids-living', 'Kids living area', 'living', 16.5, 41, 35.5, 23),
+  r('homework', 'Homework and art room', 'living', 52, 41, 14, 21),
+  // West: two more kids' rooms facing west.
+  r('kid-5', 'Kid bedroom 5', 'bedroom', 0, 41, 16.5, 11, 'kid-5-bath'),
+  r('kid-5-bath', 'Bath 5', 'bath', 0, 52, 16.5, 5.5),
+  r('kid-6', 'Kid bedroom 6', 'bedroom', 0, 57.5, 16.5, 12.5, 'kid-6-bath'),
+  r('kid-6-bath', 'Bath 6 and closet', 'bath', 0, 70, 16.5, 14),
+  // North: the seventh kid's room and the extra bedroom, then the stair.
+  r('kid-7', 'Kid bedroom 7', 'bedroom', 16.5, 64, 12, 20, 'kid-7-bath'),
+  r('kid-7-bath', 'Bath 7', 'bath', 28.5, 64, 5.5, 20),
+  r('extra-bed', 'Extra bedroom', 'bedroom', 34, 64, 12, 20, 'extra-bath'),
+  r('extra-bath', 'Extra bedroom bath', 'bath', 46, 64, 6, 20),
+  r('u-stair', 'Stairs', 'circulation', 52, 62, 14, 14),
+  r('u-elevator', 'Elevator', 'service', 52, 76, 8, 8),
+  r('u-storage', 'Kids storage', 'service', 60, 76, 6, 8),
 ]
 
 /** The brief as checkable requirements. Sizes are working targets, to wall centerlines. */
@@ -129,7 +131,7 @@ const program: ProgramItem[] = [
   { roomId: 'dining', need: 'Formal dining', levelId: 'main', minArea: 400, near: ['kitchen'] },
   { roomId: 'foyer', need: 'Formal front door on the north', levelId: 'main', minArea: 250 },
   { roomId: 'mudroom', need: 'Family mudroom with lockers and dog wash, next to the garage', levelId: 'main', minArea: 300, near: ['garage'] },
-  { roomId: 'garage', need: '3-car side garage', levelId: 'main', minArea: 900, minWidth: 24 },
+  { roomId: 'garage', need: '3-car garage', levelId: 'main', minArea: 900, minWidth: 24 },
   { roomId: 'office', need: 'Home office', minArea: 250 },
   { roomId: 'primary', need: 'Primary bedroom on the main floor, with fireplace', levelId: 'main', minArea: 400, minWidth: 16 },
   { roomId: 'primary-sitting', need: 'Sitting area connected to the primary bedroom', levelId: 'main', minArea: 250, near: ['primary'] },
@@ -160,25 +162,25 @@ const program: ProgramItem[] = [
 ]
 
 /**
- * Roofs: simple gables at 8:12 with 2 ft overhangs, which shed snow and suit the mountain-minimalist, European look.
- * The north bar's ridge runs east-west over the kids floor and the two-story great room. Each wing and the garage
- * get a gable whose ridge runs along the block and dies into the taller bar.
+ * Roofs: simple gables at 8:12 with 2 ft overhangs. The kids' block and the great room carry the tall roofs; the
+ * entry, the hearth room, and the primary wing are one story under lower gables.
  */
 const gable = (id: string, name: string, levelId: string, x: number, y: number, w: number, d: number, ridge: 'ew' | 'ns'): Roof =>
   ({ id, name, levelId, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, form: 'gable', pitch: 8, ridge, low: 's', overhang: ft(2) })
 const roofs: Roof[] = [
-  gable('roof-bar', 'North bar roof', 'upper', 0, 64, 190, 44, 'ew'),
-  gable('roof-west', 'West wing roof', 'main', 0, 0, 46, 64, 'ns'),
-  gable('roof-east', 'East wing roof', 'main', 144, 0, 46, 64, 'ns'),
-  gable('roof-garage', 'Garage roof', 'main', -38, 64, 38, 26, 'ew'),
+  gable('roof-kids', 'Kids wing roof', 'upper', 0, 16, 66, 68, 'ns'),
+  gable('roof-great', 'Great room roof', 'upper', 66, 16, 44, 46, 'ns'),
+  gable('roof-entry', 'Entry roof', 'main', 66, 62, 58, 22, 'ew'),
+  gable('roof-hearth', 'Hearth room roof', 'main', 110, 16, 14, 46, 'ns'),
+  gable('roof-primary', 'Primary and guest wing roof', 'main', 124, 16, 46, 68, 'ns'),
 ]
 
-/** First real layout of the main house, from the brief. A starting point to react to, not a finished design. */
-export const mainHouse: HouseModel = withHouseDefaults({
+/** Second layout of the main house, about 24,500 sq ft. A starting point to react to. */
+const firstPass: HouseModel = withHouseDefaults({
   buildingId: 'main-house',
-  // The owner chose to keep the walkout facing the south courtyard and excavate for it.
+  // The owner chose to keep the walkout facing south and excavate for it.
   excavated: true,
-  origin: p(1060, 5360),
+  origin: p(1060, 5395),
   concept: true,
   program,
   roofs,
@@ -188,3 +190,30 @@ export const mainHouse: HouseModel = withHouseDefaults({
     { id: 'upper', name: 'Kids floor', elevation: ft(11), floorHeight: ft(10), rooms: upper },
   ],
 })
+
+/**
+ * The rule-based first pass connects every room, but an open house wants wide cased openings around the great room,
+ * and the primary bath and closet reached from the primary suite rather than the guest room behind them.
+ */
+const opening = (id: string, roomId: string, side: Opening['side'], offsetFt: number, widthFt: number): Opening =>
+  ({ id, kind: 'opening', roomId, side, offset: ft(offsetFt), width: ft(widthFt), height: ft(8), sill: 0 })
+const door = (id: string, roomId: string, side: Opening['side'], offsetFt: number, width: number): Opening =>
+  ({ id, kind: 'door', roomId, side, offset: ft(offsetFt), width, height: 80, sill: 0, swing: 'in' })
+const REPLACED = new Set(['bath-his-door-1', 'closet-his-door-1', 'den-door-3', 'great-door-1', 'hearth-door-1', 'lounge-door-2'])
+
+export const mainHouse: HouseModel = {
+  ...firstPass,
+  openings: [
+    ...firstPass.openings.filter(o => !REPLACED.has(o.id)),
+    opening('kitchen-great', 'kitchen', 'e', 15, 16),
+    opening('kitchen-dining', 'kitchen', 'n', 15, 12),
+    opening('dining-great', 'dining', 'e', 8, 8),
+    opening('great-foyer', 'great', 'n', 10, 10),
+    opening('great-den', 'great', 'n', 36, 8),
+    opening('great-hearth', 'great', 'e', 11, 10),
+    opening('great-lounge', 'great', 'e', 34, 10),
+    door('bath-his-door', 'bath-his', 'w', 5, 32),
+    door('closet-his-door', 'closet-his', 'w', 5, 30),
+    door('guest-bed-door', 'guest-bed', 'w', 6, 36),
+  ],
+}

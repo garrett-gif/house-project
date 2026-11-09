@@ -14,15 +14,14 @@ const texts = (marks: Mark[]) => marks.flatMap(m => m.t === 'text' ? [m.text] : 
 
 describe('building sections', () => {
   it('cut north-south and east-west through the two-story great room, clear of wall lines', () => {
-    // The middle of the great room falls on a walkout wall line, so each cut moves 2 ft to pass through rooms instead.
-    expect(sectionCuts(sampleEstate.house)).toEqual([{ id: 'A', axis: 'x', at: ft(122) }, { id: 'B', axis: 'y', at: ft(78) }])
+    expect(sectionCuts(sampleEstate.house)).toEqual([{ id: 'A', axis: 'x', at: ft(88) }, { id: 'B', axis: 'y', at: ft(36) }])
   })
 
   it('show cut walls, floors, the roof profile, and room names', () => {
-    const a = sectionMarks(sampleEstate, sectionCuts(sampleEstate.house)[0], 0, 0)
+    const a = sectionMarks(sampleEstate, sectionCuts(sampleEstate.house)[1], 0, 0)
     const t = texts(a.marks)
-    expect(t).toEqual(expect.arrayContaining(['GREAT ROOM', 'STEAM ROOM', 'SAUNA', `MAIN FLOOR 0'-0"`]))
-    // The bar roof crosses the cut twice, once per slope.
+    expect(t).toEqual(expect.arrayContaining(['GREAT ROOM', 'INDOOR POOL', 'EAT-IN PARTY KITCHEN', 'KIDS GALLERY', `MAIN FLOOR 0'-0"`]))
+    // The east-west cut crosses the gable roofs, each slope a heavy line.
     expect(a.marks.filter(m => m.t === 'line' && m.w === 3).length).toBeGreaterThanOrEqual(2)
     expect(a.marks.filter(m => m.t === 'path' && m.fill === '#000').length).toBeGreaterThan(3)
   })
@@ -66,13 +65,13 @@ describe('DXF floor plans', () => {
   it('is in inches, at true size', () => {
     const lines = parsed.entities.filter(e => e.type === 'LINE' && e.layer === 'A-WALL-MAIN') as unknown as { vertices: { x: number }[] }[]
     const xs = lines.flatMap(l => l.vertices.map(v => v.x))
-    // The main floor sits second from the left; its walls span 228 ft plus wall thickness.
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(ft(228))
-    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(ft(229))
+    // The main floor's walls span 170 ft plus wall thickness.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(ft(170))
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(ft(171))
   })
 
   it('follows edits', () => {
-    const r = applyOperations(sampleEstate, [{ op: 'renameRoom', roomId: 'library', name: 'Reading room' }])
+    const r = applyOperations(sampleEstate, [{ op: 'renameRoom', roomId: 'office', name: 'Reading room' }])
     if (!r.ok) throw new Error(r.error)
     expect(floorPlansDxf(r.estate)).toContain('READING ROOM')
   })
