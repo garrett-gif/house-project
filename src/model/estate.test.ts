@@ -8,8 +8,7 @@ describe('approved layout version 3', () => {
   const checks = validateEstate(sampleEstate)
 
   // Some inside walls need beams over the big walkout rooms, so that warns.
-  // Wildfire advisories flag real gaps in the schematic site layout: buildings at the forest edge and no fire lanes yet.
-  const EXPECTED_WARNINGS = new Set(['stack-interior', 'defensible-space', 'hose-pull'])
+  const EXPECTED_WARNINGS = new Set(['stack-interior'])
   it.each(checks.map(c => [c.label, c] as const))('%s', (_label, c) => {
     expect(c.status, c.detail).toBe(EXPECTED_WARNINGS.has(c.id) ? 'warn' : 'pass')
   })
