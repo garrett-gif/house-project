@@ -23,6 +23,16 @@ export interface Building {
   parts?: Rect[]
   /** Footprint on every level, including rooms below grade. Collisions use this. Absent means the same as `parts`. */
   footprint?: Rect[]
+  /** People sleeping here at peak. Absent means none, except the main house, which counts two per bedroom. */
+  beds?: number
+  /** Daytime staff, students, or visitors at peak who do not sleep here. */
+  staff?: number
+  /** Keeps power in an outage: on a generator. */
+  backupPower?: boolean
+  /** Stores fuel, so wells keep their distance. */
+  fuelStorage?: boolean
+  /** Peak electrical demand in kW when the estimate from floor area does not fit, as for RV hookups or helipads. */
+  loadKw?: number
 }
 
 export interface Zone {
@@ -35,6 +45,8 @@ export interface Zone {
   cleared: boolean
   /** Paved or graveled yard, parking, or apron that a fire engine can drive onto. */
   hardstand?: boolean
+  /** Parking lot. Spaces are counted from its area. */
+  parking?: boolean
   round?: boolean
 }
 
@@ -72,12 +84,64 @@ export interface FireRules {
   maxWaterDistanceFt: number
   minWaterGallons: number
 }
+export type UtilityKind = 'well' | 'storage' | 'septic' | 'service' | 'solar' | 'generator' | 'propane'
+
+/**
+ * A utility on the site: what it occupies (`rect`, site inches, cleared ground) and the buildings it serves.
+ * `capacity` is in the unit of its kind: well gallons per minute, storage gallons, septic gallons per day of design
+ * flow (`rect` is the drainfield, primary and reserve), service, solar, and generator kW, propane tank gallons.
+ */
+export interface Utility { id: string; name: string; kind: UtilityKind; rect: Rect; capacity: number; serves: string[] }
+
+/**
+ * A camera or light. `range` is how far a camera sees or a light reaches. Cameras look toward `facing` (degrees,
+ * 0 east, 90 north) across a `fov` degree view. `on` is a building the device is mounted on; it moves with it.
+ * `power` says what keeps it on: grid only, the backup generator, or its own solar panel and battery.
+ */
+export interface SecurityDevice {
+  id: string
+  name: string
+  kind: 'camera' | 'light'
+  at: Pt
+  range: Inches
+  facing?: number
+  fov?: number
+  on?: string
+  power: 'grid' | 'backup' | 'solar'
+}
+
+/** Owner-replaceable planning values for utilities and security. See DEFAULT_UTILITY_RULES. */
+export interface UtilityRules {
+  waterGpdPerBed: number
+  waterGpdPerStaff: number
+  sewageGpdPerBed: number
+  sewageGpdPerStaff: number
+  drainfieldGpdPerSqFt: number
+  drainfieldReserve: number
+  wellPumpHours: number
+  storageDays: number
+  backupShare: number
+  wellToSepticFt: number
+  wellToFuelFt: number
+  septicToBuildingFt: number
+  septicToWaterFt: number
+  solarShadeFt: number
+  maxTrenchFt: number
+  sqFtPerParkingSpace: number
+  cameraForestFt: number
+  approachFt: number
+  backupFeedFt: number
+}
+
 /** `from` and `to` are building ids. Moving one of those buildings moves that end of the walkway with it. */
 export interface Walkway { id: string; name: string; points: Pt[]; from?: string; to?: string }
 
 export type RoomType = 'bedroom' | 'bath' | 'living' | 'service' | 'circulation' | 'wellness' | 'garage' | 'pool' | 'outdoor'
-/** `twoStory` rooms are open to the floor above, so their walls rise through it to the roof. */
-export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean }
+/**
+ * `twoStory` rooms are open to the floor above, so their walls rise through it to the roof. `safeRoom` marks a room
+ * built to shelter in.
+ */
+export interface Room { id: string; name: string; type: RoomType; rect: Rect; bathId?: string; twoStory?: boolean; safeRoom?: boolean }
 /** A side of a rectangle: north, south, east, or west. */
 export type Side = 'n' | 's' | 'e' | 'w'
 
@@ -176,6 +240,12 @@ export interface Estate {
   waterSources?: WaterSource[]
   /** Owner's planning values for wildfire checks. Absent means the defaults. */
   fireRules?: FireRules
+  /** Wells, septic, power, solar, generators, propane. Optional so older saves still load. */
+  utilities?: Utility[]
+  /** Cameras and lights. */
+  security?: SecurityDevice[]
+  /** Owner's planning values for utility and security checks; missing values use the defaults. */
+  utilityRules?: Partial<UtilityRules>
 }
 
 export type CheckStatus = 'pass' | 'warn' | 'fail'

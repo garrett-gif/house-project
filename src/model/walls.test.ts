@@ -258,7 +258,7 @@ describe('every chat tool', () => {
       const props = (tool.input_schema as { properties: Record<string, { type: string | string[]; enum?: unknown[] }> }).properties
       const input = Object.fromEntries(Object.entries(props).map(([key, p]) => {
         const type = Array.isArray(p.type) ? p.type[0] : p.type
-        return [key, p.enum ? p.enum[0] : type === 'number' ? 1 : type === 'string' ? 'x' : type === 'array' ? [1, 1, 2, 2] : type === 'boolean' ? true : null]
+        return [key, p.enum ? p.enum[0] : type === 'number' ? 1 : type === 'string' ? 'x' : type === 'array' ? ((p as { items?: { type: string } }).items?.type === 'string' ? ['main-house'] : [1, 1, 2, 2]) : type === 'boolean' ? true : null]
       }))
       expect(toEditOp(tool.name, input), tool.name).toMatchObject({ ok: true })
     }

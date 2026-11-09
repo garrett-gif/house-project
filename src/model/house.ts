@@ -46,7 +46,9 @@ const walkout: Room[] = [
   r('w-elevator', 'Elevator', 'service', 106, 94, 8, 14),
   r('w-stair', 'Stairs', 'circulation', 114, 94, 16, 14),
   r('wine-cellar', 'Wine cellar', 'service', 130, 94, 24, 14),
-  r('w-storage-2', 'Storage', 'service', 154, 94, 36, 14),
+  r('w-storage-2', 'Storage', 'service', 154, 94, 20, 14),
+  // Safe room in the buried northeast corner: two concrete foundation walls, no windows, one door from the gallery.
+  { ...r('safe-room', 'Safe room', 'service', 174, 94, 16, 14), safeRoom: true },
   // West wing: theater with its lobby and candy wall, and the woodshop opening to the courtyard.
   r('woodshop', 'Dust-controlled woodshop', 'service', 0, 0, 46, 24),
   r('theater', '20-seat theater', 'living', 0, 24, 24, 40),

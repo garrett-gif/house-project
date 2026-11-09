@@ -1,6 +1,7 @@
 import type { EditOp } from './edits'
 import { ANCHORS, DOOR_KINDS, FIRE_RULE_NAMES, ROAD_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
 import { ROOF_FORMS } from './roofs'
+import { UTILITY_KINDS, UTILITY_RULE_NAMES } from './utilities'
 
 /**
  * Tool definitions for the chat editor. Claude works in feet, which it handles more reliably;
@@ -14,6 +15,8 @@ const anchor = { type: 'string', enum: ANCHORS, description: 'Point that stays f
 const side = { type: 'string', enum: SIDES, description: 'Side of the room: n, s, e, or w.' }
 const offset = num('Distance in feet from the start of that side (its west end for n and s sides, its south end for e and w sides) to the center of the opening.')
 const bool = (description: string) => ({ type: 'boolean', description })
+const ids = (description: string) => ({ type: 'array', items: { type: 'string' }, description })
+const CAPACITY = 'Capacity in the unit of its kind: well gpm, storage gallons, septic gallons a day of design flow, service, solar, and generator kW, propane tank gallons.'
 const object = (properties: Record<string, unknown>) =>
   ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false })
 
@@ -170,6 +173,47 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     description: 'Replace one of the wildfire planning values with the owner\'s own standard. Zone distances, widths, and distances are in feet; gallons are gallons.',
     input_schema: object({ rule: { type: 'string', enum: [...FIRE_RULE_NAMES], description: 'Which rule.' }, value: num('New value.') }),
   },
+  {
+    name: 'addUtility',
+    description: 'Add a utility on the site: a well, water storage tank, septic system (the rectangle is its drainfield, primary and reserve), grid power service, solar array, generator, or propane tank. The rectangle is in site feet and becomes cleared ground.',
+    input_schema: object({
+      id: str('New unique id: lowercase letters, numbers, and hyphens.'), name: str('Name.'),
+      kind: { type: 'string', enum: UTILITY_KINDS, description: 'What it is.' },
+      xFt: num('Site x of the southwest corner in feet.'), yFt: num('Site y of the southwest corner in feet.'),
+      widthFt: num('East-west width in feet.'), depthFt: num('North-south depth in feet.'),
+      capacity: num(CAPACITY), serves: ids('Ids of the buildings it serves. Empty for solar that feeds the grid service.'),
+    }),
+  },
+  { name: 'moveUtility', description: 'Move a utility by an offset in feet.', input_schema: object({ utilityId: str('Utility id from the model summary.'), eastFt: num('Feet east. Negative is west.'), northFt: num('Feet north. Negative is south.') }) },
+  { name: 'resizeUtility', description: 'Resize a utility\'s rectangle, such as a drainfield or solar array.', input_schema: object({ utilityId: str('Utility id from the model summary.'), widthFt: num('East-west width in feet.'), depthFt: num('North-south depth in feet.'), anchor }) },
+  { name: 'setUtility', description: 'Change a utility\'s capacity and the buildings it serves.', input_schema: object({ utilityId: str('Utility id from the model summary.'), capacity: num(CAPACITY), serves: ids('Ids of the buildings it serves.') }) },
+  { name: 'removeUtility', description: 'Remove a utility.', input_schema: object({ utilityId: str('Utility id from the model summary.') }) },
+  {
+    name: 'addDevice',
+    description: 'Add a security camera or a light at a site point in feet. Cameras look toward facingDeg (0 east, 90 north) across fovDeg; lights ignore both.',
+    input_schema: object({
+      id: str('New unique id: lowercase letters, numbers, and hyphens.'), name: str('Name.'),
+      kind: { type: 'string', enum: ['camera', 'light'], description: 'camera or light.' },
+      xFt: num('Site x in feet.'), yFt: num('Site y in feet.'), rangeFt: num('How far the camera sees or the light reaches, in feet.'),
+      facingDeg: num('Camera direction in degrees: 0 east, 90 north, 180 west, 270 south.'), fovDeg: num('Camera field of view in degrees.'),
+      power: { type: 'string', enum: ['grid', 'backup', 'solar'], description: 'What keeps it on: grid only, the backup generator, or its own solar panel and battery.' },
+      onBuilding: { type: ['string', 'null'], description: 'Id of the building it is mounted on, which it then moves with, or null.' },
+    }),
+  },
+  { name: 'moveDevice', description: 'Move a camera or light by an offset in feet.', input_schema: object({ deviceId: str('Device id from the model summary.'), eastFt: num('Feet east. Negative is west.'), northFt: num('Feet north. Negative is south.') }) },
+  { name: 'aimCamera', description: 'Point a camera, and set its view and range.', input_schema: object({ deviceId: str('Camera id from the model summary.'), facingDeg: num('Direction in degrees: 0 east, 90 north, 180 west, 270 south.'), fovDeg: num('Field of view in degrees.'), rangeFt: num('Range in feet.') }) },
+  { name: 'removeDevice', description: 'Remove a camera or light.', input_schema: object({ deviceId: str('Device id from the model summary.') }) },
+  {
+    name: 'setOccupancy',
+    description: 'Set how many people sleep in a building and how many more are there by day at peak, and whether it must keep power in an outage. These drive water, septic, power, and parking demand.',
+    input_schema: object({ buildingId: str('Building id from the model summary.'), beds: num('People sleeping there at peak.'), staff: num('Daytime staff, students, or visitors who do not sleep there.'), backupPower: bool('True if it must be on a generator.') }),
+  },
+  {
+    name: 'setUtilityRule',
+    description: 'Replace one of the utility or security planning values with the owner\'s or county\'s standard. Distances in feet, flows in gallons a day, backupShare as a fraction.',
+    input_schema: object({ rule: { type: 'string', enum: UTILITY_RULE_NAMES, description: 'Which rule.' }, value: num('New value.') }),
+  },
+  { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
 
 /** Feet to inches, rounded to 1/8 inch so repeated edits do not collect float noise. */
@@ -187,9 +231,10 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
   for (const [key, prop] of Object.entries(schema.properties)) {
     const types = Array.isArray(prop.type) ? prop.type : [prop.type]
     const value = v[key]
+    const item = (prop as { items?: { type: string } }).items?.type ?? 'number'
     const ok = types.some(t => t === 'null' ? value === null
       : t === 'number' ? typeof value === 'number' && Number.isFinite(value)
-      : t === 'array' ? Array.isArray(value) && value.every(v => typeof v === 'number' && Number.isFinite(v))
+      : t === 'array' ? Array.isArray(value) && value.every(v => item === 'string' ? typeof v === 'string' : typeof v === 'number' && Number.isFinite(v))
       : typeof value === t)
     if (!ok) return { ok: false, error: `Field "${key}" must be ${types.join(' or ')}.` }
   }
@@ -249,6 +294,21 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeWaterSource': return { ok: true, op: { op: 'removeWaterSource', sourceId: s('sourceId') } }
     case 'setIgnition': return { ok: true, op: { op: 'setIgnition', buildingId: s('buildingId'), ignition: { roofClass: s('roofClass') as never, emberVents: v.emberVents as boolean, enclosedEaves: v.enclosedEaves as boolean, decks: s('decks') as never } } }
     case 'setFireRule': return { ok: true, op: { op: 'setFireRule', rule: s('rule') as never, value: n('value') } }
+    case 'addUtility': return { ok: true, op: { op: 'addUtility', utility: { id: s('id'), name: s('name'), kind: s('kind') as never, rect: { x: inches(n('xFt')), y: inches(n('yFt')), w: inches(n('widthFt')), d: inches(n('depthFt')) }, capacity: n('capacity'), serves: v.serves as string[] } } }
+    case 'moveUtility': return { ok: true, op: { op: 'moveUtility', utilityId: s('utilityId'), dx: inches(n('eastFt')), dy: inches(n('northFt')) } }
+    case 'resizeUtility': return { ok: true, op: { op: 'resizeUtility', utilityId: s('utilityId'), w: inches(n('widthFt')), d: inches(n('depthFt')), anchor: s('anchor') as never } }
+    case 'setUtility': return { ok: true, op: { op: 'setUtility', utilityId: s('utilityId'), capacity: n('capacity'), serves: v.serves as string[] } }
+    case 'removeUtility': return { ok: true, op: { op: 'removeUtility', utilityId: s('utilityId') } }
+    case 'addDevice': return { ok: true, op: { op: 'addDevice', device: {
+      id: s('id'), name: s('name'), kind: s('kind') as never, at: { x: inches(n('xFt')), y: inches(n('yFt')) }, range: inches(n('rangeFt')),
+      ...(v.kind === 'camera' ? { facing: n('facingDeg'), fov: n('fovDeg') } : {}), power: s('power') as never, ...(v.onBuilding ? { on: s('onBuilding') } : {}),
+    } } }
+    case 'moveDevice': return { ok: true, op: { op: 'moveDevice', deviceId: s('deviceId'), dx: inches(n('eastFt')), dy: inches(n('northFt')) } }
+    case 'aimCamera': return { ok: true, op: { op: 'aimCamera', deviceId: s('deviceId'), facing: n('facingDeg'), fov: n('fovDeg'), range: inches(n('rangeFt')) } }
+    case 'removeDevice': return { ok: true, op: { op: 'removeDevice', deviceId: s('deviceId') } }
+    case 'setOccupancy': return { ok: true, op: { op: 'setOccupancy', buildingId: s('buildingId'), beds: n('beds'), staff: n('staff'), backupPower: v.backupPower as boolean } }
+    case 'setUtilityRule': return { ok: true, op: { op: 'setUtilityRule', rule: s('rule') as never, value: n('value') } }
+    case 'setSafeRoom': return { ok: true, op: { op: 'setSafeRoom', roomId: s('roomId'), safeRoom: v.safeRoom as boolean } }
     case 'setRoof': return { ok: true, op: { op: 'setRoof', roofId: s('roofId'), form: s('form') as never, pitch: n('pitch'), ridge: s('ridge') as never, low: s('low') as never, overhang: inches(n('overhangFt')) } }
   }
 }

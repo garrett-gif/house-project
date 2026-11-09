@@ -1,8 +1,10 @@
-import type { Building, Check, CheckStatus, Estate } from './types'
+import type { Building, Check, CheckStatus, Estate, Rect } from './types'
 import { wallChecks } from './wallChecks'
 import { programChecks } from './programChecks'
 import { roofChecks } from './roofChecks'
 import { fireChecks } from './fireChecks'
+import { utilityChecks } from './utilityChecks'
+import { securityChecks } from './securityChecks'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
@@ -20,7 +22,10 @@ export function forestAcres(e: Estate) {
   const cleared = e.zones.filter(z => z.cleared)
   const outer = cleared.filter(z => !cleared.some(o => o !== z && area(o.rect) > area(z.rect) &&
     z.rect.x >= o.rect.x && z.rect.y >= o.rect.y && z.rect.x + z.rect.w <= o.rect.x + o.rect.w && z.rect.y + z.rect.d <= o.rect.y + o.rect.d))
-  const clearedArea = outer.reduce((sum, z) => sum + area(z.rect), 0)
+  // Utilities clear their own ground where they sit outside a cleared zone.
+  const overlap = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.d, b.y + b.d) - Math.max(a.y, b.y))
+  const utilityArea = (e.utilities ?? []).reduce((sum, u) => sum + Math.max(0, area(u.rect) - outer.reduce((s, z) => s + overlap(u.rect, z.rect), 0)), 0)
+  const clearedArea = outer.reduce((sum, z) => sum + area(z.rect), 0) + utilityArea
   return (e.parcel.size ** 2 - clearedArea) / SQ_IN_PER_ACRE
 }
 
@@ -68,7 +73,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(check('perimeter', 'Full perimeter road', !!perimeter, perimeter ? `${(toFt(pathLength(perimeter.points)) / 5280).toFixed(1)} miles` : 'Missing'))
 
   const forest = forestAcres(e)
-  checks.push(check('forest', 'At least 700 acres stay working forest', forest >= 700, `${n(forest)} acres uncleared`, 'warn'))
+  checks.push(check('forest', 'At least 700 acres stay working forest', forest >= 700, `${forest.toFixed(1)} acres uncleared`, 'warn'))
 
   const runwayLength = Math.max(e.runway.rect.w, e.runway.rect.d)
   checks.push(check('runway', 'Airstrip meets the 3,500 ft planning length', runwayLength >= PLANNED_RUNWAY, `${n(toFt(runwayLength))} ft, not checked against aircraft or FAA guidance`))
@@ -120,6 +125,8 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(...programChecks(e))
   checks.push(...roofChecks(e))
   checks.push(...fireChecks(e))
+  checks.push(...utilityChecks(e))
+  checks.push(...securityChecks(e))
   return checks
 }
 

@@ -1,5 +1,5 @@
-import type { Access, Building, BuildingUse, Estate, Ignition, Pt, Road, WaterSource, Zone, ZoneKind } from './types'
-import { bezier, box, ft, p } from './geometry'
+import type { Access, Building, BuildingUse, Estate, Ignition, Pt, Road, SecurityDevice, Utility, UtilityKind, WaterSource, Zone, ZoneKind } from './types'
+import { bezier, box, ft, p, samplePath } from './geometry'
 import { mainHouse } from './house'
 import { withDerivedGeometry } from './derive'
 
@@ -47,6 +47,94 @@ const roads: Road[] = [
   { id: 'perimeter', name: 'Perimeter road', kind: 'perimeter', points: line([inset, inset], [SIZE - inset, inset], [SIZE - inset, SIZE - inset], [inset, SIZE - inset], [inset, inset]) },
 ]
 
+/**
+ * Who is on site at peak, from the brief: about 150 people sleeping in the lodges, cabins, and RV sites, and about
+ * 300 working or visiting by day. Buildings that must keep power in an outage are on generators.
+ */
+const PEOPLE: Record<string, Partial<Building>> = {
+  'main-house': { staff: 10, backupPower: true },
+  'guest-house': { beds: 4, backupPower: true },
+  ...Object.fromEntries([1, 2, 3, 4, 5].map(i => [`lodge-${i}`, { beds: 22, backupPower: true }])),
+  commons: { staff: 20, backupPower: true },
+  cabins: { beds: 24, backupPower: true },
+  rv: { beds: 16, loadKw: 80 },
+  offices: { staff: 60, backupPower: true },
+  'forestry-shop': { staff: 50 },
+  'wildland-shop': { staff: 60, backupPower: true },
+  'maintenance-shop': { staff: 30 },
+  fuel: { staff: 5, fuelStorage: true },
+  classroom: { staff: 50 },
+  hangars: { staff: 15, backupPower: true, fuelStorage: true },
+  helipads: { loadKw: 10 },
+}
+
+const ESTATE = ['main-house', 'guest-house', 'outdoor-pool', 'car-building', 'entertainment']
+const LODGING = ['lodge-1', 'lodge-2', 'lodge-3', 'lodge-4', 'lodge-5', 'commons', 'cabins', 'rv']
+const LODGES = LODGING.filter(id => id !== 'rv')
+const WORK = ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'fuel', 'classroom', 'hangars', 'helipads']
+const u = (id: string, name: string, kind: UtilityKind, x0: number, y0: number, x1: number, y1: number, capacity: number, serves: string[]): Utility =>
+  ({ id, name, kind, rect: { x: ft(x0), y: ft(y0), w: ft(x1 - x0), d: ft(y1 - y0) }, capacity, serves })
+
+/**
+ * Utilities, as a first pass to react to. Wells sit uphill (north) of drainfields; the ground is assumed to fall
+ * south. Drainfield rectangles hold a primary and a reserve field. Sizes come from the demand estimates and need
+ * soil, percolation, and well tests.
+ */
+const utilities: Utility[] = [
+  u('estate-well', 'Estate well', 'well', 860, 5620, 880, 5640, 15, ESTATE),
+  u('estate-storage', 'Estate water storage', 'storage', 890, 5615, 915, 5645, 10000, ESTATE),
+  u('estate-septic', 'Estate septic and drainfield', 'septic', 900, 4710, 1000, 4800, 2400, ESTATE),
+  u('estate-service', 'Estate power service', 'service', 1160, 5560, 1180, 5580, 600, ESTATE),
+  u('estate-generator', 'Estate generator', 'generator', 1270, 5480, 1294, 5492, 150, ['main-house', 'guest-house']),
+  u('estate-propane', 'Estate propane tank', 'propane', 1320, 5600, 1340, 5606, 1000, ['main-house', 'guest-house']),
+  u('estate-solar', 'Estate solar array', 'solar', 2000, 4000, 2250, 4180, 250, []),
+  u('compound-well-1', 'Compound well 1', 'well', 2190, 1830, 2210, 1850, 20, [...LODGING, ...WORK]),
+  u('compound-well-2', 'Compound well 2', 'well', 3690, 1640, 3710, 1660, 20, [...LODGING, ...WORK]),
+  u('compound-storage', 'Compound water storage', 'storage', 2600, 1830, 2640, 1870, 30000, [...LODGING, ...WORK]),
+  u('lodging-septic', 'Lodging septic and drainfield', 'septic', 2470, 1170, 2870, 1270, 12000, LODGING),
+  u('ops-septic', 'Operations septic and drainfield', 'septic', 3300, 1180, 3500, 1255, 4000, ['offices', 'forestry-shop', 'wildland-shop', 'maintenance-shop', 'classroom']),
+  u('aviation-septic', 'Aviation septic and drainfield', 'septic', 5600, 1250, 5660, 1280, 500, ['hangars', 'fuel', 'helipads']),
+  u('compound-service', 'Compound substation', 'service', 3160, 170, 3200, 210, 2500, [...LODGING, ...WORK]),
+  u('compound-solar', 'Compound solar array', 'solar', 5500, 350, 6300, 500, 600, []),
+  u('lodging-generator', 'Lodging generator', 'generator', 2510, 1520, 2534, 1532, 400, LODGES),
+  u('ops-generator', 'Operations generator', 'generator', 3600, 560, 3624, 572, 250, ['offices', 'wildland-shop']),
+  u('aviation-generator', 'Aviation generator', 'generator', 5840, 1880, 5864, 1892, 100, ['hangars']),
+  u('lodging-propane', 'Lodging propane tank', 'propane', 2520, 1445, 2545, 1452, 2000, LODGES),
+]
+
+/**
+ * Cameras and lights, as a first pass: two cameras on every building at opposite corners, looking along its walls;
+ * two cameras and a light at each gate on their own solar power; lights on work and visitor buildings and over
+ * parking. The private estate has cameras but no site lighting, so it stays hidden at night.
+ */
+function securityFirstPass(e: Estate): SecurityDevice[] {
+  const out: SecurityDevice[] = []
+  for (const r of e.roads.filter(r => r.gate)) {
+    const ahead = samplePath(r.points, ft(20))[10]
+    const g = r.points[0], facing = Math.round(Math.atan2(ahead.y - g.y, ahead.x - g.x) * 180 / Math.PI)
+    const slug = r.gate!.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    out.push({ id: `cam-${slug}`, name: `${r.gate} camera, looking in`, kind: 'camera', at: { ...g }, range: ft(400), facing, fov: 60, power: 'solar' })
+    out.push({ id: `cam-${slug}-back`, name: `${r.gate} camera, looking out`, kind: 'camera', at: { ...ahead }, range: ft(300), facing: facing + 180, fov: 60, power: 'solar' })
+    out.push({ id: `light-${slug}`, name: `${r.gate} light`, kind: 'light', at: { ...g }, range: ft(60), power: 'solar' })
+  }
+  for (const b of e.buildings) {
+    const { x, y, w, d } = b.rect
+    const corners = [{ k: 'sw', at: { x, y }, facing: 45 }, { k: 'ne', at: { x: x + w, y: y + d }, facing: 225 }]
+    for (const c of corners) {
+      out.push({ id: `cam-${b.id}-${c.k}`, name: `${b.name} camera, ${c.k.toUpperCase()} corner`, kind: 'camera', at: { ...c.at }, range: ft(300), facing: c.facing, fov: 110, on: b.id, power: 'backup' })
+      if (b.access !== 'private') out.push({ id: `light-${b.id}-${c.k}`, name: `${b.name} light, ${c.k.toUpperCase()} corner`, kind: 'light', at: { ...c.at }, range: ft(120), on: b.id, power: 'backup' })
+    }
+  }
+  for (const z of e.zones.filter(z => z.parking)) {
+    let i = 0
+    for (let x = z.rect.x + ft(80); x < z.rect.x + z.rect.w; x += ft(160)) for (let y = z.rect.y + ft(75); y < z.rect.y + z.rect.d; y += ft(150)) {
+      i++
+      out.push({ id: `light-${z.id}-${i}`, name: `${z.name} light ${i}`, kind: 'light', at: { x, y }, range: ft(120), power: 'grid' })
+    }
+  }
+  return out
+}
+
 /** Fire water: cisterns with dry hydrants near each group of buildings, and the pond. Sizes are planning assumptions. */
 const water = (id: string, name: string, kind: WaterSource['kind'], x: number, y: number, gallons: number): WaterSource => ({ id, name, kind, at: p(x, y), gallons })
 const waterSources: WaterSource[] = [
@@ -58,7 +146,7 @@ const waterSources: WaterSource[] = [
   water('aviation-cistern', 'Aviation fire cistern', 'cistern', 5900, 1300, 60000),
 ]
 
-export const sampleEstate: Estate = withDerivedGeometry({
+const laidOut: Estate = withDerivedGeometry({
   name: 'House Project',
   layoutVersion: 3,
   parcel: { seed: 1876, size: ft(SIZE), gridSize: 128 },
@@ -92,7 +180,7 @@ export const sampleEstate: Estate = withDerivedGeometry({
     z('kart-track', 'Outdoor kart track', 'recreation', 'private', 650, 3800, 1550, 4300, true, true),
     z('operations', 'Operations compound', 'operations', 'work', 3150, 150, 5450, 1800, true),
     { ...z('equipment-yard', 'Equipment yard', 'operations', 'work', 3150, 770, 5310, 1150, true), hardstand: true },
-    { ...z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true), hardstand: true },
+    { ...z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true), hardstand: true, parking: true },
     // Widened 50 ft west so the west lodges have 100 ft of cleared ground around them.
     z('lodging', 'Lodging village', 'lodging', 'work', 1850, 500, 2900, 1900, true),
     z('training', 'Training ground', 'training', 'visitor', 3700, 2250, 5600, 4350, false),
@@ -113,5 +201,9 @@ export const sampleEstate: Estate = withDerivedGeometry({
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   waterSources,
+  utilities,
   house: mainHouse,
 })
+laidOut.buildings = laidOut.buildings.map(b => ({ ...b, ...PEOPLE[b.id] }))
+
+export const sampleEstate: Estate = { ...laidOut, security: securityFirstPass(laidOut) }

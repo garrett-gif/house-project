@@ -1,4 +1,5 @@
-import type { Estate } from './types'
+import type { Estate, Rect } from './types'
+import { footprintOf, overlaps } from './geometry'
 import { sampleEstate } from './sampleEstate'
 
 /**
@@ -16,5 +17,29 @@ export function withFireDefaults(e: Estate): Estate {
     roads: e.roads.map(r => r.turnaround === undefined && road.get(r.id)?.turnaround ? { ...r, turnaround: true } : r),
     zones: e.zones.map(z => z.hardstand === undefined && zone.get(z.id)?.hardstand ? { ...z, hardstand: true } : z),
     buildings: e.buildings.map(b => b.ignition === undefined && building.get(b.id)?.ignition ? { ...b, ignition: { ...building.get(b.id)!.ignition! } } : b),
+  }
+}
+
+/**
+ * Projects saved before utilities and security existed get the sample's utilities, cameras, lights, occupancy, and
+ * parking, matched by id. Utilities that would land on one of their buildings, and devices on buildings they no
+ * longer have, are left out, so the checks show what still needs placing.
+ */
+export function withUtilityDefaults(e: Estate): Estate {
+  if (e.utilities !== undefined) return e
+  const building = new Map(sampleEstate.buildings.map(b => [b.id, b]))
+  const zone = new Map(sampleEstate.zones.map(z => [z.id, z]))
+  const ids = new Set(e.buildings.map(b => b.id))
+  const buildings = e.buildings.map(b => {
+    const s = building.get(b.id)
+    return s ? { ...b, beds: b.beds ?? s.beds, staff: b.staff ?? s.staff, backupPower: b.backupPower ?? s.backupPower, fuelStorage: b.fuelStorage ?? s.fuelStorage, loadKw: b.loadKw ?? s.loadKw } : b
+  })
+  const clear = (r: Rect) => !e.buildings.some(b => footprintOf(b).some(p => overlaps(p, r)))
+  return {
+    ...e,
+    buildings,
+    zones: e.zones.map(z => z.parking === undefined && zone.get(z.id)?.parking ? { ...z, parking: true } : z),
+    utilities: structuredClone(sampleEstate.utilities ?? []).filter(u => clear(u.rect)).map(u => ({ ...u, serves: u.serves.filter(id => ids.has(id)) })),
+    security: structuredClone(sampleEstate.security ?? []).filter(d => !d.on || ids.has(d.on)),
   }
 }
