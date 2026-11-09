@@ -1,0 +1,238 @@
+import type { Estate, Level, Side } from '../model/types'
+import { houseBounds } from '../model/derive'
+import { levelWalls, placeOpenings } from '../model/walls'
+import type { PlacedOpening, WallSegment } from '../model/walls'
+import { ARCH_D, PT_PER_IN, ftIn } from './sheet'
+import type { Mark, Sheet } from './sheet'
+
+/** 1/8 inch on paper per foot: 9 points per foot, 0.75 points per model inch. */
+export const SCALE = { label: '1/8" = 1\'-0"', ptPerInch: (PT_PER_IN / 8) / 12 }
+
+const MARGIN = 0.5 * PT_PER_IN
+const TITLE_W = 3.5 * PT_PER_IN
+const INWARD: Record<Side, [number, number]> = { n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0] }
+
+export interface SheetInfo {
+  /** Model revision the sheet was drawn from. */
+  revision: number
+  /** Date printed on the sheet, YYYY-MM-DD. */
+  date: string
+  projectName: string
+}
+
+/** Sheet numbers follow level order from the lowest: A-101, A-102, ... */
+export function floorPlanSheets(e: Estate, info: SheetInfo): Sheet[] {
+  const levels = [...e.house.levels].sort((a, b) => a.elevation - b.elevation)
+  return levels.map((level, i) => floorPlanSheet(e, level, `A-${101 + i}`, info, levels.length))
+}
+
+export function floorPlanSheet(e: Estate, level: Level, number: string, info: SheetInfo, count = 1): Sheet {
+  const { width: W, height: H } = ARCH_D
+  const marks: Mark[] = []
+  const k = SCALE.ptPerInch
+  const b = houseBounds(e.house)
+  const areaW = W - 2 * MARGIN - TITLE_W
+  const ox = MARGIN + (areaW - b.w * k) / 2
+  const oy = MARGIN + 1.6 * PT_PER_IN
+  /** Model inches (house-local, y north) to sheet points (y down). */
+  const X = (x: number) => ox + (x - b.x) * k
+  const Y = (y: number) => oy + (b.y + b.d - y) * k
+  const walls = levelWalls(e.house, level)
+  const openings = placeOpenings(e.house).filter(o => o.levelId === level.id && o.wall && !o.problem)
+
+  // Border.
+  marks.push({ t: 'rect', x: MARGIN / 2, y: MARGIN / 2, w: W - MARGIN, h: H - MARGIN, stroke: '#000', sw: 1.5 })
+
+  // Outdoor rooms dashed, as they have no walls.
+  for (const r of level.rooms.filter(r => r.type === 'outdoor')) {
+    marks.push({ t: 'rect', x: X(r.rect.x), y: Y(r.rect.y + r.rect.d), w: r.rect.w * k, h: r.rect.d * k, stroke: '#000', sw: 0.5, dash: [4, 3] })
+  }
+
+  // Walls, solid at their real thickness.
+  const wallBox = (s: WallSegment) => {
+    const half = s.thickness / 2
+    return s.orientation === 'h'
+      ? { x: X(s.from - half), y: Y(s.at + half), w: (s.to - s.from + s.thickness) * k, h: s.thickness * k }
+      : { x: X(s.at - half), y: Y(s.to + half), w: s.thickness * k, h: (s.to - s.from + s.thickness) * k }
+  }
+  for (const s of walls) marks.push({ t: 'rect', ...wallBox(s), fill: s.kind === 'foundation' ? '#555' : s.kind === 'exterior' ? '#000' : '#333' })
+
+  // Openings cut through the walls, then their symbols.
+  for (const o of openings) drawOpening(marks, o, X, Y, k)
+
+  // Room names and centerline sizes.
+  for (const r of level.rooms) {
+    const cx = X(r.rect.x + r.rect.w / 2), cy = Y(r.rect.y + r.rect.d / 2)
+    const small = r.rect.w < 14 * 12 || r.rect.d < 10 * 12
+    marks.push({ t: 'text', x: cx, y: cy - (small ? 0 : 2), text: r.name.toUpperCase(), size: small ? 5 : 7, anchor: 'middle', bold: true })
+    if (!small) marks.push({ t: 'text', x: cx, y: cy + 8, text: `${ftIn(r.rect.w)} × ${ftIn(r.rect.d)}`, size: 6, anchor: 'middle' })
+  }
+
+  // Dimension strings: a chain and an overall dimension on the north and west sides.
+  drawDimensions(marks, walls, 'n', X, Y)
+  drawDimensions(marks, walls, 'w', X, Y)
+
+  // Drawing title, north arrow, scale bar.
+  const titleY = Y(b.y) + 1.1 * PT_PER_IN
+  const titleX = MARGIN + 0.6 * PT_PER_IN
+  marks.push({ t: 'text', x: titleX, y: titleY, text: `${level.name.toUpperCase()} PLAN`, size: 16, bold: true })
+  marks.push({ t: 'line', x1: titleX, y1: titleY + 5, x2: titleX + 3.2 * PT_PER_IN, y2: titleY + 5, w: 1.2 })
+  marks.push({ t: 'text', x: titleX, y: titleY + 18, text: `SCALE: ${SCALE.label}    DIMENSIONS TO WALL CENTERLINES`, size: 8 })
+  drawNorthArrow(marks, titleX + 4.4 * PT_PER_IN, titleY - 6)
+  drawScaleBar(marks, titleX + 5.4 * PT_PER_IN, titleY + 2, k)
+
+  drawTitleBlock(marks, e, level, number, info, count)
+  return { number, title: `${level.name} plan`, width: W, height: H, marks }
+}
+
+function drawOpening(marks: Mark[], o: PlacedOpening, X: (x: number) => number, Y: (y: number) => number, k: number) {
+  const t = o.wall!.thickness
+  const P = (a: number, c: number): [number, number] => o.orientation === 'h' ? [X(a), Y(c)] : [X(c), Y(a)]
+  const [gx0, gy0] = P(o.from, o.at + (o.orientation === 'h' ? t / 2 + 0.5 : -t / 2 - 0.5))
+  const [gx1, gy1] = P(o.to, o.at + (o.orientation === 'h' ? -t / 2 - 0.5 : t / 2 + 0.5))
+  marks.push({ t: 'rect', x: Math.min(gx0, gx1), y: Math.min(gy0, gy1), w: Math.abs(gx1 - gx0), h: Math.abs(gy1 - gy0), fill: '#fff' })
+  const along = (p: number, off = 0) => P(p, o.at + off)
+  if (o.kind === 'window') {
+    for (const off of [-t / 2, 0, t / 2]) {
+      const [x1, y1] = along(o.from, off), [x2, y2] = along(o.to, off)
+      marks.push({ t: 'line', x1, y1, x2, y2, w: off === 0 ? 0.35 : 0.6 })
+    }
+    for (const end of [o.from, o.to]) {
+      const [x1, y1] = along(end, -t / 2), [x2, y2] = along(end, t / 2)
+      marks.push({ t: 'line', x1, y1, x2, y2, w: 0.6 })
+    }
+    return
+  }
+  if (o.kind === 'garage-door') {
+    const [x1, y1] = along(o.from), [x2, y2] = along(o.to)
+    marks.push({ t: 'line', x1, y1, x2, y2, w: 0.8, dash: [6, 3] })
+    return
+  }
+  if (o.kind === 'opening') return
+  // Door leaf open at 90 degrees, with a quarter-circle swing, hinged at the west or south end.
+  const [ix, iy] = INWARD[o.side]
+  const dir = o.swing === 'out' ? -1 : 1
+  const hinge = { x: o.orientation === 'h' ? o.from : o.at, y: o.orientation === 'h' ? o.at : o.from }
+  const closed = { x: o.orientation === 'h' ? o.to : o.at, y: o.orientation === 'h' ? o.at : o.to }
+  const open = { x: hinge.x + ix * dir * o.width, y: hinge.y + iy * dir * o.width }
+  const [hx, hy] = [X(hinge.x), Y(hinge.y)], [cx, cy] = [X(closed.x), Y(closed.y)], [qx, qy] = [X(open.x), Y(open.y)]
+  const sweep = (cx - hx) * (qy - hy) - (cy - hy) * (qx - hx) > 0 ? 1 : 0
+  const r = o.width * k
+  marks.push({ t: 'line', x1: hx, y1: hy, x2: qx, y2: qy, w: 0.8 })
+  marks.push({ t: 'path', d: `M ${cx} ${cy} A ${r} ${r} 0 0 ${sweep} ${qx} ${qy}`, stroke: '#000', sw: 0.35 })
+}
+
+/**
+ * Chain dimensions along the north or west face: every place an outside wall turns or an inside wall meets it,
+ * then the overall length outside that.
+ */
+function drawDimensions(marks: Mark[], walls: WallSegment[], face: 'n' | 'w', X: (x: number) => number, Y: (y: number) => number) {
+  const facing = walls.filter(s => s.kind !== 'interior' && (face === 'n'
+    ? s.orientation === 'h' && !s.sides[1]
+    : s.orientation === 'v' && !s.sides[0]))
+  if (!facing.length) return
+  const cross = walls.filter(s => s.orientation !== facing[0].orientation)
+  const points = new Set<number>()
+  for (const s of facing) {
+    points.add(s.from); points.add(s.to)
+    for (const c of cross) {
+      const touches = face === 'n' ? Math.abs(c.to - s.at) < 0.5 : Math.abs(c.from - s.at) < 0.5
+      if (touches && c.at > s.from + 0.5 && c.at < s.to - 0.5) points.add(c.at)
+    }
+  }
+  const stops = [...points].sort((a, b) => a - b)
+  const edge = face === 'n' ? Math.max(...facing.map(s => s.at)) : Math.min(...facing.map(s => s.at))
+  const tiers = [4 * 12, 8 * 12]
+  const at = (tier: number) => face === 'n' ? Y(edge + tiers[tier]) : X(edge - tiers[tier])
+  const pos = (v: number) => face === 'n' ? X(v) : Y(v)
+  const dimLine = (from: number, to: number, tier: number) => {
+    const a = pos(from), c = pos(to), d = at(tier)
+    const [x1, y1, x2, y2] = face === 'n' ? [a, d, c, d] : [d, a, d, c]
+    marks.push({ t: 'line', x1, y1, x2, y2, w: 0.4 })
+    for (const p of [a, c]) {
+      const [tx, ty] = face === 'n' ? [p, d] : [d, p]
+      marks.push({ t: 'line', x1: tx - 2.5, y1: ty + 2.5, x2: tx + 2.5, y2: ty - 2.5, w: 0.9 })
+      const ext = face === 'n' ? { x1: tx, y1: ty - 3, x2: tx, y2: Y(edge) - 3 } : { x1: tx - 3, y1: ty, x2: X(edge) - 3, y2: ty }
+      if (tier === 0) marks.push({ t: 'line', ...ext, w: 0.25 })
+    }
+    const len = Math.abs(to - from)
+    const label = ftIn(len), mid = (a + c) / 2
+    const size = Math.abs(c - a) < 24 ? 4.5 : 6
+    if (face === 'n') marks.push({ t: 'text', x: mid, y: d - 2.5, text: label, size, anchor: 'middle' })
+    else marks.push({ t: 'text', x: d - 3, y: mid + 2, text: label, size, anchor: 'end' })
+  }
+  for (let i = 0; i < stops.length - 1; i++) dimLine(stops[i], stops[i + 1], 0)
+  dimLine(stops[0], stops[stops.length - 1], 1)
+}
+
+function drawNorthArrow(marks: Mark[], x: number, y: number) {
+  marks.push({ t: 'path', d: `M ${x} ${y - 22} L ${x + 8} ${y + 6} L ${x} ${y} L ${x - 8} ${y + 6} Z`, fill: '#000' })
+  marks.push({ t: 'text', x, y: y - 26, text: 'N', size: 10, anchor: 'middle', bold: true })
+}
+
+function drawScaleBar(marks: Mark[], x: number, y: number, k: number) {
+  const ft = 12 * k
+  for (const [i, from, to] of [[0, 0, 4], [1, 4, 8], [2, 8, 16]] as const) {
+    marks.push({ t: 'rect', x: x + from * ft, y: y - 4, w: (to - from) * ft, h: 4, fill: i % 2 ? '#fff' : '#000', stroke: '#000', sw: 0.5 })
+  }
+  for (const v of [0, 4, 8, 16]) marks.push({ t: 'text', x: x + v * ft, y: y + 9, text: String(v), size: 6, anchor: 'middle' })
+  marks.push({ t: 'text', x: x + 16 * ft + 6, y: y + 9, text: 'FEET', size: 6 })
+}
+
+function drawTitleBlock(marks: Mark[], e: Estate, level: Level, number: string, info: SheetInfo, count: number) {
+  const { width: W, height: H } = ARCH_D
+  const x = W - MARGIN / 2 - TITLE_W, top = MARGIN / 2, bottom = H - MARGIN / 2, pad = 10
+  const textW = TITLE_W - 2 * pad
+  marks.push({ t: 'line', x1: x, y1: top, x2: x, y2: bottom, w: 1.5 })
+  let y = top + pad
+  const box = (h: number) => { marks.push({ t: 'line', x1: x, y1: y + h, x2: x + TITLE_W, y2: y + h, w: 0.75 }); const start = y; y += h; return start }
+  const text = (tx: string, at: number, size: number, bold = false) => marks.push({ t: 'text', x: x + pad, y: at, text: tx, size, bold })
+  /** Rough wrap by character count. Helvetica averages about half the font size per character. */
+  const wrap = (tx: string, size: number) => {
+    const per = Math.floor(textW / (size * 0.6)), lines: string[] = []
+    let line = ''
+    for (const word of tx.split(' ')) { if ((line + ' ' + word).trim().length > per) { lines.push(line); line = word } else line = (line + ' ' + word).trim() }
+    if (line) lines.push(line)
+    return lines
+  }
+  const para = (tx: string, size: number, start: number, bold = false) => { wrap(tx, size).forEach((l, i) => text(l, start + i * (size + 2.5), size, bold)); return wrap(tx, size).length * (size + 2.5) }
+
+  // The draft stamp comes first and largest.
+  let s = box(118)
+  marks.push({ t: 'rect', x: x + pad - 4, y: s + 6, w: TITLE_W - 2 * pad + 8, h: 100, stroke: '#000', sw: 2 })
+  text('DRAFT', s + 34, 22, true)
+  para('NOT FOR CONSTRUCTION UNTIL REVIEWED BY A QUALIFIED PERSON', 10, s + 54, true)
+  text('Reviewed by: ______________________', s + 92, 8)
+  text('Date: ____________', s + 104, 8)
+
+  s = box(78)
+  text(info.projectName.toUpperCase(), s + 20, 12, true)
+  text('MAIN HOUSE', s + 36, 10, true)
+  para('Concept. Placeholder massing used to test the model, not a finished design.', 7.5, s + 52)
+
+  s = box(170)
+  text('GENERAL NOTES', s + 16, 8, true)
+  let ny = s + 30
+  for (const note of [
+    'Dimensions are to wall centerlines unless noted.',
+    `Walls: exterior ${e.house.wallThickness.exterior}" (2x6 frame, sheathing, siding, drywall); interior ${e.house.wallThickness.interior}"; foundation ${e.house.wallThickness.foundation}" concrete.`,
+    "Passing this app's planning checks does not mean the design meets code. Confirm the adopted code edition with the local building official.",
+    'Structural, foundation, mechanical, electrical, plumbing, and site work by others.',
+  ]) ny += para(`• ${note}`, 7, ny) + 3
+
+  s = box(64)
+  text('SHEET', s + 14, 7)
+  text(`${level.name.toUpperCase()} PLAN`, s + 32, 11, true)
+  text(`Scale ${SCALE.label}`, s + 48, 8)
+
+  s = box(54)
+  text(`Drawn from model revision ${info.revision}`, s + 16, 8)
+  text(`Date ${info.date}`, s + 30, 8)
+  text('Drawn by House Project', s + 44, 8)
+
+  // Sheet number sits at the bottom right, where people look for it.
+  y = bottom - 96
+  marks.push({ t: 'line', x1: x, y1: y, x2: x + TITLE_W, y2: y, w: 1.5 })
+  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 56, text: number, size: 40, anchor: 'middle', bold: true })
+  marks.push({ t: 'text', x: x + TITLE_W / 2, y: y + 80, text: `Sheet ${Number(number.slice(-2))} of ${count}`, size: 8, anchor: 'middle' })
+}

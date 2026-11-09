@@ -2,9 +2,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
-import { HEALTH_PATH, PROPOSE_PATH } from '../src/chat/protocol'
+import { HEALTH_PATH, PROPOSE_PATH, SHEETS_PATH } from '../src/chat/protocol'
+import { floorPlanSheets } from '../src/drawings/floorPlanSheet'
+import { sheetsToPdf } from './pdf'
 import type { Health } from '../src/chat/protocol'
-import { DEFAULT_MODEL, parseRequest, proposeEdits } from './proposeEdits'
+import { DEFAULT_MODEL, isEstate, parseRequest, proposeEdits } from './proposeEdits'
 
 // The API key lives only here, in server/.env or the shell environment. Browser code never sees it.
 const ENV_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '.env')
@@ -38,6 +40,21 @@ app.get(HEALTH_PATH, (_req, res) => {
   if (!hasKey()) loadEnv()
   const health: Health = { ok: true, model: MODEL, hasKey: hasKey() }
   res.json(health)
+})
+
+// Draft floor plan sheets as a PDF. Drawn from the estate the browser sends; nothing is stored.
+app.post(SHEETS_PATH, async (req, res) => {
+  const { estate, revision } = (req.body ?? {}) as { estate?: unknown; revision?: unknown }
+  if (!isEstate(estate)) return void res.status(400).json({ ok: false, error: 'The estate model is missing or malformed.' })
+  try {
+    const date = new Date().toISOString().slice(0, 10)
+    const sheets = floorPlanSheets(estate, { revision: Number(revision) || 0, date, projectName: estate.name })
+    const pdf = await sheetsToPdf(sheets, `${estate.name}, draft floor plans`)
+    res.type('application/pdf').set('Content-Disposition', `attachment; filename="house-project-floor-plans-${date}.pdf"`).send(pdf)
+  } catch (err) {
+    console.error('[sheets]', err instanceof Error ? err.message : err)
+    res.status(500).json({ ok: false, error: 'Could not draw the sheets.' })
+  }
 })
 
 app.post(PROPOSE_PATH, async (req, res) => {

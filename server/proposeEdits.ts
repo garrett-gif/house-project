@@ -122,16 +122,20 @@ export async function proposeEdits(create: CreateMessage, req: ProposeRequest, m
     : { ok: false, error: 'Claude could not produce edits that apply to the model. Try rewording the request.' }
 }
 
+/** True when `e` looks enough like an estate to work with. */
+export function isEstate(e: unknown): e is Estate {
+  const x = e as Estate | undefined
+  return !!x && Array.isArray(x.buildings) && Array.isArray(x.walkways) && !!x.house && Array.isArray(x.house.levels) && Array.isArray(x.house.openings)
+}
+
 /** Light shape check on what the browser sent. The server is local, but bad input should fail clearly. */
 export function parseRequest(body: unknown): { ok: true; req: ProposeRequest } | { ok: false; error: string } {
   const b = body as Partial<ProposeRequest> | null
   if (!b || typeof b !== 'object') return { ok: false, error: 'Send a JSON body.' }
   if (typeof b.request !== 'string' || !b.request.trim()) return { ok: false, error: 'The request is empty.' }
   if (b.request.length > 4000) return { ok: false, error: 'The request is too long. Keep it under 4,000 characters.' }
-  const e = b.estate as Estate | undefined
-  if (!e || !Array.isArray(e.buildings) || !Array.isArray(e.walkways) || !e.house || !Array.isArray(e.house.levels)) {
-    return { ok: false, error: 'The estate model is missing or malformed.' }
-  }
+  const e = b.estate
+  if (!isEstate(e)) return { ok: false, error: 'The estate model is missing or malformed.' }
   const history = Array.isArray(b.history) ? b.history.slice(-20) : []
   return { ok: true, req: { estate: e, request: b.request.trim(), history } }
 }

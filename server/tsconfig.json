@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "types": ["node"], "noEmit": true },
-  "include": [".", "../src/model", "../src/chat"]
+  "include": [".", "../src/model", "../src/chat", "../src/drawings"]
 }

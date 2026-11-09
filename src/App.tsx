@@ -6,7 +6,9 @@ import { sampleEstate } from './model/sampleEstate'
 import { diffChecks, validateEstate } from './model/validate'
 import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
 import type { ChatTurn } from './chat/protocol'
-import { checkServer, requestEdits } from './chat/client'
+import { checkServer, requestEdits, requestSheetsPdf } from './chat/client'
+import { floorPlanSheets } from './drawings/floorPlanSheet'
+import { SheetView } from './views/SheetView'
 import type { Health } from './chat/protocol'
 import { browserProjectStore } from './storage/projectStore'
 import { SitePlan } from './views/SitePlan'
@@ -15,9 +17,9 @@ import { Scene3D } from './views/Scene3D'
 import { ChatPanel, CheckChanges } from './ui/ChatPanel'
 import type { Turn } from './ui/ChatPanel'
 
-type View = 'site' | 'house' | 'site3d' | 'house3d'
+type View = 'site' | 'house' | 'site3d' | 'house3d' | 'sheets'
 type Tab = 'chat' | 'checks' | 'history'
-const VIEWS: [View, string][] = [['site', 'Site plan'], ['house', 'House plan'], ['site3d', 'Estate 3D'], ['house3d', 'House 3D']]
+const VIEWS: [View, string][] = [['site', 'Site plan'], ['house', 'House plan'], ['site3d', 'Estate 3D'], ['house3d', 'House 3D'], ['sheets', 'Drawings']]
 const MARK = { pass: '✓', warn: '!', fail: '✕' }
 
 interface Proposal { request: string; ops: EditOp[]; estate: Estate }
@@ -95,7 +97,27 @@ export function App() {
   }, [checks])
   const passed = checks.length - failing
   const levels = estate.house.levels.slice().reverse()
-  const showsHouse = view === 'house' || view === 'house3d'
+  const showsHouse = view === 'house' || view === 'house3d' || view === 'sheets'
+  const revisionNumber = appliedRevisions(timeline).length
+  const sheets = useMemo(() => view === 'sheets'
+    ? floorPlanSheets(estate, { revision: revisionNumber, date: new Date().toISOString().slice(0, 10), projectName: estate.name })
+    : [], [view, estate, revisionNumber])
+  const sheetFor = (levelId: string) => {
+    const order = [...estate.house.levels].sort((a, b) => a.elevation - b.elevation).findIndex(l => l.id === levelId)
+    return sheets[order] ?? sheets[0]
+  }
+  const [downloading, setDownloading] = useState(false)
+  const downloadPdf = async () => {
+    setDownloading(true)
+    const res = await requestSheetsPdf(currentEstate(timeline), revisionNumber)
+    setDownloading(false)
+    if (!res.ok) { setNotice(res.error); return }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(res.blob)
+    a.download = res.filename
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
 
   const addTurn = (turn: Omit<Turn, 'id'>) => setTurns(ts => [...ts, { ...turn, id: nextId.current++ }])
   const settlePending = (status: Turn['status']) => setTurns(ts => ts.map(t => t.status === 'pending' ? { ...t, status } : t))
@@ -219,6 +241,17 @@ export function App() {
           {view === 'house' && <HousePlan house={estate.house} levelId={level} flagged={flagged} />}
           {view === 'site3d' && <Scene3D estate={estate} mode="site" levelId={level} />}
           {view === 'house3d' && <Scene3D estate={estate} mode="house" levelId={level} />}
+          {view === 'sheets' && sheets.length > 0 && (
+            <>
+              <div className="plan-tools">
+                <span className="muted small">Sheet {sheetFor(level).number}: {sheetFor(level).title}, ARCH D 36 × 24 in at 1/8″ = 1′-0″. Draft, not for construction.</span>
+                <button className="primary" onClick={() => void downloadPdf()} disabled={downloading || !!proposal} title={proposal ? 'Apply or discard the proposal first' : 'Download all floor plan sheets as one PDF'}>
+                  {downloading ? 'Drawing PDF…' : 'Download PDF'}
+                </button>
+              </div>
+              <SheetView sheet={sheetFor(level)} />
+            </>
+          )}
         </section>
         <aside>
           <div className="tabs" role="tablist">

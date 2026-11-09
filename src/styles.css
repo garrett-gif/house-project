@@ -83,3 +83,5 @@ button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
   .stage { height: 76vh; }
   aside { border-left: 0; border-top: 1px solid var(--line); min-height: 70vh; }
 }
+.plan svg.sheet { background: #fff; }
+.plan-tools .primary { margin-left: auto; }

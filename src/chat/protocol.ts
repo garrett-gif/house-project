@@ -11,6 +11,10 @@ export type ProposeResponse = { ok: true; ops: EditOp[]; reply: string } | { ok:
 
 export const PROPOSE_PATH = '/api/propose-edits'
 export const HEALTH_PATH = '/api/health'
+export const SHEETS_PATH = '/api/sheets.pdf'
+
+/** Asks the server to draw the floor plan sheets for this estate as a PDF. */
+export interface SheetsRequest { estate: Estate; revision: number }
 
 /** What the chat server reports about itself. Never includes the key. */
 export interface Health { ok: true; model: string; hasKey: boolean }
