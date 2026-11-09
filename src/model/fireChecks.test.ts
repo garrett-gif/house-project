@@ -19,32 +19,42 @@ describe('wildfire checks on the sample estate', () => {
     expect(checks.every(c => /Advisory planning values/.test(c.detail))).toBe(true)
   })
 
-  it('pass where the layout already plans for fire', () => {
-    for (const id of ['ignition', 'road-width', 'dead-ends', 'two-ways-out', 'fire-water']) expect(check(sampleEstate, id).status, id).toBe('pass')
+  it('all pass now that the layout has fire lanes, aprons, and clearings', () => {
+    for (const c of fireChecks(sampleEstate)) expect(c.status, `${c.id}: ${c.detail}`).toBe('pass')
   })
 
-  it('flag the classroom in the training forest and the lodges at the forest edge', () => {
-    const c = check(sampleEstate, 'defensible-space')
+  it('flag the classroom and the west lodges without their clearings', () => {
+    const e = structuredClone(sampleEstate)
+    e.zones = e.zones.filter(z => z.id !== 'classroom-clearing').map(z => z.id === 'lodging' ? { ...z, rect: { ...z.rect, x: ft(1900), w: ft(1000) } } : z)
+    const c = check(e, 'defensible-space')
     expect(c.status).toBe('warn')
     expect(c.elements).toEqual(expect.arrayContaining(['classroom', 'lodge-1', 'lodge-3']))
     expect(c.elements).not.toContain('main-house')
   })
 
-  it('flag buildings an engine cannot reach within a hose pull, including the main house', () => {
-    const c = check(sampleEstate, 'hose-pull')
+  it('flag the main house when its fire lane is removed', () => {
+    const e = ok(applyOperations(sampleEstate, [{ op: 'removeRoad', roadId: 'house-fire-lane' }]))
+    const c = check(e, 'hose-pull')
     expect(c.status).toBe('warn')
     expect(c.elements).toContain('main-house')
     expect(c.elements).not.toContain('hangars')
   })
+
+  it('count paved aprons as places an engine can work from', () => {
+    const e = structuredClone(sampleEstate)
+    e.zones = e.zones.filter(z => z.id !== 'shop-apron')
+    expect(check(e, 'hose-pull').elements).toEqual(expect.arrayContaining(['forestry-shop', 'wildland-shop', 'maintenance-shop']))
+  })
 })
 
 describe('fire edits', () => {
-  it('a fire lane brings the main house within a hose pull', () => {
+  it('adding a fire lane by edit brings the main house back within a hose pull', () => {
+    const without = ok(applyOperations(sampleEstate, [{ op: 'removeRoad', roadId: 'house-fire-lane' }]))
     // A lane along the south of the courtyard, from the estate drive around the west wing.
-    const lane: EditOp = { op: 'addRoad', road: { id: 'house-fire-lane', name: 'House fire lane', kind: 'estate', width: ft(20), turnaround: true,
+    const lane: EditOp = { op: 'addRoad', road: { id: 'courtyard-lane', name: 'Courtyard lane', kind: 'estate', width: ft(20), turnaround: true,
       points: [{ x: ft(980), y: ft(5520) }, { x: ft(980), y: ft(5300) }, { x: ft(1270), y: ft(5300) }] } }
-    const e = ok(applyOperations(sampleEstate, [lane]))
-    expect(check(e, 'hose-pull').elements).not.toContain('main-house')
+    const e = ok(applyOperations(without, [lane]))
+    expect(check(e, 'hose-pull').elements ?? []).not.toContain('main-house')
     expect(check(e, 'dead-ends').status).toBe('pass')
   })
 
@@ -81,9 +91,11 @@ describe('fire edits', () => {
   })
 
   it('the owner can replace a planning value', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'setFireRule', rule: 'maxHosePullFt', value: 400 }]))
-    expect(e.fireRules?.maxHosePullFt).toBe(400)
-    expect((check(e, 'hose-pull').elements ?? []).length).toBeLessThan(check(sampleEstate, 'hose-pull').elements!.length)
+    // A stricter 100 ft hose pull than the default flags buildings the 150 ft default lets pass.
+    const e = ok(applyOperations(sampleEstate, [{ op: 'setFireRule', rule: 'maxHosePullFt', value: 100 }]))
+    expect(e.fireRules?.maxHosePullFt).toBe(100)
+    expect(check(sampleEstate, 'hose-pull').status).toBe('pass')
+    expect(check(e, 'hose-pull').status).toBe('warn')
     expect(sampleEstate.fireRules).toBeUndefined()
     expect(DEFAULT_FIRE_RULES.maxHosePullFt).toBe(150)
   })

@@ -34,6 +34,16 @@ const roads: Road[] = [
   { id: 'lodging-street', name: 'Lodging street', kind: 'work', points: line([3000, 1375], [1950, 1375]), turnaround: true },
   { id: 'cabin-street', name: 'Cabin and RV street', kind: 'work', points: line([3000, 790], [2050, 790]), turnaround: true },
   { id: 'gated-link', name: 'Gated link', kind: 'gated-link', points: line([2520, 3400], [3550, 3400]) },
+  // Fire lanes, 20 ft wide, so an engine can reach every outside wall within a 150 ft hose pull.
+  { id: 'house-fire-lane', name: 'House fire lane', kind: 'estate', width: ft(20), points: line([1000, 5520], [1000, 5300], [1800, 5300]) },
+  { id: 'car-fire-lane', name: 'Car building fire lane', kind: 'estate', width: ft(20), turnaround: true, points: line([1440, 5300], [1440, 5560], [1700, 5560]) },
+  { id: 'entertainment-fire-lane', name: 'Entertainment shop fire lane', kind: 'estate', width: ft(20), points: line([1440, 5300], [1440, 4930], [1140, 4930], [1140, 5300]) },
+  { id: 'guest-fire-lane', name: 'Guest house fire lane', kind: 'estate', width: ft(20), turnaround: true, points: line([750, 5450], [700, 4950]) },
+  { id: 'lodging-north-lane', name: 'Lodging north fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 1720], [1950, 1720]) },
+  { id: 'lodging-middle-lane', name: 'Lodging middle fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 1000], [1950, 1000]) },
+  { id: 'cabin-south-lane', name: 'Cabin and RV south fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 580], [2000, 580]) },
+  { id: 'office-lane', name: 'Office fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 420], [3700, 420]) },
+  { id: 'classroom-lane', name: 'Classroom fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([4100, 1800], [4100, 1960]) },
   { id: 'perimeter', name: 'Perimeter road', kind: 'perimeter', points: line([inset, inset], [SIZE - inset, inset], [SIZE - inset, SIZE - inset], [inset, SIZE - inset], [inset, inset]) },
 ]
 
@@ -83,10 +93,16 @@ export const sampleEstate: Estate = withDerivedGeometry({
     z('operations', 'Operations compound', 'operations', 'work', 3150, 150, 5450, 1800, true),
     { ...z('equipment-yard', 'Equipment yard', 'operations', 'work', 3150, 770, 5310, 1150, true), hardstand: true },
     { ...z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true), hardstand: true },
-    z('lodging', 'Lodging village', 'lodging', 'work', 1900, 500, 2900, 1900, true),
+    // Widened 50 ft west so the west lodges have 100 ft of cleared ground around them.
+    z('lodging', 'Lodging village', 'lodging', 'work', 1850, 500, 2900, 1900, true),
     z('training', 'Training ground', 'training', 'visitor', 3700, 2250, 5600, 4350, false),
     z('aviation-corridor', 'Runway corridor', 'aviation', 'shared', 5710, 2200, 6210, 5700, true),
     { ...z('aviation-apron', 'Aviation apron', 'aviation', 'shared', 5500, 1450, 6400, 2200, true), hardstand: true },
+    // Paved aprons around the shops and the fuel island, which an engine can work from.
+    { ...z('shop-apron', 'Shop aprons', 'operations', 'work', 3250, 1320, 5250, 1560, true), hardstand: true },
+    { ...z('fuel-apron', 'Fuel island apron', 'operations', 'work', 4920, 360, 5200, 580, true), hardstand: true },
+    // Cleared ground around the classroom, which otherwise sits in the training forest.
+    z('classroom-clearing', 'Classroom clearing', 'training', 'visitor', 3925, 1885, 4275, 2175, true),
     z('incident-camp', 'Incident camp', 'incident', 'shared', 5450, 250, 6350, 1450, true),
     z('pond', 'Pond and fire water', 'water', 'shared', 2630, 2530, 3270, 2970, true, true),
   ],
