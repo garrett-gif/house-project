@@ -1,5 +1,10 @@
-import type { HouseModel, RoomType, Side } from '../model/types'
-import { toFt } from '../model/geometry'
+import { useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { HouseModel, Room, RoomType, Side } from '../model/types'
+import type { EditOp } from '../model/edits'
+import { ft, toFt } from '../model/geometry'
+import { cursorFor, grabRoom, openingDragOp, roomDragOp } from '../ui/dragOps'
+import type { RoomGrab } from '../ui/dragOps'
 import { houseBounds } from '../model/derive'
 import { levelWalls, placeOpenings } from '../model/walls'
 import type { PlacedOpening, WallSegment } from '../model/walls'
@@ -13,22 +18,77 @@ const FLAG = { fail: '#c0262d', warn: '#c98a14' }
 /** Direction into the host room from each of its sides, in plan coordinates (y north). */
 const INWARD: Record<Side, [number, number]> = { n: [0, -1], s: [0, 1], e: [-1, 0], w: [1, 0] }
 
-/** `flagged` maps ids of rooms and openings named by checks that do not pass to how badly: red for fail, amber for warn. */
-export function HousePlan({ house, levelId, flagged = new Map() }: { house: HouseModel; levelId: string; flagged?: ReadonlyMap<string, 'warn' | 'fail'> }) {
+type Grabbed = { kind: 'room'; room: Room; grab: RoomGrab } | { kind: 'opening'; opening: PlacedOpening }
+
+interface Props {
+  house: HouseModel
+  levelId: string
+  /** Ids of rooms and openings named by checks that do not pass, and how badly: red for fail, amber for warn. */
+  flagged?: ReadonlyMap<string, 'warn' | 'fail'>
+  /** When set, rooms, walls, doors, and windows can be dragged. The plan only reports the edit; the app applies it. */
+  onDrag?: (op: EditOp | null) => void
+  onDrop?: (op: EditOp | null) => void
+}
+
+export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop }: Props) {
   const level = house.levels.find(l => l.id === levelId) ?? house.levels[1]
-  const b = houseBounds(house)
+  const svg = useRef<SVGSVGElement>(null)
+  const drag = useRef<{ start: [number, number]; what: Grabbed; op: EditOp | null } | null>(null)
+  // The view frame stays put while dragging, so a room growing past the outline does not rescale under the pointer.
+  const [frozen, setFrozen] = useState<ReturnType<typeof houseBounds> | null>(null)
+  const b = frozen ?? houseBounds(house)
   const x0 = toFt(b.x), x1 = toFt(b.x + b.w), y0 = toFt(b.y), y1 = toFt(b.y + b.d)
   const minX = x0 - 4, maxX = x1 + 4, top = y1 + 4, mid = (x0 + x1) / 2
   // Plan inches to SVG feet, with north up.
   const P = (x: number, y: number): [number, number] => [toFt(x), top - toFt(y)]
   const walls = levelWalls(house, level)
   const openings = placeOpenings(house).filter(o => o.levelId === level.id && o.wall)
+  const editable = !!onDrag && !!onDrop
+
+  /** Pointer position in model inches, house-local, y north. */
+  const toModel = (e: { clientX: number; clientY: number }): [number, number] => {
+    const el = svg.current!, pt = el.createSVGPoint()
+    pt.x = e.clientX; pt.y = e.clientY
+    const p = pt.matrixTransform(el.getScreenCTM()!.inverse())
+    return [ft(p.x), ft(top - p.y)]
+  }
+  const begin = (e: ReactPointerEvent, what: Grabbed) => {
+    if (!editable || e.button !== 0) return
+    e.preventDefault(); e.stopPropagation()
+    drag.current = { start: toModel(e), what, op: null }
+    setFrozen(houseBounds(house))
+    svg.current!.setPointerCapture(e.pointerId)
+  }
+  const move = (e: ReactPointerEvent) => {
+    const d = drag.current
+    if (!d) return
+    const [x, y] = toModel(e), dx = x - d.start[0], dy = y - d.start[1]
+    d.op = d.what.kind === 'room' ? roomDragOp(d.what.room, d.what.grab, dx, dy) : openingDragOp(d.what.opening, dx, dy)
+    onDrag!(d.op)
+  }
+  const end = (cancel: boolean) => {
+    const d = drag.current
+    drag.current = null
+    setFrozen(null)
+    if (d) onDrop!(cancel ? null : d.op)
+  }
+  /** The wall a segment belongs to, as the side of one of the rooms it bounds. */
+  const wallGrab = (s: WallSegment): Grabbed | null => {
+    const id = s.sides[0] ?? s.sides[1]
+    const room = level.rooms.find(r => r.id === id)
+    if (!room) return null
+    const side: Side = s.orientation === 'h' ? (s.sides[0] ? 'n' : 's') : (s.sides[0] ? 'e' : 'w')
+    return { kind: 'room', room, grab: { kind: 'wall', side } }
+  }
 
   const wallRect = (s: WallSegment) => {
     const half = s.thickness / 2
     const [ax, ay] = s.orientation === 'h' ? P(s.from - half, s.at + half) : P(s.at - half, s.to + half)
     const [bx, by] = s.orientation === 'h' ? P(s.to + half, s.at - half) : P(s.at + half, s.from - half)
-    return <rect key={s.id} x={ax} y={ay} width={bx - ax} height={by - ay} fill={WALL[s.kind]} />
+    const grab = editable ? wallGrab(s) : null
+    return <rect key={s.id} x={ax} y={ay} width={bx - ax} height={by - ay} fill={WALL[s.kind]}
+      style={grab ? { cursor: s.orientation === 'h' ? 'ns-resize' : 'ew-resize' } : undefined}
+      onPointerDown={grab ? e => begin(e, grab) : undefined} />
   }
 
   const opening = (o: PlacedOpening) => {
@@ -37,13 +97,14 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
     const [bx, by] = o.orientation === 'h' ? P(o.to, o.at - half) : P(o.at + half, o.from)
     const flag = flagged.get(o.id)
     const color = flag ? FLAG[flag] : '#3c3a35'
+    const handlers = editable ? { onPointerDown: (e: ReactPointerEvent) => begin(e, { kind: 'opening', opening: o }), style: { cursor: o.orientation === 'h' ? 'ew-resize' : 'ns-resize' } } : {}
     const gap = <rect x={ax} y={ay} width={bx - ax} height={by - ay} fill="#fffdf8" />
     const along = (p: number): [number, number] => o.orientation === 'h' ? [p, o.at] : [o.at, p]
     if (o.kind === 'window' || o.kind === 'garage-door') {
       const [sx, sy] = P(...along(o.from)), [ex, ey] = P(...along(o.to))
       const off = toFt(t) / 4, [nx, ny] = o.orientation === 'h' ? [0, off] : [off, 0]
       return (
-        <g key={o.id}>
+        <g key={o.id} {...handlers}>
           {gap}
           {o.kind === 'window'
             ? <><line x1={sx - nx} y1={sy - ny} x2={ex - nx} y2={ey - ny} stroke={color} strokeWidth={0.18} /><line x1={sx + nx} y1={sy + ny} x2={ex + nx} y2={ey + ny} stroke={color} strokeWidth={0.18} /></>
@@ -51,7 +112,7 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
         </g>
       )
     }
-    if (o.kind === 'opening') return <g key={o.id}>{gap}</g>
+    if (o.kind === 'opening') return <g key={o.id} {...handlers}>{gap}</g>
     // A door: the leaf drawn open at 90 degrees, with its swing arc. Hinged at the west or south end.
     const [ix, iy] = INWARD[o.side]
     const dir = o.swing === 'out' ? -1 : 1
@@ -61,7 +122,7 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
     const sweep = (cx - hx) * (oy - hy) - (cy - hy) * (ox - hx) > 0 ? 1 : 0
     const r = toFt(o.width)
     return (
-      <g key={o.id}>
+      <g key={o.id} {...handlers}>
         {gap}
         <line x1={hx} y1={hy} x2={ox} y2={oy} stroke={color} strokeWidth={0.22} />
         <path d={`M ${cx} ${cy} A ${r} ${r} 0 0 ${sweep} ${ox} ${oy}`} fill="none" stroke={color} strokeWidth={0.12} strokeDasharray="0.5 0.35" />
@@ -71,12 +132,15 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
 
   return (
     <div className="plan">
-      <svg viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}>
+      <svg ref={svg} viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}
+        onPointerMove={move} onPointerUp={() => end(false)} onPointerCancel={() => end(true)} style={{ touchAction: editable ? 'none' : undefined }}>
         {level.rooms.map(room => {
           const x = toFt(room.rect.x), w = toFt(room.rect.w), d = toFt(room.rect.d), y = top - toFt(room.rect.y) - d
           return (
             <g key={room.id}>
-              <rect x={x} y={y} width={w} height={d} fill={ROOM_COLOR[room.type]} stroke={room.type === 'outdoor' ? '#8c8473' : 'none'} strokeWidth={0.2} strokeDasharray={room.type === 'outdoor' ? '0.8 0.6' : undefined} />
+              <rect x={x} y={y} width={w} height={d} fill={ROOM_COLOR[room.type]} stroke={room.type === 'outdoor' ? '#8c8473' : 'none'} strokeWidth={0.2} strokeDasharray={room.type === 'outdoor' ? '0.8 0.6' : undefined}
+                onPointerMove={editable && !drag.current ? e => { const [mx, my] = toModel(e); (e.currentTarget as SVGRectElement).style.cursor = cursorFor(grabRoom(room, mx, my)) } : undefined}
+                onPointerDown={editable ? e => { const [mx, my] = toModel(e); begin(e, { kind: 'room', room, grab: grabRoom(room, mx, my) }) } : undefined} />
               {flagged.has(room.id) && <rect x={x + 0.7} y={y + 0.7} width={Math.max(0, w - 1.4)} height={Math.max(0, d - 1.4)} fill="none" stroke={FLAG[flagged.get(room.id)!]} strokeWidth={flagged.get(room.id) === 'fail' ? 0.6 : 0.35} strokeDasharray={flagged.get(room.id) === 'fail' ? undefined : '1 0.6'} />}
             </g>
           )
@@ -89,7 +153,7 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
           const words = room.name.split(' ')
           const lines = w < 24 && words.length > 1 ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [room.name]
           return (
-            <g key={`label-${room.id}`}>
+            <g key={`label-${room.id}`} pointerEvents="none">
               {lines.map((t, i) => <text key={t} x={x + w / 2} y={y + d / 2 + (i - (lines.length - 1) / 2) * 2.5 - (compact ? 0 : 0.8)} fontSize={compact ? 1.45 : 1.9} textAnchor="middle" className="room-name">{t}</text>)}
               {!compact && <text x={x + w / 2} y={y + d / 2 + lines.length * 1.9 + 0.5} fontSize={1.45} textAnchor="middle" className="room-size">{w}′ × {d}′</text>}
             </g>
@@ -101,6 +165,7 @@ export function HousePlan({ house, levelId, flagged = new Map() }: { house: Hous
       <div className="legend">
         <span>{level.name}</span>
         <span>Room sizes are to wall centerlines</span>
+        {editable && <span>Drag a room to move it, its edge to move a wall, or a door or window to slide it</span>}
         <span>Walls: exterior {house.wallThickness.exterior}″, interior {house.wallThickness.interior}″, foundation {house.wallThickness.foundation}″</span>
         <span style={{ color: FLAG.fail }}>Red: failing check</span>
         <span style={{ color: FLAG.warn }}>Amber dashed: warning</span>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Estate } from './model/types'
 import type { EditOp } from './model/edits'
-import { applyOperations, describeEdits } from './model/edits'
+import { applyOperations, describeEdit, describeEdits } from './model/edits'
 import { sampleEstate } from './model/sampleEstate'
 import { diffChecks, validateEstate } from './model/validate'
 import { appliedRevisions, canRedo, canUndo, commit, currentEstate, loadProject, redo, saveProject, startTimeline, undo } from './model/history'
@@ -87,8 +87,12 @@ export function App() {
   }, [restored, store, timeline])
 
   const current = currentEstate(timeline)
-  const estate = proposal?.estate ?? current
-  const checks = useMemo(() => validateEstate(estate), [estate])
+  // While dragging, the plans show a live preview; checks wait for the drop, since some are too slow to run every frame.
+  const [dragPreview, setDragPreview] = useState<Estate | null>(null)
+  const [dragText, setDragText] = useState('')
+  const checked = proposal?.estate ?? current
+  const estate = proposal?.estate ?? dragPreview ?? current
+  const checks = useMemo(() => validateEstate(checked), [checked])
   const failing = checks.filter(c => c.status !== 'pass').length
   // Elements named by checks that do not pass. A failure outranks a warning on the same element.
   const flagged = useMemo(() => {
@@ -126,6 +130,28 @@ export function App() {
     a.click()
     URL.revokeObjectURL(a.href)
   }
+
+  // Drag to edit: the plans report one named edit; it is applied here, through the same rules as chat.
+  const dragFrame = useRef(0)
+  const onDrag = useCallback((op: EditOp | null) => {
+    cancelAnimationFrame(dragFrame.current)
+    dragFrame.current = requestAnimationFrame(() => {
+      if (!op) { setDragPreview(null); setDragText(''); return }
+      const r = applyOperations(current, [op])
+      setDragPreview(r.ok ? r.estate : null)
+      setDragText(r.ok ? describeEdit(op, current) : `Cannot: ${r.error.replace(/^Not applied: /, '').split('. ')[0]}`)
+    })
+  }, [current])
+  const onDrop = useCallback((op: EditOp | null) => {
+    cancelAnimationFrame(dragFrame.current)
+    setDragPreview(null)
+    setDragText('')
+    if (!op) return
+    const result = commit(timeline, [op], 'owner', describeEdit(op, current))
+    if (result.ok) setTimeline(result.timeline)
+    else setNotice(`Not changed: ${result.error.replace(/^Not applied: /, '')}`)
+  }, [timeline, current])
+  const canDrag = !proposal && !busy
 
   const addTurn = (turn: Omit<Turn, 'id'>) => setTurns(ts => [...ts, { ...turn, id: nextId.current++ }])
   const settlePending = (status: Turn['status']) => setTurns(ts => ts.map(t => t.status === 'pending' ? { ...t, status } : t))
@@ -245,8 +271,9 @@ export function App() {
               {levels.map(l => <button key={l.id} className={level === l.id ? 'active' : ''} onClick={() => setLevel(l.id)}>{l.name}</button>)}
             </div>
           )}
-          {view === 'site' && <SitePlan estate={estate} flagged={flagged} />}
-          {view === 'house' && <HousePlan house={estate.house} levelId={level} flagged={flagged} />}
+          {dragText && <div className={dragText.startsWith('Cannot') ? 'notice' : 'preview-bar'} role="status">{dragText}</div>}
+          {view === 'site' && <SitePlan estate={estate} flagged={flagged} onDrag={canDrag ? onDrag : undefined} onDrop={canDrag ? onDrop : undefined} />}
+          {view === 'house' && <HousePlan house={estate.house} levelId={level} flagged={flagged} onDrag={canDrag ? onDrag : undefined} onDrop={canDrag ? onDrop : undefined} />}
           {view === 'site3d' && <Scene3D estate={estate} mode="site" levelId={level} />}
           {view === 'house3d' && <Scene3D estate={estate} mode="house" levelId={level} />}
           {view === 'sheets' && sheets.length > 0 && (

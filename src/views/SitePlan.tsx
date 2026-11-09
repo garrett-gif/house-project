@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { EditOp } from '../model/edits'
+import { buildingDragOp } from '../ui/dragOps'
 import type { Estate, RoadKind, ZoneKind } from '../model/types'
 import { footprintOf, ft, partsOf, toFt } from '../model/geometry'
 import { fireRules, roadWidth } from '../model/fireChecks'
@@ -21,7 +24,31 @@ const BUILDING = { private: '#2f6f62', work: '#a65a35', visitor: '#a65a35', shar
 const FLAG = { fail: '#c0262d', warn: '#c98a14' }
 
 /** `flagged` maps ids of elements named by checks that do not pass to how badly: red for fail, amber for warn. */
-export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flagged?: ReadonlyMap<string, 'warn' | 'fail'> }) {
+export function SitePlan({ estate, flagged = new Map(), onDrag, onDrop }: { estate: Estate; flagged?: ReadonlyMap<string, 'warn' | 'fail'>; onDrag?: (op: EditOp | null) => void; onDrop?: (op: EditOp | null) => void }) {
+  const svg = useRef<SVGSVGElement>(null)
+  const drag = useRef<{ start: [number, number]; building: Estate['buildings'][number]; op: EditOp | null } | null>(null)
+  const editable = !!onDrag && !!onDrop
+  /** Pointer position in site inches, y north. */
+  const toSite = (e: { clientX: number; clientY: number }): [number, number] => {
+    const el = svg.current!, pt = el.createSVGPoint()
+    pt.x = e.clientX; pt.y = e.clientY
+    const p = pt.matrixTransform(el.getScreenCTM()!.inverse())
+    return [ft(p.x), ft(6600 - p.y)]
+  }
+  const begin = (e: ReactPointerEvent, building: Estate['buildings'][number]) => {
+    if (!editable || e.button !== 0) return
+    e.preventDefault()
+    drag.current = { start: toSite(e), building, op: null }
+    svg.current!.setPointerCapture(e.pointerId)
+  }
+  const move = (e: ReactPointerEvent) => {
+    const d = drag.current
+    if (!d) return
+    const [x, y] = toSite(e)
+    d.op = buildingDragOp(d.building, x - d.start[0], y - d.start[1])
+    onDrag!(d.op)
+  }
+  const end = (cancel: boolean) => { const d = drag.current; drag.current = null; if (d) onDrop!(cancel ? null : d.op) }
   const flagColor = (id: string) => FLAG[flagged.get(id) ?? 'fail']
   const [focus, setFocus] = useState<Focus>('Whole property')
   const [hover, setHover] = useState<string | null>(null)
@@ -42,7 +69,8 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
         <button className={fire ? 'active' : ''} onClick={() => setFire(v => !v)} aria-pressed={fire} title="Defensible space and fire water">Fire layer</button>
         <span className="hover">{hover ?? 'Hover a building for its name'}</span>
       </div>
-      <svg viewBox={`${vx} ${S - vy - vh} ${vw} ${vh}`} role="img" aria-label="Site plan of the 1,000-acre estate and compound">
+      <svg ref={svg} viewBox={`${vx} ${S - vy - vh} ${vw} ${vh}`} role="img" aria-label="Site plan of the 1,000-acre estate and compound"
+        onPointerMove={move} onPointerUp={() => end(false)} onPointerCancel={() => end(true)} style={{ touchAction: editable ? 'none' : undefined }}>
         <rect x="0" y="0" width={S} height={S} fill="#a9bb8c" />
         {estate.zones.map(z => {
           const x = toFt(z.rect.x), w = toFt(z.rect.w), d = toFt(z.rect.d), y = Y(z.rect.y) - d
@@ -61,7 +89,7 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
         {estate.buildings.map(b => {
           const x = toFt(b.rect.x), w = toFt(b.rect.w), d = toFt(b.rect.d), y = Y(b.rect.y) - d
           return (
-            <g key={b.id} onMouseEnter={() => setHover(b.name)}>
+            <g key={b.id} onMouseEnter={() => setHover(b.name)} onPointerDown={editable ? e => begin(e, b) : undefined} style={editable ? { cursor: 'move' } : undefined}>
               {b.footprint && footprintOf(b).map((part, i) => <rect key={`f${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} fillOpacity={0.3} />)}
               {partsOf(b).map((part, i) => <rect key={i} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill={BUILDING[b.access]} />)}
               {flagged.has(b.id) && footprintOf(b).map((part, i) => <rect key={`x${i}`} x={toFt(part.x)} y={Y(part.y) - toFt(part.d)} width={toFt(part.w)} height={toFt(part.d)} fill="none" stroke={flagColor(b.id)} strokeWidth={Math.max(4, 2 * scale)} />)}
@@ -99,7 +127,7 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
         {fire && <span><i style={{ background: 'none', outline: '2px dashed #e07b1a', outlineOffset: -2 }} />{rules.zones[2]} ft zone</span>}
         {fire && <span><i style={{ background: '#2d78b8', borderRadius: '50%' }} />Fire water</span>}
         {fire && <span><i style={{ background: 'none', outline: '2px solid #55524c', borderRadius: '50%', outlineOffset: -2 }} />Turnaround</span>}
-        <span>North is up · building sizes are placeholders</span>
+        <span>North is up · building sizes are placeholders{editable ? ' · drag a building to move it' : ''}</span>
       </div>
     </div>
   )
