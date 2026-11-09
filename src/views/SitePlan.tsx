@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Estate, RoadKind, ZoneKind } from '../model/types'
-import { footprintOf, partsOf, toFt } from '../model/geometry'
+import { footprintOf, ft, partsOf, toFt } from '../model/geometry'
+import { fireRules, roadWidth } from '../model/fireChecks'
 
 const FOCUS = {
   'Whole property': [0, 0, 6600, 6600],
@@ -24,6 +25,8 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
   const flagColor = (id: string) => FLAG[flagged.get(id) ?? 'fail']
   const [focus, setFocus] = useState<Focus>('Whole property')
   const [hover, setHover] = useState<string | null>(null)
+  const [fire, setFire] = useState(false)
+  const rules = fireRules(estate)
   const [vx, vy, vw, vh] = FOCUS[focus]
   const S = 6600
   const Y = (y: number) => S - toFt(y)
@@ -36,6 +39,7 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
     <div className="plan">
       <div className="plan-tools" role="group" aria-label="Map focus">
         {(Object.keys(FOCUS) as Focus[]).map(f => <button key={f} className={f === focus ? 'active' : ''} onClick={() => setFocus(f)}>{f}</button>)}
+        <button className={fire ? 'active' : ''} onClick={() => setFire(v => !v)} aria-pressed={fire} title="Defensible space and fire water">Fire layer</button>
         <span className="hover">{hover ?? 'Hover a building for its name'}</span>
       </div>
       <svg viewBox={`${vx} ${S - vy - vh} ${vw} ${vh}`} role="img" aria-label="Site plan of the 1,000-acre estate and compound">
@@ -49,8 +53,9 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
         })}
         {estate.walkways.map(w => <polyline key={w.id} points={pts(w.points)} fill="none" stroke={flagged.has(w.id) ? flagColor(w.id) : '#2f6f62'} strokeWidth={Math.max(flagged.has(w.id) ? 14 : 8, (flagged.has(w.id) ? 4 : 2) * scale)} onMouseEnter={() => setHover(w.name)} />)}
         {estate.roads.map(r => {
-          const [color, width, dash] = ROAD[r.kind]
-          return <polyline key={r.id} points={pts(r.points)} fill="none" stroke={color} strokeWidth={Math.max(width, 2 * scale)} strokeDasharray={dash} strokeLinejoin="round" onMouseEnter={() => setHover(r.name)} />
+          const [color, , dash] = ROAD[r.kind]
+          const stroke = flagged.has(r.id) ? flagColor(r.id) : color
+          return <polyline key={r.id} points={pts(r.points)} fill="none" stroke={stroke} strokeWidth={Math.max(toFt(roadWidth(r)), 2 * scale)} strokeDasharray={dash} strokeLinejoin="round" onMouseEnter={() => setHover(`${r.name}, ${Math.round(toFt(roadWidth(r)))} ft wide${r.turnaround ? ', turnaround at end' : ''}`)} />
         })}
         <rect x={toFt(estate.runway.rect.x)} y={Y(estate.runway.rect.y) - toFt(estate.runway.rect.d)} width={toFt(estate.runway.rect.w)} height={toFt(estate.runway.rect.d)} fill="#46443f" onMouseEnter={() => setHover(estate.runway.name)} />
         {estate.buildings.map(b => {
@@ -64,6 +69,20 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
             </g>
           )
         })}
+        {fire && estate.buildings.flatMap(b => partsOf(b).flatMap((part, i) => [rules.zones[1], rules.zones[2]].map((dist, k) => {
+          const by = ft(dist)
+          return <rect key={`${b.id}-z${i}-${k}`} x={toFt(part.x - by)} y={Y(part.y + part.d + by)} width={toFt(part.w + 2 * by)} height={toFt(part.d + 2 * by)} fill="none" stroke={k === 0 ? '#c0262d' : '#e07b1a'} strokeWidth={Math.max(1.5, scale)} strokeDasharray={`${6 * scale} ${4 * scale}`} pointerEvents="none" />
+        })))}
+        {fire && (estate.waterSources ?? []).map(w => (
+          <g key={w.id} onMouseEnter={() => setHover(`${w.name}, ${w.gallons.toLocaleString('en-US')} gallons`)}>
+            <circle cx={toFt(w.at.x)} cy={Y(w.at.y)} r={Math.max(14, 6 * scale)} fill="#2d78b8" stroke="#fff" strokeWidth={Math.max(2, scale)} />
+            {showLabels && <text x={toFt(w.at.x)} y={Y(w.at.y) + 18 * scale} fontSize={label * 0.85} textAnchor="middle" className="site-label">{(w.gallons / 1000).toLocaleString('en-US')}k gal</text>}
+          </g>
+        ))}
+        {fire && estate.roads.filter(r => r.turnaround).map(r => {
+          const end = r.points[r.points.length - 1]
+          return <circle key={`t-${r.id}`} cx={toFt(end.x)} cy={Y(end.y)} r={48} fill="none" stroke="#55524c" strokeWidth={Math.max(3, scale)} pointerEvents="none" />
+        })}
         {showLabels && estate.zones.filter(z => ['kart-track', 'training', 'incident-camp', 'pond', 'parking', 'equipment-yard'].includes(z.id)).map(z => (
           <text key={z.id} x={toFt(z.rect.x + z.rect.w / 2)} y={Y(z.rect.y + z.rect.d / 2)} fontSize={label} textAnchor="middle" className="site-label">{z.name}</text>
         ))}
@@ -76,6 +95,10 @@ export function SitePlan({ estate, flagged = new Map() }: { estate: Estate; flag
         <span><i style={{ background: BUILDING.private, opacity: 0.3 }} />Below grade only</span>
         <span><i style={{ background: 'none', outline: `2px solid ${FLAG.fail}`, outlineOffset: -2 }} />Failing check</span>
         <span><i style={{ background: 'none', outline: `2px solid ${FLAG.warn}`, outlineOffset: -2 }} />Warning</span>
+        {fire && <span><i style={{ background: 'none', outline: '2px dashed #c0262d', outlineOffset: -2 }} />{rules.zones[1]} ft zone</span>}
+        {fire && <span><i style={{ background: 'none', outline: '2px dashed #e07b1a', outlineOffset: -2 }} />{rules.zones[2]} ft zone</span>}
+        {fire && <span><i style={{ background: '#2d78b8', borderRadius: '50%' }} />Fire water</span>}
+        {fire && <span><i style={{ background: 'none', outline: '2px solid #55524c', borderRadius: '50%', outlineOffset: -2 }} />Turnaround</span>}
         <span>North is up · building sizes are placeholders</span>
       </div>
     </div>

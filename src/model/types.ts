@@ -17,6 +17,8 @@ export interface Building {
   access: Access
   rect: Rect
   height: Inches
+  /** Ember and flame resistance. Absent means not decided yet. */
+  ignition?: Ignition
   /** Actual masses above grade when the building is not a plain rectangle. `rect` remains the overall bounds. */
   parts?: Rect[]
   /** Footprint on every level, including rooms below grade. Collisions use this. Absent means the same as `parts`. */
@@ -31,10 +33,45 @@ export interface Zone {
   rect: Rect
   /** Cleared or developed land. Thinned forest and training ground stay false. */
   cleared: boolean
+  /** Paved or graveled yard, parking, or apron that a fire engine can drive onto. */
+  hardstand?: boolean
   round?: boolean
 }
 
-export interface Road { id: string; name: string; kind: RoadKind; points: Pt[]; gate?: string }
+/**
+ * `width` is the drivable width; absent means the default for its kind. `turnaround` marks a turnaround for fire
+ * apparatus at the road's last point.
+ */
+export interface Road { id: string; name: string; kind: RoadKind; points: Pt[]; gate?: string; width?: Inches; turnaround?: boolean }
+
+/** Water a fire crew can draft or pump from, with a fill point or dry hydrant at `at`. */
+export interface WaterSource { id: string; name: string; kind: 'cistern' | 'pond' | 'hydrant'; at: Pt; gallons: number }
+
+/** How a building resists embers and flame. Absent means not decided yet. */
+export interface Ignition {
+  /** Fire-tested roof classification. Class A resists the most severe exposure. */
+  roofClass: 'A' | 'B' | 'C' | 'unrated'
+  /** Vents screened or built to resist embers. */
+  emberVents: boolean
+  /** Eaves boxed in with soffits, rather than open rafters. */
+  enclosedEaves: boolean
+  /** Decks and porches: none, built of noncombustible materials, or combustible and open underneath. */
+  decks: 'none' | 'noncombustible' | 'combustible'
+}
+
+/**
+ * Planning values for wildfire and fire access. Defaults follow common wildland-urban interface guidance and are
+ * meant to be replaced with the owner's own standards or the local fire authority's.
+ */
+export interface FireRules {
+  /** Distances in feet from a building: the ember-resistant zone, the lean, clean, and green zone, and the reduced-fuel zone. */
+  zones: [number, number, number]
+  minRoadWidthFt: number
+  maxHosePullFt: number
+  maxDeadEndFt: number
+  maxWaterDistanceFt: number
+  minWaterGallons: number
+}
 /** `from` and `to` are building ids. Moving one of those buildings moves that end of the walkway with it. */
 export interface Walkway { id: string; name: string; points: Pt[]; from?: string; to?: string }
 
@@ -135,6 +172,10 @@ export interface Estate {
   walkways: Walkway[]
   runway: { name: string; rect: Rect }
   house: HouseModel
+  /** Fire water. Optional so older saves still load. */
+  waterSources?: WaterSource[]
+  /** Owner's planning values for wildfire checks. Absent means the defaults. */
+  fireRules?: FireRules
 }
 
 export type CheckStatus = 'pass' | 'warn' | 'fail'

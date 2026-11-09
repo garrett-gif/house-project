@@ -1,12 +1,15 @@
-import type { Access, Building, BuildingUse, Estate, Pt, Road, Zone, ZoneKind } from './types'
+import type { Access, Building, BuildingUse, Estate, Ignition, Pt, Road, WaterSource, Zone, ZoneKind } from './types'
 import { bezier, box, ft, p } from './geometry'
 import { mainHouse } from './house'
 import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
 
+/** Planned for every building: metal roofs, ember-resistant vents, boxed eaves, and no combustible decks. */
+const PLANNED: Ignition = { roofClass: 'A', emberVents: true, enclosedEaves: true, decks: 'none' }
+
 const b = (id: string, name: string, use: BuildingUse, access: Access, cx: number, cy: number, w: number, d: number, h: number): Building =>
-  ({ id, name, use, access, rect: box(cx, cy, w, d), height: ft(h) })
+  ({ id, name, use, access, rect: box(cx, cy, w, d), height: ft(h), ignition: PLANNED })
 
 const z = (id: string, name: string, kind: ZoneKind, access: Access, x0: number, y0: number, x1: number, y1: number, cleared: boolean, round = false): Zone =>
   ({ id, name, kind, access, rect: { x: ft(x0), y: ft(y0), w: ft(x1 - x0), d: ft(y1 - y0) }, cleared, round })
@@ -21,17 +24,28 @@ const approach = [
 
 const inset = 100
 const roads: Road[] = [
-  { id: 'estate-drive', name: 'Estate drive', kind: 'estate', points: approach, gate: 'Estate gate' },
+  { id: 'estate-drive', name: 'Estate drive', kind: 'estate', points: approach, gate: 'Estate gate', turnaround: true },
   { id: 'guest-road', name: 'Estate cross road', kind: 'estate', points: line([350, 3400], [2520, 3400]) },
-  { id: 'guest-north', name: 'Guest and transporter road', kind: 'estate', points: line([1800, 3400], [1800, 5450]) },
-  { id: 'entertainment-spur', name: 'Entertainment shop spur', kind: 'estate', points: line([1800, 5050], [1440, 5050]) },
+  { id: 'guest-north', name: 'Guest and transporter road', kind: 'estate', points: line([1800, 3400], [1800, 5450]), turnaround: true },
+  { id: 'entertainment-spur', name: 'Entertainment shop spur', kind: 'estate', points: line([1800, 5050], [1440, 5050]), turnaround: true },
   { id: 'work-main', name: 'Work main road', kind: 'work', points: line([3000, 0], [3000, 1800], [5600, 1800]), gate: 'Work gate' },
   { id: 'work-loop', name: 'Work loop', kind: 'work', points: line([3000, 1800], [3550, 2250], [3550, 4450], [5750, 4450], [5750, 2120], [5600, 1800]) },
-  { id: 'ops-yard', name: 'Operations yard road', kind: 'work', points: line([3000, 720], [5400, 720]) },
-  { id: 'lodging-street', name: 'Lodging street', kind: 'work', points: line([3000, 1375], [1950, 1375]) },
-  { id: 'cabin-street', name: 'Cabin and RV street', kind: 'work', points: line([3000, 790], [2050, 790]) },
+  { id: 'ops-yard', name: 'Operations yard road', kind: 'work', points: line([3000, 720], [5400, 720]), turnaround: true },
+  { id: 'lodging-street', name: 'Lodging street', kind: 'work', points: line([3000, 1375], [1950, 1375]), turnaround: true },
+  { id: 'cabin-street', name: 'Cabin and RV street', kind: 'work', points: line([3000, 790], [2050, 790]), turnaround: true },
   { id: 'gated-link', name: 'Gated link', kind: 'gated-link', points: line([2520, 3400], [3550, 3400]) },
   { id: 'perimeter', name: 'Perimeter road', kind: 'perimeter', points: line([inset, inset], [SIZE - inset, inset], [SIZE - inset, SIZE - inset], [inset, SIZE - inset], [inset, inset]) },
+]
+
+/** Fire water: cisterns with dry hydrants near each group of buildings, and the pond. Sizes are planning assumptions. */
+const water = (id: string, name: string, kind: WaterSource['kind'], x: number, y: number, gallons: number): WaterSource => ({ id, name, kind, at: p(x, y), gallons })
+const waterSources: WaterSource[] = [
+  water('estate-cistern', 'Estate fire cistern', 'cistern', 1300, 5520, 60000),
+  water('pond-hydrant', 'Pond dry hydrant', 'pond', 2950, 2530, 2000000),
+  water('lodging-cistern', 'Lodging fire cistern', 'cistern', 2400, 1250, 60000),
+  water('ops-cistern', 'Operations fire cistern', 'cistern', 4300, 900, 100000),
+  water('training-cistern', 'Training fire cistern', 'cistern', 4100, 2250, 30000),
+  water('aviation-cistern', 'Aviation fire cistern', 'cistern', 5900, 1300, 60000),
 ]
 
 export const sampleEstate: Estate = withDerivedGeometry({
@@ -40,7 +54,7 @@ export const sampleEstate: Estate = withDerivedGeometry({
   parcel: { seed: 1876, size: ft(SIZE), gridSize: 128 },
   buildings: [
     // The U-shaped outline is derived from the house rooms and origin by withDerivedGeometry.
-    { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), rect: { x: 0, y: 0, w: 0, d: 0 } },
+    { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5388, 80, 40, 14),
     b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
     b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
@@ -67,12 +81,12 @@ export const sampleEstate: Estate = withDerivedGeometry({
     z('estate-core', 'Estate grounds', 'estate', 'private', 400, 3700, 2300, 5750, true),
     z('kart-track', 'Outdoor kart track', 'recreation', 'private', 650, 3800, 1550, 4300, true, true),
     z('operations', 'Operations compound', 'operations', 'work', 3150, 150, 5450, 1800, true),
-    z('equipment-yard', 'Equipment yard', 'operations', 'work', 3150, 770, 5310, 1150, true),
-    z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true),
+    { ...z('equipment-yard', 'Equipment yard', 'operations', 'work', 3150, 770, 5310, 1150, true), hardstand: true },
+    { ...z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true), hardstand: true },
     z('lodging', 'Lodging village', 'lodging', 'work', 1900, 500, 2900, 1900, true),
     z('training', 'Training ground', 'training', 'visitor', 3700, 2250, 5600, 4350, false),
     z('aviation-corridor', 'Runway corridor', 'aviation', 'shared', 5710, 2200, 6210, 5700, true),
-    z('aviation-apron', 'Aviation apron', 'aviation', 'shared', 5500, 1450, 6400, 2200, true),
+    { ...z('aviation-apron', 'Aviation apron', 'aviation', 'shared', 5500, 1450, 6400, 2200, true), hardstand: true },
     z('incident-camp', 'Incident camp', 'incident', 'shared', 5450, 250, 6350, 1450, true),
     z('pond', 'Pond and fire water', 'water', 'shared', 2630, 2530, 3270, 2970, true, true),
   ],
@@ -82,5 +96,6 @@ export const sampleEstate: Estate = withDerivedGeometry({
     { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1230, 5360], [1230, 5130]), from: 'main-house', to: 'entertainment' },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
+  waterSources,
   house: mainHouse,
 })

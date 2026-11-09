@@ -1,5 +1,5 @@
 import type { EditOp } from './edits'
-import { ANCHORS, DOOR_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
+import { ANCHORS, DOOR_KINDS, FIRE_RULE_NAMES, ROAD_KINDS, ROOM_TYPES, SIDES, WALL_KINDS, WINDOW_OPERATIONS } from './edits'
 import { ROOF_FORMS } from './roofs'
 
 /**
@@ -13,6 +13,7 @@ const str = (description: string) => ({ type: 'string', description })
 const anchor = { type: 'string', enum: ANCHORS, description: 'Point that stays fixed: sw, s, se, w, center, e, nw, n, ne. For example n keeps the north edge in place and grows or shrinks to the south.' }
 const side = { type: 'string', enum: SIDES, description: 'Side of the room: n, s, e, or w.' }
 const offset = num('Distance in feet from the start of that side (its west end for n and s sides, its south end for e and w sides) to the center of the opening.')
+const bool = (description: string) => ({ type: 'boolean', description })
 const object = (properties: Record<string, unknown>) =>
   ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false })
 
@@ -127,6 +128,48 @@ export const EDIT_TOOLS: EditToolSpec[] = [
       overhangFt: num('Overhang past the walls in feet.'),
     }),
   },
+  {
+    name: 'addRoad',
+    description: 'Add a road or fire lane on the site. Points are site feet: x east, y north from the southwest parcel corner, in driving order. Mark a turnaround at the last point if it dead-ends.',
+    input_schema: object({
+      id: str('New unique road id: lowercase letters, numbers, and hyphens.'),
+      name: str('Road name.'),
+      kind: { type: 'string', enum: ROAD_KINDS, description: 'estate for private roads, work for compound roads, perimeter, or gated-link.' },
+      pointsFt: { type: 'array', items: { type: 'number' }, description: 'Flat list of site coordinates in feet: x1, y1, x2, y2, and so on. At least two points.' },
+      widthFt: num('Drivable width in feet. Fire apparatus roads need at least the fire rule minimum, 20 ft by default.'),
+      turnaround: bool('True if there is a turnaround for fire apparatus at the last point.'),
+    }),
+  },
+  { name: 'removeRoad', description: 'Remove a road.', input_schema: object({ roadId: str('Road id from the model summary.') }) },
+  { name: 'setRoadWidth', description: 'Change the drivable width of a road.', input_schema: object({ roadId: str('Road id from the model summary.'), widthFt: num('Width in feet.') }) },
+  { name: 'setTurnaround', description: 'Add or remove a fire apparatus turnaround at the last point of a road.', input_schema: object({ roadId: str('Road id from the model summary.'), turnaround: bool('True to add, false to remove.') }) },
+  {
+    name: 'addWaterSource',
+    description: 'Add fire water: a cistern, a pond dry hydrant, or a hydrant, at a site point in feet.',
+    input_schema: object({
+      id: str('New unique id: lowercase letters, numbers, and hyphens.'), name: str('Name.'),
+      kind: { type: 'string', enum: ['cistern', 'pond', 'hydrant'], description: 'cistern, pond, or hydrant.' },
+      xFt: num('Site x in feet, east from the southwest parcel corner.'), yFt: num('Site y in feet, north from the southwest parcel corner.'),
+      gallons: num('Usable gallons.'),
+    }),
+  },
+  { name: 'removeWaterSource', description: 'Remove a fire water source.', input_schema: object({ sourceId: str('Water source id from the model summary.') }) },
+  {
+    name: 'setIgnition',
+    description: 'Set how a building resists embers and flame.',
+    input_schema: object({
+      buildingId: str('Building id from the model summary.'),
+      roofClass: { type: 'string', enum: ['A', 'B', 'C', 'unrated'], description: 'Fire-tested roof class.' },
+      emberVents: bool('True if vents are ember-resistant.'),
+      enclosedEaves: bool('True if eaves are boxed in with soffits.'),
+      decks: { type: 'string', enum: ['none', 'noncombustible', 'combustible'], description: 'Decks and porches.' },
+    }),
+  },
+  {
+    name: 'setFireRule',
+    description: 'Replace one of the wildfire planning values with the owner\'s own standard. Zone distances, widths, and distances are in feet; gallons are gallons.',
+    input_schema: object({ rule: { type: 'string', enum: [...FIRE_RULE_NAMES], description: 'Which rule.' }, value: num('New value.') }),
+  },
 ]
 
 /** Feet to inches, rounded to 1/8 inch so repeated edits do not collect float noise. */
@@ -144,7 +187,10 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
   for (const [key, prop] of Object.entries(schema.properties)) {
     const types = Array.isArray(prop.type) ? prop.type : [prop.type]
     const value = v[key]
-    const ok = types.some(t => t === 'null' ? value === null : t === 'number' ? typeof value === 'number' && Number.isFinite(value) : typeof value === t)
+    const ok = types.some(t => t === 'null' ? value === null
+      : t === 'number' ? typeof value === 'number' && Number.isFinite(value)
+      : t === 'array' ? Array.isArray(value) && value.every(v => typeof v === 'number' && Number.isFinite(v))
+      : typeof value === t)
     if (!ok) return { ok: false, error: `Field "${key}" must be ${types.join(' or ')}.` }
   }
   const extra = Object.keys(v).filter(k => !(k in schema.properties))
@@ -190,6 +236,19 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'removeOpening': return { ok: true, op: { op: 'removeOpening', openingId: s('openingId') } }
     case 'moveWall': return { ok: true, op: { op: 'moveWall', roomId: s('roomId'), side: s('side') as never, distance: inches(n('distanceFt')) } }
     case 'setWallThickness': return { ok: true, op: { op: 'setWallThickness', kind: s('kind') as never, thickness: n('thicknessIn') } }
+    case 'addRoad': {
+      const flat = v.pointsFt as number[]
+      if (flat.length < 4 || flat.length % 2) return { ok: false, error: 'pointsFt needs pairs of x and y, at least two points.' }
+      const points = Array.from({ length: flat.length / 2 }, (_, i) => ({ x: inches(flat[2 * i]), y: inches(flat[2 * i + 1]) }))
+      return { ok: true, op: { op: 'addRoad', road: { id: s('id'), name: s('name'), kind: s('kind') as never, points, width: inches(n('widthFt')), turnaround: v.turnaround as boolean } } }
+    }
+    case 'removeRoad': return { ok: true, op: { op: 'removeRoad', roadId: s('roadId') } }
+    case 'setRoadWidth': return { ok: true, op: { op: 'setRoadWidth', roadId: s('roadId'), width: inches(n('widthFt')) } }
+    case 'setTurnaround': return { ok: true, op: { op: 'setTurnaround', roadId: s('roadId'), turnaround: v.turnaround as boolean } }
+    case 'addWaterSource': return { ok: true, op: { op: 'addWaterSource', source: { id: s('id'), name: s('name'), kind: s('kind') as never, at: { x: inches(n('xFt')), y: inches(n('yFt')) }, gallons: n('gallons') } } }
+    case 'removeWaterSource': return { ok: true, op: { op: 'removeWaterSource', sourceId: s('sourceId') } }
+    case 'setIgnition': return { ok: true, op: { op: 'setIgnition', buildingId: s('buildingId'), ignition: { roofClass: s('roofClass') as never, emberVents: v.emberVents as boolean, enclosedEaves: v.enclosedEaves as boolean, decks: s('decks') as never } } }
+    case 'setFireRule': return { ok: true, op: { op: 'setFireRule', rule: s('rule') as never, value: n('value') } }
     case 'setRoof': return { ok: true, op: { op: 'setRoof', roofId: s('roofId'), form: s('form') as never, pitch: n('pitch'), ridge: s('ridge') as never, low: s('low') as never, overhang: inches(n('overhangFt')) } }
   }
 }

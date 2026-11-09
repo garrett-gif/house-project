@@ -7,8 +7,9 @@ import { ft } from './geometry'
 describe('approved layout version 3', () => {
   const checks = validateEstate(sampleEstate)
 
-  // The placeholder massing was never laid out for walls to stack, so inside walls warn. Everything else passes.
-  const EXPECTED_WARNINGS = new Set(['stack-interior'])
+  // Some inside walls need beams over the big walkout rooms, so that warns.
+  // Wildfire advisories flag real gaps in the schematic site layout: buildings at the forest edge and no fire lanes yet.
+  const EXPECTED_WARNINGS = new Set(['stack-interior', 'defensible-space', 'hose-pull'])
   it.each(checks.map(c => [c.label, c] as const))('%s', (_label, c) => {
     expect(c.status, c.detail).toBe(EXPECTED_WARNINGS.has(c.id) ? 'warn' : 'pass')
   })

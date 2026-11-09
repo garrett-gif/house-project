@@ -2,6 +2,7 @@ import type { Building, Check, CheckStatus, Estate } from './types'
 import { wallChecks } from './wallChecks'
 import { programChecks } from './programChecks'
 import { roofChecks } from './roofChecks'
+import { fireChecks } from './fireChecks'
 import { SQ_IN_PER_ACRE, area, center, footprintOf, ft, overlaps, partsOf, pathLength, pointToRect, rectDistance, samplePath, toFt } from './geometry'
 
 const QUARTER_MILE = ft(1320)
@@ -118,6 +119,7 @@ export function validateEstate(e: Estate): Check[] {
   checks.push(...wallChecks(e))
   checks.push(...programChecks(e))
   checks.push(...roofChecks(e))
+  checks.push(...fireChecks(e))
   return checks
 }
 

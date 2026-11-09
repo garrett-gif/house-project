@@ -1,4 +1,5 @@
-import type { Estate, Inches, Opening, OpeningKind, Rect, RoofForm, Room, RoomType, Side, WallKind, WindowOperation } from './types'
+import type { Estate, FireRules, Ignition, Inches, Opening, OpeningKind, Rect, Road, RoadKind, RoofForm, Room, RoomType, Side, WallKind, WaterSource, WindowOperation } from './types'
+import { DEFAULT_FIRE_RULES } from './fireChecks'
 import { ROOF_FORMS } from './roofs'
 import { SIDE_WORD, placeOpenings, sideLine } from './walls'
 import { footprintOf, overlaps, toFt, translate } from './geometry'
@@ -32,6 +33,20 @@ export type EditOp =
   | { op: 'setWallThickness'; kind: WallKind; thickness: Inches }
   /** Changes how a roof is shaped. Its extent stays the same. */
   | { op: 'setRoof'; roofId: string; form: RoofForm; pitch: number; ridge: 'ew' | 'ns'; low: Side; overhang: Inches }
+  /** Site points are in site inches: x east, y north from the southwest parcel corner. */
+  | { op: 'addRoad'; road: Road }
+  | { op: 'removeRoad'; roadId: string }
+  | { op: 'setRoadWidth'; roadId: string; width: Inches }
+  | { op: 'setTurnaround'; roadId: string; turnaround: boolean }
+  | { op: 'addWaterSource'; source: WaterSource }
+  | { op: 'removeWaterSource'; sourceId: string }
+  | { op: 'setIgnition'; buildingId: string; ignition: Ignition }
+  | { op: 'setFireRule'; rule: FireRuleName; value: number }
+
+export const ROAD_KINDS: RoadKind[] = ['estate', 'work', 'perimeter', 'gated-link']
+export const FIRE_RULE_NAMES = ['zone1Ft', 'zone2Ft', 'zone3Ft', 'minRoadWidthFt', 'maxHosePullFt', 'maxDeadEndFt', 'maxWaterDistanceFt', 'minWaterGallons'] as const
+export type FireRuleName = typeof FIRE_RULE_NAMES[number]
+const ID = /^[a-z0-9][a-z0-9-]*$/
 
 export const SIDES: Side[] = ['n', 's', 'e', 'w']
 export const WALL_KINDS: WallKind[] = ['exterior', 'interior', 'foundation']
@@ -263,6 +278,73 @@ function run(e: Estate, op: EditOp): string {
       Object.assign(roof, { form: op.form, pitch: op.pitch, ridge: op.ridge, low: op.low, overhang: op.overhang })
       return ''
     }
+    case 'addRoad': {
+      const r = op.road
+      if (!ID.test(r.id)) return 'Road ids use lowercase letters, numbers, and hyphens.'
+      if (e.roads.some(x => x.id === r.id)) return `A road with id "${r.id}" already exists.`
+      if (!r.name?.trim()) return 'A new road needs a name.'
+      if (!ROAD_KINDS.includes(r.kind)) return `Road kind must be one of: ${ROAD_KINDS.join(', ')}.`
+      if (!Array.isArray(r.points) || r.points.length < 2) return 'A road needs at least two points.'
+      if (r.points.some(p => !finite(p.x, p.y) || p.x < 0 || p.y < 0 || p.x > e.parcel.size || p.y > e.parcel.size)) return 'Road points must be inside the parcel.'
+      if (r.width !== undefined && (!finite(r.width) || r.width < 96 || r.width > 12 * 60)) return 'Road width must be between 8 and 60 ft.'
+      e.roads.push({ ...r, points: r.points.map(p => ({ ...p })) })
+      return ''
+    }
+    case 'removeRoad': {
+      if (!e.roads.some(r => r.id === op.roadId)) return `No road with id "${op.roadId}".`
+      e.roads = e.roads.filter(r => r.id !== op.roadId)
+      return ''
+    }
+    case 'setRoadWidth': {
+      const r = e.roads.find(x => x.id === op.roadId)
+      if (!r) return `No road with id "${op.roadId}".`
+      if (!finite(op.width) || op.width < 96 || op.width > 12 * 60) return 'Road width must be between 8 and 60 ft.'
+      r.width = op.width
+      return ''
+    }
+    case 'setTurnaround': {
+      const r = e.roads.find(x => x.id === op.roadId)
+      if (!r) return `No road with id "${op.roadId}".`
+      r.turnaround = !!op.turnaround
+      return ''
+    }
+    case 'addWaterSource': {
+      const w = op.source
+      const list = e.waterSources ?? []
+      if (!ID.test(w.id)) return 'Water source ids use lowercase letters, numbers, and hyphens.'
+      if (list.some(x => x.id === w.id)) return `A water source with id "${w.id}" already exists.`
+      if (!['cistern', 'pond', 'hydrant'].includes(w.kind)) return 'Kind must be cistern, pond, or hydrant.'
+      if (!finite(w.at.x, w.at.y) || w.at.x < 0 || w.at.y < 0 || w.at.x > e.parcel.size || w.at.y > e.parcel.size) return 'The water source must be inside the parcel.'
+      if (!finite(w.gallons) || w.gallons < 100) return 'Gallons must be at least 100.'
+      e.waterSources = [...list, { ...w, at: { ...w.at } }]
+      return ''
+    }
+    case 'removeWaterSource': {
+      if (!(e.waterSources ?? []).some(w => w.id === op.sourceId)) return `No water source with id "${op.sourceId}".`
+      e.waterSources = (e.waterSources ?? []).filter(w => w.id !== op.sourceId)
+      return ''
+    }
+    case 'setIgnition': {
+      const b = e.buildings.find(x => x.id === op.buildingId)
+      if (!b) return `No building with id "${op.buildingId}".`
+      const i = op.ignition
+      if (!['A', 'B', 'C', 'unrated'].includes(i.roofClass)) return 'Roof class must be A, B, C, or unrated.'
+      if (!['none', 'noncombustible', 'combustible'].includes(i.decks)) return 'Decks must be none, noncombustible, or combustible.'
+      b.ignition = { roofClass: i.roofClass, emberVents: !!i.emberVents, enclosedEaves: !!i.enclosedEaves, decks: i.decks }
+      return ''
+    }
+    case 'setFireRule': {
+      if (!FIRE_RULE_NAMES.includes(op.rule)) return `Rule must be one of: ${FIRE_RULE_NAMES.join(', ')}.`
+      if (!finite(op.value) || op.value <= 0 || op.value > 1_000_000_000) return 'Rule values must be positive numbers.'
+      const r: FireRules = structuredClone(e.fireRules ?? DEFAULT_FIRE_RULES)
+      if (op.rule === 'zone1Ft') r.zones[0] = op.value
+      else if (op.rule === 'zone2Ft') r.zones[1] = op.value
+      else if (op.rule === 'zone3Ft') r.zones[2] = op.value
+      else r[op.rule] = op.value
+      if (!(r.zones[0] < r.zones[1] && r.zones[1] < r.zones[2])) return 'Defensible space zones must grow outward: zone 1 < zone 2 < zone 3.'
+      e.fireRules = r
+      return ''
+    }
     default:
       return `Unknown edit "${(op as { op: string }).op}".`
   }
@@ -354,6 +436,14 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeOpening': return `Remove ${op.openingId}`
     case 'moveWall': return `Move the ${SIDE_WORD[op.side]} wall of ${room(op.roomId)} ${feet(op.distance)} ${op.distance > 0 ? 'out' : 'in'}`
     case 'setWallThickness': return `Make ${op.kind} walls ${op.thickness} in thick`
+    case 'addRoad': return `Add ${op.road.name} (${feet(op.road.width ?? 240)} wide${op.road.turnaround ? ', turnaround at its end' : ''})`
+    case 'removeRoad': return `Remove ${e.roads.find(r => r.id === op.roadId)?.name ?? op.roadId}`
+    case 'setRoadWidth': return `Make ${e.roads.find(r => r.id === op.roadId)?.name ?? op.roadId} ${feet(op.width)} wide`
+    case 'setTurnaround': return `${op.turnaround ? 'Add' : 'Remove'} a turnaround at the end of ${e.roads.find(r => r.id === op.roadId)?.name ?? op.roadId}`
+    case 'addWaterSource': return `Add ${op.source.name}, ${op.source.gallons.toLocaleString('en-US')} gallons`
+    case 'removeWaterSource': return `Remove ${(e.waterSources ?? []).find(w => w.id === op.sourceId)?.name ?? op.sourceId}`
+    case 'setIgnition': return `Set ${e.buildings.find(b => b.id === op.buildingId)?.name ?? op.buildingId} to a class ${op.ignition.roofClass} roof, ${op.ignition.emberVents ? 'ember-resistant' : 'standard'} vents, ${op.ignition.enclosedEaves ? 'boxed' : 'open'} eaves, ${op.ignition.decks === 'none' ? 'no' : op.ignition.decks} decks`
+    case 'setFireRule': return `Set fire rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
     case 'setRoof': {
       const name = e.house.roofs.find(r => r.id === op.roofId)?.name ?? op.roofId
       const shape = op.form === 'shed' ? `shed sloping down to the ${SIDE_WORD[op.low]}` : `${op.form} with its ridge running ${op.ridge === 'ew' ? 'east-west' : 'north-south'}`
