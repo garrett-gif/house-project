@@ -51,6 +51,8 @@ npm run build   # type-check src and server, vite build, then scan dist/ for cre
 
 ## Other notes
 
+- `docs/design-brief.md` records Garrett's design decisions for every building. Read it before changing a building, and add to it when he decides something new.
+
 - Detailed buildings: the main house is `estate.house`; others with their own rooms live in `estate.houses` (today the guest house, `src/model/guestHouse.ts`, a v1 layout for big gatherings). Room, opening, roof, and level ids are unique across all of them. `src/model/houses.ts` has `allHouses`, `focusHouse` (swaps a building into the `house` slot so views, drawings, and checks written for one house work on any), and `checksForEachHouse` (runs house checks per building and merges them by id, details labeled by building). `applyOperations` routes room, opening, and roof edits to the building that owns the id; `addRoom` goes by level id. Old saves get the guest house layout where its box stood (`withGuestHouseDefaults`).
 - The main house is the second layout (v2), still a concept: open and homey, about 24,500 sq ft, around a two-story great room with the indoor pool under it. Garrett found v1 too compound-like. Its bearing lines and design intent are at the top of `src/model/house.ts`; keep new walls on them where possible so floors stack. A saved browser project with no edits of its own follows the current sample (`resumeProject`).
 - `house.program` holds the brief as checkable requirements (`src/model/programChecks.ts`): rooms, levels, minimum areas and widths, and rooms that must share a wall. Update it when Garrett changes the brief.
