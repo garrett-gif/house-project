@@ -8,9 +8,8 @@ describe('approved layout version 3', () => {
   const checks = validateEstate(sampleEstate)
 
   // Some inside walls need beams over the big walkout rooms, so that warns.
-  // Open for Garrett to decide: the walkout faces south but the sample land falls east, and one stretch of the
-  // perimeter road is just over 10%.
-  const EXPECTED_WARNINGS = new Set(['stack-interior', 'road-grade', 'walkout-grade'])
+  // Open for Garrett to decide: one stretch of the perimeter road is just over 10%.
+  const EXPECTED_WARNINGS = new Set(['stack-interior', 'road-grade'])
   it.each(checks.map(c => [c.label, c] as const))('%s', (_label, c) => {
     expect(c.status, c.detail).toBe(EXPECTED_WARNINGS.has(c.id) ? 'warn' : 'pass')
   })

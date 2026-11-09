@@ -3,7 +3,7 @@ import { bounds, center, footprintOf, ft, partsOf, toFt } from './geometry'
 import { ring } from './fireChecks'
 import { UTILITY_BASIS, demand, utilityRules } from './utilities'
 import { allHouses, houseByBuilding, houseName } from './houses'
-import { existingGrade, groundAt, lowestFloor, roadGrade, siteSlope } from './terrain'
+import { earthwork, existingGrade, groundAt, lowestFloor, roadGrade, siteSlope } from './terrain'
 
 type Bad = { text: string; ids: string[] }
 const BASIS = `Measured on the sample parcel's generated terrain, not a survey. ${UTILITY_BASIS}`
@@ -53,7 +53,10 @@ export function terrainChecks(e: Estate): Check[] {
       const fall = along(OPP[side]) - along(side), need = -level.elevation
       const word = { n: 'north', s: 'south', e: 'east', w: 'west' }[side]
       const best = (['n', 's', 'e', 'w'] as const).map(s => ({ s, fall: along(OPP[s]) - along(s) })).reduce((a, b) => b.fall > a.fall ? b : a)
-      if (fall < need - ft(2)) {
+      if (fall < need - ft(2) && house.excavated) {
+        const w = earthwork(e, house)
+        fits.push(`${houseName(e, house)}: excavated by design, about ${n1(toFt(need - fall))} ft of cut along the ${word} face with retaining walls, roughly ${n(Math.round(w.cutCy / 100) * 100)} cubic yards of cut and ${n(Math.round(w.fillCy / 100) * 100)} of fill`)
+      } else if (fall < need - ft(2)) {
         walkouts.push({
           text: `${houseName(e, house)}: the ground ${fall < 0 ? 'rises' : 'falls'} ${n1(toFt(Math.abs(fall)))} ft toward the ${word} side, and the ${level.name.toLowerCase()} needs about ${n1(toFt(need))} ft, so about ${n1(toFt(need - fall))} ft of cut along the ${word} face. The land falls most toward the ${{ n: 'north', s: 'south', e: 'east', w: 'west' }[best.s]}, ${n1(toFt(best.fall))} ft across the house`,
           ids: [house.buildingId],

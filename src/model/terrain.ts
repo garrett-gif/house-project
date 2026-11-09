@@ -1,6 +1,7 @@
 import type { Building, Estate, HouseModel, Pt, Rect, Road } from './types'
 import { Terrain } from './parcel'
 import { bounds, center, footprintOf, ft, samplePath, toFt } from './geometry'
+import { gradeAt } from './designGrade'
 
 /**
  * Existing ground from the parcel's terrain. Elevations are inches above sea level. The sample parcel's terrain is
@@ -47,6 +48,27 @@ export function houseDatum(e: Estate, house: HouseModel) {
 /** Existing ground at a house-local point, in inches relative to the house's main floor. */
 export const existingGrade = (e: Estate, house: HouseModel, x: number, y: number) =>
   groundAt(e, { x: house.origin.x + x, y: house.origin.y + y }) - houseDatum(e, house)
+
+/**
+ * Rough earthwork for a house, in cubic yards: the designed grade (`gradeAt`) against existing ground over the
+ * house and 30 ft around it, on a 5 ft grid. Under rooms, the design is their lowest floor, so a walkout level is
+ * dug out. A planning estimate; it leaves out footings, overdig, and swell.
+ */
+export function earthwork(e: Estate, house: HouseModel) {
+  const rooms = house.levels.flatMap(l => l.rooms.filter(r => r.type !== 'outdoor').map(r => ({ r, z: l.elevation })))
+  const box = bounds(rooms.map(x => x.r.rect))
+  const step = ft(5), pad = ft(30)
+  let cut = 0, fill = 0
+  for (let x = box.x - pad; x < box.x + box.w + pad; x += step) for (let y = box.y - pad; y < box.y + box.d + pad; y += step) {
+    const px = x + step / 2, py = y + step / 2
+    const under = rooms.filter(({ r }) => px > r.rect.x && px < r.rect.x + r.rect.w && py > r.rect.y && py < r.rect.y + r.rect.d)
+    const design = under.length ? Math.min(...under.map(u => u.z)) : gradeAt(house, px, py)
+    const diff = existingGrade(e, house, px, py) - design
+    if (diff > 0) cut += diff * step * step; else fill -= diff * step * step
+  }
+  const cy = 46656 // cubic inches in a cubic yard
+  return { cutCy: cut / cy, fillCy: fill / cy }
+}
 
 /** Elevation of a building's lowest floor above sea level: ground at its middle, less any levels below grade. */
 export function lowestFloor(e: Estate, b: Building, house?: HouseModel) {

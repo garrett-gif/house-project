@@ -48,6 +48,14 @@ export function withUtilityDefaults(e: Estate): Estate {
  * Projects saved before the guest house had rooms keep its old placeholder box. Give it the guest house layout,
  * with its southwest corner where the box's was. Its outline is derived from the rooms afterward.
  */
+/**
+ * The owner chose to excavate the main house site for its south walkout. Projects saved before that choice get it,
+ * unless they already say otherwise.
+ */
+export function withExcavationDefault(e: Estate): Estate {
+  return e.house.excavated === undefined && e.house.buildingId === 'main-house' ? { ...e, house: { ...e.house, excavated: true } } : e
+}
+
 export function withGuestHouseDefaults(e: Estate): Estate {
   if (e.houses !== undefined) return e
   const box = e.buildings.find(b => b.id === 'guest-house')

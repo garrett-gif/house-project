@@ -176,6 +176,8 @@ const roofs: Roof[] = [
 /** First real layout of the main house, from the brief. A starting point to react to, not a finished design. */
 export const mainHouse: HouseModel = withHouseDefaults({
   buildingId: 'main-house',
+  // The owner chose to keep the walkout facing the south courtyard and excavate for it.
+  excavated: true,
   origin: p(1060, 5360),
   concept: true,
   program,

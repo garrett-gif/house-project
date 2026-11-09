@@ -6,7 +6,7 @@ import { placeOpenings } from './walls'
 import { ridgeHeight } from './roofs'
 import { fireRules, roadWidth } from './fireChecks'
 import { UTILITY_UNIT, demand, occupancy, utilityRules } from './utilities'
-import { groundAt, roadGrade, siteSlope } from './terrain'
+import { earthwork, groundAt, roadGrade, siteSlope } from './terrain'
 import { bounds, center, footprintOf } from './geometry'
 
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
@@ -49,7 +49,7 @@ export function summarizeEstate(e: Estate): string {
 
   for (const house of allHouses(e)) {
   const { origin } = house
-  lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.`)
+  lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.${house.excavated ? ` Its site is excavated to the walkout by design, about ${Math.round(earthwork(e, house).cutCy / 100) * 100} cubic yards of cut.` : ''}`)
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)

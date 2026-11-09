@@ -214,6 +214,7 @@ export const EDIT_TOOLS: EditToolSpec[] = [
     description: 'Replace one of the utility or security planning values with the owner\'s or county\'s standard. Distances in feet, flows in gallons a day, backupShare as a fraction.',
     input_schema: object({ rule: { type: 'string', enum: UTILITY_RULE_NAMES, description: 'Which rule.' }, value: num('New value.') }),
   },
+  { name: 'setExcavated', description: 'Set whether a house site is excavated down to its walkout, with retaining walls, instead of relying on the natural fall of the land.', input_schema: object({ buildingId: str('main-house or guest-house.'), excavated: bool('True to excavate.') }) },
   { name: 'setSwale', description: 'Add or remove a graded drainage swale or curtain drain around a building that sits low.', input_schema: object({ buildingId: str('Building id from the model summary.'), swale: bool('True to add, false to remove.') }) },
   { name: 'setSafeRoom', description: 'Mark or unmark a room of the main house as the safe room.', input_schema: object({ roomId: str('Room id from the model summary.'), safeRoom: bool('True to make it a safe room.') }) },
 ]
@@ -300,6 +301,7 @@ export function toEditOp(name: string, input: unknown): ToolConversion {
     case 'moveUtility': return { ok: true, op: { op: 'moveUtility', utilityId: s('utilityId'), dx: inches(n('eastFt')), dy: inches(n('northFt')) } }
     case 'resizeUtility': return { ok: true, op: { op: 'resizeUtility', utilityId: s('utilityId'), w: inches(n('widthFt')), d: inches(n('depthFt')), anchor: s('anchor') as never } }
     case 'setUtility': return { ok: true, op: { op: 'setUtility', utilityId: s('utilityId'), capacity: n('capacity'), serves: v.serves as string[], pumped: v.pumped as boolean } }
+    case 'setExcavated': return { ok: true, op: { op: 'setExcavated', buildingId: s('buildingId'), excavated: v.excavated as boolean } }
     case 'setSwale': return { ok: true, op: { op: 'setSwale', buildingId: s('buildingId'), swale: v.swale as boolean } }
     case 'removeUtility': return { ok: true, op: { op: 'removeUtility', utilityId: s('utilityId') } }
     case 'addDevice': return { ok: true, op: { op: 'addDevice', device: {

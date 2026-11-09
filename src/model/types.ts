@@ -235,6 +235,11 @@ export interface HouseModel {
   roofs: Roof[]
   /** The brief as checkable requirements. Optional so older saves still load. */
   program?: ProgramItem[]
+  /**
+   * The site is excavated to the design: the ground is cut down to the walkout on its exposed sides, with retaining
+   * walls where the cut meets the existing slope, rather than relying on the land's natural fall.
+   */
+  excavated?: boolean
 }
 
 export interface Estate {

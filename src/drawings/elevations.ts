@@ -25,24 +25,8 @@ export function project(view: ElevationView, [x, y, z]: P3) {
   }
 }
 
-/**
- * Assumed grade, as the brief describes: the land falls south. North of the house is at the main floor; the courtyard
- * and the ground south of the wings are at the walkout floor; the sides of the wings slope between the two.
- */
-export function gradeAt(house: HouseModel, x: number, y: number) {
-  const walkout = [...house.levels].sort((a, b) => a.elevation - b.elevation).find(l => l.elevation < 0)
-  if (!walkout) return 0
-  const exposed = levelWalls(house, walkout).filter(s => s.kind === 'exterior' && outwardSide(s) === 's')
-  if (!exposed.length) return 0
-  const rooms = walkout.rooms.filter(r => r.type !== 'outdoor')
-  const west = Math.min(...rooms.map(r => r.rect.x)), east = Math.max(...rooms.map(r => r.rect.x + r.rect.w))
-  const south = Math.min(...rooms.map(r => r.rect.y))
-  // The highest exposed south face is where the ground steps up to the main floor: the north bar's courtyard wall.
-  const step = Math.max(...exposed.map(s => s.at))
-  if (y >= step) return 0
-  if (x > west && x < east) return walkout.elevation
-  return walkout.elevation * (1 - Math.max(0, Math.min(1, (y - south) / Math.max(1, step - south))))
-}
+import { gradeAt } from '../model/designGrade'
+export { gradeAt }
 
 /** Extent of the walkout level east to west, where the courtyard sits at walkout grade. */
 function walkoutSpan(house: HouseModel) {

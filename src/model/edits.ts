@@ -60,6 +60,8 @@ export type EditOp =
   | { op: 'setSafeRoom'; roomId: string; safeRoom: boolean }
   /** A graded swale or curtain drain around a building. */
   | { op: 'setSwale'; buildingId: string; swale: boolean }
+  /** Whether a house's site is excavated to its walkout, rather than relying on the land's natural fall. */
+  | { op: 'setExcavated'; buildingId: string; excavated: boolean }
 
 export const ROAD_KINDS: RoadKind[] = ['estate', 'work', 'perimeter', 'gated-link']
 export const FIRE_RULE_NAMES = ['zone1Ft', 'zone2Ft', 'zone3Ft', 'minRoadWidthFt', 'maxHosePullFt', 'maxDeadEndFt', 'maxWaterDistanceFt', 'minWaterGallons'] as const
@@ -156,7 +158,7 @@ function checkOpening(e: Estate, o: Opening, kinds: OpeningKind[]) {
 function targetHouse(e: Estate, op: EditOp): string | undefined {
   const opening = (id: string) => allHouses(e).find(h => h.openings.some(o => o.id === id))?.buildingId
   switch (op.op) {
-    case 'moveBuilding': case 'resizeBuilding': return houseByBuilding(e, op.buildingId)?.buildingId
+    case 'moveBuilding': case 'resizeBuilding': case 'setExcavated': return houseByBuilding(e, op.buildingId)?.buildingId
     case 'moveRoom': case 'resizeRoom': case 'removeRoom': case 'renameRoom': case 'setRoomType': case 'moveWall': case 'setSafeRoom':
       return houseOfRoom(e, op.roomId)?.buildingId
     case 'addRoom': return allHouses(e).find(h => h.levels.some(l => l.id === op.levelId))?.buildingId
@@ -511,6 +513,11 @@ function runInHouse(e: Estate, op: EditOp): string {
       e.utilityRules = { ...e.utilityRules, [op.rule]: op.value }
       return ''
     }
+    case 'setExcavated': {
+      if (e.house.buildingId !== op.buildingId) return `No house with id "${op.buildingId}".`
+      e.house.excavated = !!op.excavated
+      return ''
+    }
     case 'setSwale': {
       const b = e.buildings.find(x => x.id === op.buildingId)
       if (!b) return `No building with id "${op.buildingId}".`
@@ -648,6 +655,7 @@ export function describeEdit(op: EditOp, e: Estate): string {
     case 'removeDevice': return `Remove ${device(op.deviceId)}`
     case 'setOccupancy': return `Set ${building(op.buildingId)} to ${op.beds} sleeping and ${op.staff} by day${op.backupPower ? ', on backup power' : ', no backup power'}`
     case 'setUtilityRule': return `Set utility rule ${op.rule} to ${op.value.toLocaleString('en-US')}`
+    case 'setExcavated': return op.excavated ? `Excavate the ${building(op.buildingId).toLowerCase()} site to its walkout, with retaining walls` : `Rely on the natural fall of the land at the ${building(op.buildingId).toLowerCase()}`
     case 'setSwale': return `${op.swale ? 'Add' : 'Remove'} a drainage swale around ${building(op.buildingId)}`
     case 'setSafeRoom': return op.safeRoom ? `Make ${room(op.roomId)} the safe room` : `${room(op.roomId)} is no longer a safe room`
     case 'setRoof': {

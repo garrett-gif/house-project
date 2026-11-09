@@ -3,7 +3,8 @@ import { sampleEstate } from './sampleEstate'
 import { applyOperations } from './edits'
 import { toEditOp } from './editTools'
 import { validateEstate } from './validate'
-import { contours, groundAt, houseDatum, roadGrade, terrainOf } from './terrain'
+import { contours, earthwork, groundAt, houseDatum, roadGrade, terrainOf } from './terrain'
+import { withExcavationDefault } from './migrate'
 import { Terrain } from './parcel'
 import { summarizeEstate } from './summary'
 import { drawingSet } from '../drawings/drawingSet'
@@ -38,8 +39,18 @@ describe('terrain', () => {
 })
 
 describe('terrain checks', () => {
-  it('find that the main house walkout faces the wrong way on this land', () => {
+  it('accept the main house walkout because its site is excavated, and estimate the earthwork', () => {
     const c = check(sampleEstate, 'walkout-grade')
+    expect(c.status).toBe('pass')
+    expect(c.detail).toMatch(/Main house: excavated by design, about 11\.8 ft of cut along the south face with retaining walls, roughly [\d,]+ cubic yards of cut/)
+    const w = earthwork(sampleEstate, sampleEstate.house)
+    // At least the walkout level dug out: about 14,000 sq ft, 11 ft deep, over 27 cubic feet per yard.
+    expect(w.cutCy).toBeGreaterThan(14000 * 11 / 27 * 0.8)
+  })
+
+  it('find that the walkout faces the wrong way on this land without the excavation', () => {
+    const e = ok(applyOperations(sampleEstate, [{ op: 'setExcavated', buildingId: 'main-house', excavated: false }]))
+    const c = check(e, 'walkout-grade')
     expect(c).toMatchObject({ status: 'warn', elements: ['main-house'] })
     expect(c.detail).toMatch(/about 11\.8 ft of cut along the south face\. The land falls most toward the east, 8\.4 ft/)
   })
@@ -47,6 +58,7 @@ describe('terrain checks', () => {
   it('show how much cut an east-facing walkout would need instead', () => {
     const e = structuredClone(sampleEstate)
     e.house.levels.find(l => l.id === 'walkout')!.exposed = ['e']
+    e.house.excavated = false
     expect(check(e, 'walkout-grade').detail).toMatch(/falls 8\.4 ft toward the east side, .* about 2\.6 ft of cut along the east face/)
   })
 
@@ -79,6 +91,18 @@ describe('terrain checks', () => {
   })
 })
 
+describe('the excavation choice', () => {
+  it('carries into projects saved before it, but not over an explicit no', () => {
+    const old = structuredClone(sampleEstate)
+    delete old.house.excavated
+    expect(withExcavationDefault(old).house.excavated).toBe(true)
+    const no = structuredClone(sampleEstate)
+    no.house.excavated = false
+    expect(withExcavationDefault(no).house.excavated).toBe(false)
+    expect(toEditOp('setExcavated', { buildingId: 'main-house', excavated: true })).toEqual({ ok: true, op: { op: 'setExcavated', buildingId: 'main-house', excavated: true } })
+  })
+})
+
 describe('terrain in the drawings and the chat summary', () => {
   const info = { revision: 0, date: '2026-11-09', projectName: 'House Project' }
   const texts = (number: string) => drawingSet(sampleEstate, info).find(s => s.number === number)!.marks.flatMap(m => m.t === 'text' ? [m.text] : [])
@@ -99,5 +123,6 @@ describe('terrain in the drawings and the chat summary', () => {
     expect(text).toMatch(/- perimeter: Perimeter road, .* steepest 10\.2%/)
     expect(text).toMatch(/car-building: .* drainage swale/)
     expect(text).toMatch(/lodging-septic: .* pumped/)
+    expect(text).toMatch(/Its site is excavated to the walkout by design, about [\d]+ cubic yards of cut\./)
   })
 })
