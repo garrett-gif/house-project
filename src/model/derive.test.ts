@@ -33,7 +33,7 @@ describe('below-grade rooms', () => {
 
 describe('checks name what they are about', () => {
   it('names the stretched walkway', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'moveBuilding', buildingId: 'car-building', dx: ft(100), dy: 0 }]))
+    const e = ok(applyOperations(sampleEstate, [{ op: 'moveBuilding', buildingId: 'car-building', dx: ft(300), dy: 0 }]))
     expect(validateEstate(e).find(c => c.id === 'walkways')).toMatchObject({ status: 'fail', elements: ['walk-car'] })
   })
 

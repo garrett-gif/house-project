@@ -87,7 +87,7 @@ describe('site plan sheet', () => {
     }
     expect(texts).toContain('ESTATE GATE')
     expect(texts).toContain('WORK GATE')
-    expect(texts).toContain('3,000 gallons a day')
+    expect(texts).toContain('4,000 gallons a day')
   })
 
   it('keeps the plan and schedules clear of the title block and on the sheet', () => {

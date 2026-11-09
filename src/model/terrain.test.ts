@@ -86,10 +86,10 @@ describe('terrain checks', () => {
     expect(check(e, 'drainfield-ground').status).toBe('warn')
   })
 
-  it('flag a building in a hollow unless a swale carries the water around it', () => {
-    expect(check(sampleEstate, 'site-drainage').detail).toMatch(/swale carries runoff around Car collection building/)
-    const e = ok(applyOperations(sampleEstate, [{ op: 'setSwale', buildingId: 'car-building', swale: false }]))
-    expect(check(e, 'site-drainage')).toMatchObject({ status: 'warn', elements: ['car-building'] })
+  it('name the buildings with a drainage swale', () => {
+    expect(check(sampleEstate, 'site-drainage').status).toBe('pass')
+    const e = ok(applyOperations(sampleEstate, [{ op: 'setSwale', buildingId: 'fuel', swale: true }]))
+    expect(check(e, 'site-drainage').detail).toMatch(/swale carries runoff around Fuel island and storage/)
     expect(toEditOp('setSwale', { buildingId: 'car-building', swale: true })).toEqual({ ok: true, op: { op: 'setSwale', buildingId: 'car-building', swale: true } })
   })
 })
@@ -124,7 +124,6 @@ describe('terrain in the drawings and the chat summary', () => {
     const text = summarizeEstate(sampleEstate)
     expect(text).toMatch(/- main-house: Main house, .* ground \d{4}(\.\d)? ft above sea level sloping [\d.]+%/)
     expect(text).toMatch(/- perimeter: Perimeter road, .* steepest 10\.2%/)
-    expect(text).toMatch(/car-building: .* drainage swale/)
     expect(text).toMatch(/lodging-septic: .* pumped/)
     expect(text).toMatch(/Its site is excavated to the walkout by design, about [\d]+ cubic yards of cut\./)
   })

@@ -194,7 +194,7 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
             </g>
           )
         })}
-        <text x={mid} y={top - y1 - 2} fontSize={2.2} textAnchor="middle" className="room-size">North, entry</text>
+        <text x={mid} y={top - y1 - 2} fontSize={2.2} textAnchor="middle" className="room-size">North</text>
         <text x={mid} y={top - y0 + 6} fontSize={2.2} textAnchor="middle" className="room-size">South</text>
       </svg>
       <div className="legend">

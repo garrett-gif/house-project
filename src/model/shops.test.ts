@@ -84,6 +84,6 @@ describe('shop drawings and the chat summary', () => {
     const text = summarizeEstate(sampleEstate)
     expect(text).toMatch(/\d+ overhead doors, .* one at each end of every lane/)
     expect(text).toMatch(/furniture: 25 engine-t3, 25 engine-t6, 25 water-tender, 3 crew-carrier/)
-    expect(text.length).toBeLessThan(120000)
+    expect(text.length).toBeLessThan(150000)
   })
 })

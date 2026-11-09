@@ -144,6 +144,55 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'hose-washer': { name: 'Hose washer and drying rack', w: 144, d: 48, h: 96, category: 'equipment', place: 'wall', front: 48, kw: 3 },
   'gear-lockers': { name: 'Turnout and gear lockers', w: 144, d: 24, h: 84, category: 'storage', place: 'wall', front: 48 },
   'conference-table': { name: 'Table for 12', w: 192, d: 96, h: 30, category: 'table', place: 'center', around: 24, seats: 12, parts: [p('Table', 24, 24, 144, 48, 30), ...row('Chair', 5, 20, 20, 36, 8, 32, 2), ...row('Chair', 5, 20, 20, 36, 8, 32, 74), p('Chair', 2, 38, 20, 20, 36), p('Chair', 170, 38, 20, 20, 36)] },
+  // Office and dispatch.
+  'reception-desk': { name: 'Reception desk', w: 120, d: 66, h: 42, category: 'table', place: 'wall', parts: [p('Desk', 0, 0, 120, 30, 42), p('Chair', 24, 40, 24, 24, 36), p('Chair', 72, 40, 24, 24, 36)] },
+  'dispatch-row-4': { name: 'Four dispatch consoles', w: 312, d: 66, h: 30, category: 'equipment', place: 'wall', seats: 4, kw: 3.2, parts: [...row('Console', 4, 72, 36, 30, 8, 0, 0), ...row('Chair', 4, 24, 24, 36, 56, 24, 42)] },
+  'display-wall': { name: 'Display wall and screens', w: 240, d: 12, h: 96, category: 'fixture', place: 'wall', front: 48, kw: 2, shortWall: true },
+  'class-seating-50': { name: 'Training tables, 5 rows of 10', w: 432, d: 312, h: 30, category: 'table', place: 'center', around: 24, seats: 50,
+    parts: [0, 66, 132, 198, 264].flatMap(y => [...row('Table', 5, 72, 24, 30, 18, 0, y), ...row('Chair', 10, 20, 20, 36, 25.5, 6, y + 26)]) },
+  'eoc-seating-40': { name: 'Operations tables, 4 rows of 10', w: 432, d: 246, h: 30, category: 'table', place: 'center', around: 24, seats: 40, kw: 2,
+    parts: [0, 66, 132, 198].flatMap(y => [...row('Table', 5, 72, 24, 30, 18, 0, y), ...row('Chair', 10, 20, 20, 36, 25.5, 6, y + 26)]) },
+  'conference-16': { name: 'Conference table for 16', w: 264, d: 108, h: 30, category: 'table', place: 'center', around: 30, seats: 16,
+    parts: [p('Table', 24, 24, 216, 60, 30), ...row('Chair', 7, 20, 20, 36, 10, 30, 2), ...row('Chair', 7, 20, 20, 36, 10, 30, 86), p('Chair', 2, 44, 20, 20, 36), p('Chair', 242, 44, 20, 20, 36)] },
+  'conference-8': { name: 'Conference table for 8', w: 144, d: 90, h: 30, category: 'table', place: 'center', around: 24, seats: 8,
+    parts: [p('Table', 24, 24, 96, 42, 30), ...row('Chair', 3, 20, 20, 36, 8, 34, 2), ...row('Chair', 3, 20, 20, 36, 8, 34, 68), p('Chair', 2, 35, 20, 20, 36), p('Chair', 122, 35, 20, 20, 36)] },
+  'workstation-pod-4': { name: 'Four workstations', w: 120, d: 120, h: 30, category: 'table', place: 'floor', around: 24, seats: 4, kw: 0.8,
+    parts: [p('Desk', 0, 30, 60, 30, 30), p('Desk', 60, 30, 60, 30, 30), p('Desk', 0, 60, 60, 30, 30), p('Desk', 60, 60, 60, 30, 30), p('Chair', 18, 2, 24, 24, 36), p('Chair', 78, 2, 24, 24, 36), p('Chair', 18, 94, 24, 24, 36), p('Chair', 78, 94, 24, 24, 36)] },
+  'exec-desk': { name: 'Executive desk and chair', w: 84, d: 74, h: 30, category: 'table', place: 'wall', parts: [p('Desk', 0, 0, 84, 42, 30), p('Chair', 29, 48, 26, 26, 40)] },
+  kitchenette: { name: 'Kitchenette', w: 96, d: 26, h: 36, category: 'kitchen', place: 'wall', front: 36, kw: 2 },
+  'server-rack': { name: 'Server and radio racks', w: 96, d: 42, h: 84, category: 'equipment', place: 'wall', front: 42, kw: 8 },
+  'plan-table': { name: 'Map and plan table', w: 96, d: 48, h: 36, category: 'table', place: 'center', around: 36 },
+  'flat-files': { name: 'Flat files', w: 60, d: 36, h: 36, category: 'storage', place: 'wall', front: 36 },
+  copier: { name: 'Copier and printer', w: 60, d: 30, h: 48, category: 'equipment', place: 'wall', front: 36, kw: 1.5 },
+  // Car collection.
+  'sports-car': { name: 'Sports car', w: 78, d: 180, h: 48, category: 'vehicle', place: 'floor', around: 24 },
+  'classic-car': { name: 'Classic car', w: 80, d: 216, h: 54, category: 'vehicle', place: 'floor', around: 24 },
+  suv: { name: 'Truck or SUV', w: 80, d: 240, h: 78, category: 'vehicle', place: 'floor', around: 24 },
+  motorcycle: { name: 'Motorcycle', w: 34, d: 86, h: 46, category: 'vehicle', place: 'floor', around: 12 },
+  snowmobile: { name: 'Snowmobile', w: 48, d: 132, h: 48, category: 'vehicle', place: 'floor', around: 12 },
+  'car-lift': { name: 'Two-post lift bay', w: 144, d: 300, h: 4, category: 'equipment', place: 'floor', around: 18, kw: 3 },
+  'alignment-rack': { name: 'Alignment rack', w: 144, d: 300, h: 24, category: 'equipment', place: 'floor', around: 24, kw: 2 },
+  'tire-machine': { name: 'Tire changer and balancer', w: 72, d: 36, h: 48, category: 'equipment', place: 'wall', front: 36, kw: 2 },
+  'paint-booth': { name: 'Downdraft paint booth', w: 192, d: 336, h: 120, category: 'fixture', place: 'center', around: 18, kw: 15 },
+  'mixing-bench': { name: 'Paint mixing bench', w: 96, d: 30, h: 36, category: 'equipment', place: 'wall', front: 36, kw: 1 },
+  'car-wash': { name: 'Car wash bay with pressure washer', w: 144, d: 300, h: 4, category: 'equipment', place: 'center', kw: 5 },
+  'detail-station': { name: 'Detail bay', w: 144, d: 300, h: 4, category: 'equipment', place: 'center', kw: 2 },
+  // Entertainment.
+  'kart-circuit': { name: 'Indoor kart circuit', w: 2640, d: 1440, h: 3, category: 'fixture', place: 'center' },
+  'go-kart': { name: 'Electric go-kart', w: 48, d: 80, h: 30, category: 'vehicle', place: 'floor', around: 12, kw: 3 },
+  'trampoline-court': { name: 'Trampoline court', w: 600, d: 480, h: 36, category: 'fixture', place: 'floor' },
+  'foam-pit': { name: 'Foam pit', w: 240, d: 240, h: 36, category: 'fixture', place: 'floor' },
+  'dodgeball-court': { name: 'Trampoline dodgeball court', w: 360, d: 240, h: 36, category: 'fixture', place: 'floor' },
+  'ninja-course': { name: 'Ninja course', w: 480, d: 96, h: 120, category: 'fixture', place: 'wall' },
+  'climbing-wall': { name: 'Climbing wall', w: 480, d: 36, h: 360, category: 'fixture', place: 'wall', front: 120 },
+  'arena-obstacles': { name: 'Laser tag arena walls', w: 600, d: 600, h: 72, category: 'fixture', place: 'center' },
+  'basketball-court': { name: 'Basketball and pickleball court', w: 600, d: 1008, h: 1, category: 'fixture', place: 'center' },
+  'bowling-lanes-4': { name: 'Four bowling lanes', w: 288, d: 1080, h: 1, category: 'fixture', place: 'center', kw: 8, parts: row('Lane', 4, 60, 1080, 1, 12, 0, 0) },
+  'arcade-row': { name: 'Six arcade cabinets', w: 216, d: 36, h: 72, category: 'equipment', place: 'wall', front: 48, kw: 3 },
+  'pinball-row': { name: 'Three pinball machines', w: 150, d: 54, h: 72, category: 'equipment', place: 'wall', front: 42, kw: 1.2 },
+  'skee-ball-row': { name: 'Four skee-ball lanes', w: 120, d: 120, h: 60, category: 'equipment', place: 'wall', front: 48, kw: 1 },
+  'air-hockey': { name: 'Air hockey table', w: 96, d: 54, h: 32, category: 'equipment', place: 'center', around: 36, kw: 0.5 },
+  'golf-sim-bay': { name: 'Golf simulator bay', w: 180, d: 240, h: 120, category: 'equipment', place: 'floor', kw: 1.5 },
   // Mechanical and storage rooms.
   boiler: { name: 'Boiler', w: 36, d: 36, h: 72, category: 'equipment', place: 'wall', front: 36, kw: 1 },
   'water-heater': { name: 'Water heaters', w: 60, d: 30, h: 72, category: 'equipment', place: 'wall', front: 30, kw: 4.5 },
@@ -253,6 +302,47 @@ function recipe(room: Room): string[] {
     'wine-cellar': ['wine-rack'], 'safe-room': ['spa-bench', 'shelving'],
     bunk: ['bunk-bed', 'bunk-bed', 'bunk-bed'],
   }
+  if (/reception/.test(name)) return ['reception-desk', 'living-group']
+  if (/arrival lobby/.test(name)) return ['console-table', 'bench', 'bench']
+  if (/dispatch floor/.test(name)) return ['dispatch-row-4', 'dispatch-row-4', 'display-wall']
+  if (/emergency operations/.test(name)) return ['display-wall', 'eoc-seating-40']
+  if (/training room/.test(name)) return ['display-wall', 'class-seating-50']
+  if (/executive conference/.test(name)) return ['conference-8']
+  if (/executive office/.test(name)) return ['exec-desk', 'bookshelf', 'bookshelf', 'armchair-pair']
+  if (/executive lounge/.test(name)) return ['living-group', 'bar-counter']
+  if (/anteroom/.test(name)) return ['desk', 'armchair-pair']
+  if (/conference room/.test(name)) return ['conference-16', 'display-wall']
+  if (/open office/.test(name)) return Array(6).fill('workstation-pod-4')
+  if (/private office/.test(name)) return ['desk', 'bookshelf', 'armchair']
+  if (/break room/.test(name)) return ['counter-sink', 'fridge', 'game-table-4', 'game-table-4', 'game-table-4']
+  if (/dispatcher rest/.test(name)) return ['sofa', 'kitchenette', 'armchair']
+  if (/radio and server/.test(name)) return ['server-rack', 'electrical-panels']
+  if (/records and plans/.test(name)) return ['plan-table', 'flat-files', 'shelving', 'shelving']
+  if (/mail, print/.test(name)) return ['copier', 'folding-counter', 'shelving', 'shelving']
+  if (/showers and lockers/.test(name)) return ['lockers', 'lockers', 'shower', 'shower', 'bench']
+  if (/collector's lounge/.test(name)) return ['bar-counter', 'living-group', 'living-group', 'dining-12', 'armchair-pair']
+  if (/catering/.test(name)) return ['counter-range', 'counter-sink', 'fridge', 'kitchenette']
+  if (/detail bay/.test(name)) return ['detail-station', 'shelving']
+  if (/wash bay/.test(name)) return ['car-wash', 'shelving']
+  if (/paint booth/.test(name)) return ['paint-booth']
+  if (/paint mixing/.test(name)) return ['mixing-bench', 'shelving']
+  if (/body and prep/.test(name)) return ['car-lift', 'workbench']
+  if (/mechanic area/.test(name)) return ['workbench', 'parts-racks']
+  if (/^restrooms$|mezzanine restrooms/i.test(name)) return ['toilet', 'toilet', 'vanity-double']
+  if (/tire and alignment/.test(name)) return ['alignment-rack', 'tire-machine']
+  if (/indoor kart track/.test(name)) return ['kart-circuit']
+  if (/kart pit/.test(name)) return [...Array(8).fill('go-kart'), 'workbench']
+  if (/trampoline park/.test(name)) return ['trampoline-court', 'dodgeball-court', 'foam-pit', 'ninja-course']
+  if (/climbing/.test(name)) return ['climbing-wall', 'mat-area']
+  if (/laser tag/.test(name)) return ['arena-obstacles']
+  if (/sports court/.test(name)) return ['basketball-court']
+  if (/bowling/.test(name)) return ['bowling-lanes-4', 'living-group']
+  if (/arcade/.test(name)) return ['arcade-row', 'arcade-row', 'pinball-row', 'skee-ball-row', 'air-hockey']
+  if (/golf/.test(name)) return ['golf-sim-bay', 'golf-sim-bay']
+  if (/gaming lounge/.test(name)) return ['living-group', 'tv-console', 'living-group']
+  if (/snack bar/.test(name)) return ['counter-sink', 'fridge', 'bar-counter', 'game-table-4', 'game-table-4']
+  if (/party room/.test(name)) return ['dining-12', 'dining-12']
+  if (/viewing mezzanine/.test(name)) return ['living-group', 'living-group', 'living-group', 'bar-counter']
   if (/gear lockers/.test(name)) return ['gear-lockers', 'gear-lockers', 'gear-lockers', 'bench']
   if (/hose/.test(name)) return ['hose-washer', 'shelving']
   if (/ready room/.test(name)) return ['conference-table', 'living-group', 'tv-console']

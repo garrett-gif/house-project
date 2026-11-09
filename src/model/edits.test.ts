@@ -54,21 +54,22 @@ describe('moveBuilding', () => {
     expect(building(e, 'forestry-shop').rect.y).toBe(building(sampleEstate, 'forestry-shop').rect.y - ft(20))
   })
 
-  it('moves the car building 100 ft east and stretches its walkway', () => {
-    const e = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'car-building', dx: ft(100), dy: 0 }))
-    expect(building(e, 'car-building').rect.x).toBe(building(sampleEstate, 'car-building').rect.x + ft(100))
+  it('moves the car building east and stretches the walkway from the entertainment shop', () => {
+    const e = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'car-building', dx: ft(300), dy: 0 }))
+    expect(building(e, 'car-building').rect.x).toBe(building(sampleEstate, 'car-building').rect.x + ft(300))
     const walk = e.walkways.find(w => w.id === 'walk-car')!
     expect(walk.points[0]).toEqual(sampleEstate.walkways.find(w => w.id === 'walk-car')!.points[0])
-    expect(walk.points.at(-1)!.x).toBe(ft(1566))
+    expect(walk.points.at(-1)!.x).toBe(ft(1470))
     expect(validateEstate(e).find(c => c.id === 'walkways')!.status).toBe('fail')
   })
 
-  it('moves the main house with its rooms, outline, and walkway ends', () => {
+  it('moves a detailed building with its rooms, outline, and walkway ends', () => {
     const e = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'main-house', dx: ft(5), dy: ft(5) }))
     expect(e.house.origin).toEqual({ x: sampleEstate.house.origin.x + ft(5), y: sampleEstate.house.origin.y + ft(5) })
     expect(building(e, 'main-house').rect.x).toBe(building(sampleEstate, 'main-house').rect.x + ft(5))
-    const a = sampleEstate.walkways.find(w => w.id === 'walk-ent')!, b = e.walkways.find(w => w.id === 'walk-ent')!
-    expect(b.points[0]).toEqual({ x: a.points[0].x + ft(5), y: a.points[0].y + ft(5) })
+    const fun = ok(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'entertainment', dx: ft(-5), dy: 0 }))
+    const a = sampleEstate.walkways.find(w => w.id === 'walk-car')!, b = fun.walkways.find(w => w.id === 'walk-car')!
+    expect(b.points[0]).toEqual({ x: a.points[0].x - ft(5), y: a.points[0].y })
     expect(b.points.at(-1)).toEqual(a.points.at(-1))
   })
 

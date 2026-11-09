@@ -32,11 +32,11 @@ describe('wildfire checks on the sample estate', () => {
     expect(c.elements).not.toContain('main-house')
   })
 
-  it('flag the car building when the house fire lane is removed', () => {
+  it('flag the pool house when the house fire lane is removed', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'removeRoad', roadId: 'house-fire-lane' }]))
     const c = check(e, 'hose-pull')
     expect(c.status).toBe('warn')
-    expect(c.elements).toContain('car-building')
+    expect(c.elements).toContain('outdoor-pool')
     expect(c.elements).not.toContain('hangars')
   })
 
@@ -77,7 +77,7 @@ describe('fire edits', () => {
   })
 
   it('removing a cistern leaves buildings without water, and adding one restores it', () => {
-    const dry = ok(applyOperations(sampleEstate, [{ op: 'removeWaterSource', sourceId: 'estate-cistern' }]))
+    const dry = ok(applyOperations(sampleEstate, [{ op: 'removeWaterSource', sourceId: 'estate-cistern' }, { op: 'removeWaterSource', sourceId: 'fun-cistern' }]))
     expect(check(dry, 'fire-water').elements).toContain('main-house')
     const wet = ok(applyOperations(dry, [{ op: 'addWaterSource', source: { id: 'new-cistern', name: 'New cistern', kind: 'cistern', at: { x: ft(1100), y: ft(5560) }, gallons: 40000 } }]))
     expect(check(wet, 'fire-water').elements ?? []).not.toContain('main-house')
@@ -129,7 +129,7 @@ describe('older saved projects', () => {
     const loaded = loadProject({ format: 'house-project', version: 1, base: old, revisions: [], index: 0 })
     if (!loaded.ok) throw new Error(loaded.error)
     const e = loaded.timeline.states[0]
-    expect(e.waterSources).toHaveLength(6)
+    expect(e.waterSources).toHaveLength(sampleEstate.waterSources!.length)
     for (const id of ['dead-ends', 'fire-water', 'ignition']) expect(check(e, id).status, id).toBe('pass')
   })
 })

@@ -3,6 +3,7 @@ import { bezier, box, ft, p, samplePath } from './geometry'
 import { mainHouse } from './house'
 import { guestHouse } from './guestHouse'
 import { SHOP_SPECS, shopBuildings } from './shops'
+import { carBuilding, entertainmentBuilding, officeBuilding } from './amenities'
 import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
@@ -29,7 +30,8 @@ const roads: Road[] = [
   { id: 'estate-drive', name: 'Estate drive', kind: 'estate', points: approach, gate: 'Estate gate', turnaround: true },
   { id: 'guest-road', name: 'Estate cross road', kind: 'estate', points: line([350, 3400], [2520, 3400]) },
   { id: 'guest-north', name: 'Guest and transporter road', kind: 'estate', points: line([1800, 3400], [1800, 5450]), turnaround: true },
-  { id: 'entertainment-spur', name: 'Entertainment shop spur', kind: 'estate', points: line([1800, 5050], [1440, 5050]), turnaround: true },
+  // The fun buildings by the outdoor kart track, off the guest and transporter road.
+  { id: 'fun-road', name: 'Entertainment and car building drive', kind: 'estate', points: line([1800, 4660], [680, 4660]), turnaround: true },
   { id: 'work-main', name: 'Work main road', kind: 'work', points: line([3000, 0], [3000, 1800], [5600, 1800]), gate: 'Work gate' },
   { id: 'work-loop', name: 'Work loop', kind: 'work', points: line([3000, 1800], [3550, 2250], [3550, 4450], [5750, 4450], [5750, 2120], [5600, 1800]) },
   { id: 'ops-yard', name: 'Operations yard road', kind: 'work', points: line([3000, 720], [5400, 720]), turnaround: true },
@@ -38,8 +40,6 @@ const roads: Road[] = [
   { id: 'gated-link', name: 'Gated link', kind: 'gated-link', points: line([2520, 3400], [3550, 3400]) },
   // Fire lanes, 20 ft wide, so an engine can reach every outside wall within a 150 ft hose pull.
   { id: 'house-fire-lane', name: 'House fire lane', kind: 'estate', width: ft(20), points: line([1000, 5520], [1000, 5300], [1800, 5300]) },
-  { id: 'car-fire-lane', name: 'Car building fire lane', kind: 'estate', width: ft(20), turnaround: true, points: line([1440, 5300], [1440, 5560], [1700, 5560]) },
-  { id: 'entertainment-fire-lane', name: 'Entertainment shop fire lane', kind: 'estate', width: ft(20), points: line([1440, 5300], [1440, 4930], [1140, 4930], [1140, 5300]) },
   { id: 'guest-fire-lane', name: 'Guest house fire lane', kind: 'estate', width: ft(20), turnaround: true, points: line([750, 5450], [700, 4950]) },
   { id: 'lodging-north-lane', name: 'Lodging north fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 1720], [1950, 1720]) },
   { id: 'lodging-middle-lane', name: 'Lodging middle fire lane', kind: 'work', width: ft(20), turnaround: true, points: line([3000, 1000], [1950, 1000]) },
@@ -70,7 +70,8 @@ const PEOPLE: Record<string, Partial<Building>> = {
   hangars: { staff: 15, backupPower: true, fuelStorage: true },
   helipads: { loadKw: 10 },
   // It sits in a slight hollow; a swale carries runoff around it.
-  'car-building': { swale: true },
+  // Staff events and guests at the entertainment shop.
+  entertainment: { staff: 60 },
 }
 
 const ESTATE = ['main-house', 'guest-house', 'outdoor-pool', 'car-building', 'entertainment']
@@ -89,8 +90,8 @@ const utilities: Utility[] = [
   u('estate-well', 'Estate well', 'well', 860, 5620, 880, 5640, 15, ESTATE),
   u('estate-storage', 'Estate water storage', 'storage', 890, 5615, 915, 5645, 10000, ESTATE),
   // Downhill to the east of the house, below the walkout floor, so it drains by gravity.
-  u('estate-septic', 'Estate septic and drainfield', 'septic', 1900, 4450, 2000, 4550, 3000, ESTATE),
-  u('estate-service', 'Estate power service', 'service', 1160, 5560, 1180, 5580, 600, ESTATE),
+  u('estate-septic', 'Estate septic and drainfield', 'septic', 1900, 4450, 2000, 4584, 4000, ESTATE),
+  u('estate-service', 'Estate power service', 'service', 1160, 5560, 1180, 5580, 1000, ESTATE),
   u('estate-generator', 'Estate generator', 'generator', 1270, 5480, 1294, 5492, 150, ['main-house', 'guest-house']),
   u('estate-propane', 'Estate propane tank', 'propane', 1320, 5600, 1340, 5606, 1000, ['main-house', 'guest-house']),
   u('estate-solar', 'Estate solar array', 'solar', 2000, 4000, 2250, 4180, 250, []),
@@ -147,6 +148,7 @@ function securityFirstPass(e: Estate): SecurityDevice[] {
 const water = (id: string, name: string, kind: WaterSource['kind'], x: number, y: number, gallons: number): WaterSource => ({ id, name, kind, at: p(x, y), gallons })
 const waterSources: WaterSource[] = [
   water('estate-cistern', 'Estate fire cistern', 'cistern', 1300, 5520, 60000),
+  water('fun-cistern', 'Entertainment fire cistern', 'cistern', 1440, 4680, 60000),
   water('pond-hydrant', 'Pond dry hydrant', 'pond', 2950, 2530, 2000000),
   water('lodging-cistern', 'Lodging fire cistern', 'cistern', 2400, 1250, 60000),
   water('ops-cistern', 'Operations fire cistern', 'cistern', 4300, 900, 100000),
@@ -163,8 +165,9 @@ const laidOut: Estate = withDerivedGeometry({
     { id: 'main-house', name: 'Main house', use: 'residence', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     // South of the house, below the terraces.
     b('outdoor-pool', 'Outdoor pool and pool house', 'accessory', 'private', 1155, 5370, 80, 40, 14),
-    b('car-building', 'Car collection building', 'accessory', 'private', 1576, 5450, 220, 160, 30),
-    b('entertainment', 'Entertainment shop', 'assembly', 'private', 1300, 5050, 240, 160, 32),
+    // Outlines come from their rooms (src/model/amenities.ts).
+    { id: 'car-building', name: 'Car collection building', use: 'accessory', access: 'private', height: ft(30), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
+    { id: 'entertainment', name: 'Entertainment shop', use: 'assembly', access: 'private', height: ft(32), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     // Outline derived from the guest house rooms.
     { id: 'guest-house', name: 'Guest house', use: 'residence', access: 'private', height: ft(30), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     b('lodge-1', 'Lodge 1', 'lodging', 'work', 2050, 1650, 150, 60, 26),
@@ -175,7 +178,7 @@ const laidOut: Estate = withDerivedGeometry({
     b('commons', 'Dining, kitchen, laundry, commons', 'assembly', 'work', 2380, 1460, 160, 100, 24),
     b('cabins', 'Cabins', 'lodging', 'work', 2150, 680, 220, 120, 16),
     b('rv', 'RV hookups', 'lodging', 'work', 2650, 680, 200, 120, 2),
-    b('offices', 'Offices and dispatch', 'business', 'work', 3470, 500, 160, 110, 28),
+    { id: 'offices', name: 'Offices and dispatch', use: 'business', access: 'work', height: ft(28), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } },
     // The shops' outlines come from their bays and rooms (src/model/shops.ts).
     ...SHOP_SPECS.map((spec): Building => ({ id: spec.buildingId, name: spec.name, use: 'business', access: 'work', height: ft(26), ignition: PLANNED, rect: { x: 0, y: 0, w: 0, d: 0 } })),
     b('fuel', 'Fuel island and storage', 'business', 'work', 5050, 470, 160, 120, 18),
@@ -187,6 +190,9 @@ const laidOut: Estate = withDerivedGeometry({
     z('estate-fuelbreak', 'Estate fuel break', 'fuelbreak', 'private', 180, 3550, 2580, 5950, false),
     z('estate-core', 'Estate grounds', 'estate', 'private', 400, 3700, 2300, 5750, true),
     z('kart-track', 'Outdoor kart track', 'recreation', 'private', 650, 3800, 1550, 4300, true, true),
+    // Paved kart staging between the indoor and outdoor tracks, and event parking north of the fun buildings.
+    { ...z('kart-apron', 'Kart staging apron', 'recreation', 'private', 700, 4290, 1410, 4320, true), hardstand: true },
+    { ...z('fun-parking', 'Event parking', 'recreation', 'private', 700, 4530, 1410, 4650, true), hardstand: true, parking: true },
     z('operations', 'Operations compound', 'operations', 'work', 3150, 150, 5450, 1800, true),
     { ...z('equipment-yard', 'Equipment yard', 'operations', 'work', 3150, 770, 5310, 1150, true), hardstand: true },
     { ...z('parking', 'Parking', 'operations', 'visitor', 3900, 260, 4700, 680, true), hardstand: true, parking: true },
@@ -206,14 +212,13 @@ const laidOut: Estate = withDerivedGeometry({
   ],
   roads,
   walkways: [
-    { id: 'walk-car', name: 'Covered walkway to car building', points: line([1230, 5445], [1466, 5445]), from: 'main-house', to: 'car-building' },
-    { id: 'walk-ent', name: 'Covered walkway to entertainment shop', points: line([1220, 5395], [1220, 5130]), from: 'main-house', to: 'entertainment' },
+    { id: 'walk-car', name: 'Covered walkway between the entertainment shop and the car building', points: line([1110, 4400], [1170, 4400]), from: 'entertainment', to: 'car-building' },
   ],
   runway: { name: 'Airstrip', rect: box(5960, 3950, 75, 3500) },
   waterSources,
   utilities,
   house: mainHouse,
-  houses: [guestHouse, ...shopBuildings()],
+  houses: [guestHouse, ...shopBuildings(), officeBuilding, carBuilding, entertainmentBuilding],
 })
 laidOut.buildings = laidOut.buildings.map(b => ({ ...b, ...PEOPLE[b.id] }))
 

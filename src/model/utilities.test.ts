@@ -27,7 +27,8 @@ describe('the sample utilities and security', () => {
   it('plan for about 150 people sleeping in the compound and 300 by day', () => {
     const compound = sampleEstate.buildings.filter(b => b.access !== 'private')
     expect(compound.reduce((s, b) => s + occupancy(sampleEstate, b).beds, 0)).toBe(150)
-    expect(sampleEstate.buildings.reduce((s, b) => s + occupancy(sampleEstate, b).staff, 0)).toBe(300)
+    // 300 working by day, plus 60 at entertainment shop events.
+    expect(sampleEstate.buildings.reduce((s, b) => s + occupancy(sampleEstate, b).staff, 0)).toBe(360)
     // Two per bedroom in the main house: ten bedrooms.
     expect(occupancy(sampleEstate, sampleEstate.buildings.find(b => b.id === 'main-house')!).beds).toBe(20)
   })
@@ -59,7 +60,7 @@ describe('utility checks', () => {
 
   it('flag a drainfield too small for its design flow', () => {
     const e = ok(applyOperations(sampleEstate, [{ op: 'resizeUtility', utilityId: 'estate-septic', w: ft(50), d: ft(50), anchor: 'sw' }]))
-    expect(check(e, 'septic-capacity').detail).toMatch(/2,500 sq ft of drainfield, 10,000 needed/)
+    expect(check(e, 'septic-capacity').detail).toMatch(/2,500 sq ft of drainfield, 13,333 needed/)
   })
 
   it('flag a drainfield under a road', () => {
@@ -101,8 +102,8 @@ describe('utility checks', () => {
   })
 
   it('flag too little parking', () => {
-    const e = ok(applyOperations(sampleEstate, [{ op: 'setOccupancy', buildingId: 'classroom', beds: 0, staff: 800, backupPower: false }]))
-    expect(check(e, 'parking')).toMatchObject({ status: 'warn', elements: ['parking'] })
+    const e = ok(applyOperations(sampleEstate, [{ op: 'setOccupancy', buildingId: 'classroom', beds: 0, staff: 1500, backupPower: false }]))
+    expect(check(e, 'parking')).toMatchObject({ status: 'warn', elements: ['fun-parking', 'parking'] })
   })
 
   it('let the owner replace a planning value', () => {
@@ -226,7 +227,7 @@ describe('older saves', () => {
 describe('the chat summary', () => {
   it('lists utilities, devices, occupancy, and the safe room', () => {
     const text = summarizeEstate(sampleEstate)
-    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 1900,4450 size 100x100, 3,000 gallons a day, serves main-house/)
+    expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 1900,4450 size 100x134, 4,000 gallons a day, serves main-house/)
     expect(text).toMatch(/- lodge-1: Lodge 1, .* sleeps 22, 72 kW, on backup power/)
     expect(text).toMatch(/- cam-estate-gate: camera at 1000,0, facing \d+ deg, 60 deg view, 400 ft, solar/)
     expect(text).toMatch(/- safe-room: Safe room, service, .*, safe room/)
