@@ -309,7 +309,7 @@ function recipe(room: Room): string[] {
     terrace: ['outdoor-kitchen', 'fireplace-outdoor', 'dining-8'],
     lounge: ['bar-counter', 'armchair-pair'],
     foyer: ['console-table', 'bench'],
-    mudroom: ['cubbies', 'dog-wash', 'bench'],
+    mudroom: ['cubbies', 'dog-wash', 'bench', 'laundry-pair', 'folding-counter'],
     laundry: ['laundry-pair', 'folding-counter'],
     pantry: ['pantry-shelves', 'pantry-shelves', 'fridge'],
     scullery: ['counter-sink', 'counter-range', 'fridge'],

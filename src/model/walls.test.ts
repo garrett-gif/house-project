@@ -24,7 +24,7 @@ const door = (over: Partial<Opening>): Opening => ({ id: 'new-door', kind: 'door
 
 describe('derived walls', () => {
   it('puts interior walls between rooms and exterior walls on the outside', () => {
-    expect(wallBetween(sampleEstate, 'kitchen', 'dining')).toMatchObject({ kind: 'interior', thickness: 4.5, orientation: 'v', at: ft(50) })
+    expect(wallBetween(sampleEstate, 'kitchen', 'dining')).toMatchObject({ kind: 'interior', thickness: 4.5, orientation: 'v', at: ft(35) })
     const north = levelWalls(house, level('main')).filter(s => !s.wingId && s.orientation === 'h' && s.at === ft(68))
     expect(north.length).toBeGreaterThan(0)
     expect(north.every(s => s.kind === 'exterior' && s.thickness === 8)).toBe(true)
@@ -72,7 +72,7 @@ describe('first pass of doors, windows, and stairs', () => {
 })
 
 describe('opening and wall operations', () => {
-  const kitchenHall = placed(sampleEstate).find(o => o.roomId === 'kitchen' && o.leadsTo === 'family-hall')!
+  const kitchenHall = placed(sampleEstate).find(o => o.roomId === 'dining' && o.leadsTo === 'family-hall')!
   const bedroomWindow = placed(sampleEstate).find(o => o.roomId === 'kid-1' && o.kind === 'window')!
 
   const VALID: EditOp[] = [
@@ -81,7 +81,7 @@ describe('opening and wall operations', () => {
     { op: 'moveOpening', openingId: kitchenHall.id, side: 'w', offset: ft(20) },
     { op: 'resizeOpening', openingId: bedroomWindow.id, width: ft(4), height: ft(5), sill: 20 },
     { op: 'removeOpening', openingId: bedroomWindow.id },
-    { op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(2) },
+    { op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(2) },
     { op: 'setWallThickness', kind: 'exterior', thickness: 12 },
   ]
 
@@ -108,7 +108,7 @@ describe('opening and wall operations', () => {
     expect(rejected(add({ sill: 10 }))).toMatch(/sill is 0/)
     expect(rejected(add({ width: 6 }))).toMatch(/at least 1 ft/)
     expect(rejected(add({ kind: 'window' }))).toMatch(/Kind must be one of: door, opening, garage-door/)
-    expect(rejected(add({ offset: kitchenHall.offset, roomId: 'kitchen', side: 'w', id: 'dup-spot' }))).toMatch(/overlaps/)
+    expect(rejected(add({ offset: kitchenHall.offset, roomId: 'dining', side: 'w', id: 'dup-spot' }))).toMatch(/overlaps/)
   })
 
   it('rejects edits to openings that do not exist, and bad sizes', () => {
@@ -121,17 +121,17 @@ describe('opening and wall operations', () => {
   it('moveWall widens the kitchen 2 ft by taking it from the dining room, leaving doors where they were', () => {
     const e = ok(applyOperations(sampleEstate, [VALID[5]]))
     const room = (id: string) => e.house.levels[1].rooms.find(r => r.id === id)!.rect
-    expect(room('kitchen')).toMatchObject({ x: ft(17), w: ft(35) })
-    expect(room('dining')).toMatchObject({ x: ft(52), w: ft(16) })
+    expect(room('kitchen')).toMatchObject({ x: ft(33), w: ft(35) })
+    expect(room('dining')).toMatchObject({ x: ft(17), w: ft(16) })
     expect(where(e, kitchenHall.id)).toEqual(where(sampleEstate, kitchenHall.id))
-    expect(wallBetween(e, 'kitchen', 'dining')).toMatchObject({ at: ft(52) })
+    expect(wallBetween(e, 'kitchen', 'dining')).toMatchObject({ at: ft(33) })
   })
 
   it('moveWall rejects squeezing a neighbor to nothing, and walls that push a door off', () => {
-    expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(17) }]))).toMatch(/Family hall, to the guest and kids wing would be less than 1 ft wide/)
-    // The opening from the kitchen to the scullery sits near the kitchen's east end; pulling that wall west breaks it.
+    expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'w', distance: ft(18) }]))).toMatch(/Formal dining would be less than 1 ft wide/)
+    // The kitchen's east wall is the great room's west wall, which runs on past the bar: moving it would overlap them.
     const r = applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: ft(-10) }])
-    expect(rejected(r)).toContain('kitchen-scullery would not fit')
+    expect(rejected(r)).toContain('Bar and wine alcove (bar) and Great room, vaulted, stone fireplace (great) would overlap')
     expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'q' as never, distance: 12 }]))).toMatch(/Side must be/)
     expect(rejected(applyOperations(sampleEstate, [{ op: 'moveWall', roomId: 'kitchen', side: 'e', distance: 0 }]))).toMatch(/other than 0/)
   })
@@ -248,7 +248,7 @@ describe('model summary for chat', () => {
   it('lists openings under their rooms and explains offsets', () => {
     const text = summarizeEstate(sampleEstate)
     expect(text).toMatch(/offset from that side's west or south end/)
-    expect(text).toMatch(/kitchen-door-1: door, side w, offset [\d.]+, 3x6.67, to family-hall/)
+    expect(text).toMatch(/dining-door-\d: door, side w, offset [\d.]+, 3x6.67, to family-hall/)
     expect(text).toMatch(/Stairs: stair-w-stair from w-stair up to m-stair/)
   })
 })

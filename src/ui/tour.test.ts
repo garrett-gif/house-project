@@ -33,7 +33,7 @@ describe('walkthrough', () => {
     expect(canStand(house, 'main', p.x, p.y)).toBe(true)
   })
 
-  it('cannot walk through the wall between the dining room and the great room', () => {
+  it('cannot walk through the wall between the kitchen and the great room', () => {
     // North end of that wall, past the wide opening.
     expect(canStand(house, 'main', ft(68), ft(25))).toBe(false)
     const from = { x: ft(66), y: ft(25) }
@@ -43,9 +43,9 @@ describe('walkthrough', () => {
   })
 
   it('walks through an opening', () => {
-    const open = placeOpenings(house).find(o => o.id === 'dining-great')!
+    const open = placeOpenings(house).find(o => o.id === 'kitchen-great')!
     const mid = (open.from + open.to) / 2
-    // From the dining room, east through the wide opening into the great room.
+    // From the kitchen, east through the wide opening into the great room.
     let p = { x: ft(62), y: mid }
     for (let i = 0; i < 20; i++) p = step(house, 'main', p, 6, 0)
     expect(p.x).toBeGreaterThan(ft(70))

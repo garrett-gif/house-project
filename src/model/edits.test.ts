@@ -115,25 +115,25 @@ describe('room operations', () => {
   })
 
   it('rejects "make the kitchen 7 feet wider" when it would overlap the dining room', () => {
-    const error = rejected(applyEdit(sampleEstate, { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'w' }))
-    expect(error).toContain('Eat-in party kitchen, island, breakfast bay (kitchen) and Formal dining (dining) would overlap by 7 ft × 28 ft on the main floor')
+    const error = rejected(applyEdit(sampleEstate, { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'e' }))
+    expect(error).toContain('Formal dining (dining) and Eat-in party kitchen, island, breakfast bay (kitchen) would overlap by 7 ft × 28 ft on the main floor')
   })
 
   it('accepts the kitchen widening when the dining room gives up the space, in either order', () => {
-    const grow: EditOp = { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'w' }
-    const shrink: EditOp = { op: 'resizeRoom', roomId: 'dining', w: ft(11), d: ft(28), anchor: 'e' }
+    const grow: EditOp = { op: 'resizeRoom', roomId: 'kitchen', w: ft(40), d: ft(28), anchor: 'e' }
+    const shrink: EditOp = { op: 'resizeRoom', roomId: 'dining', w: ft(11), d: ft(28), anchor: 'w' }
     // The dining room's glass would be left past its new west end, so it narrows too.
     const fit: EditOp = { op: 'resizeOpening', openingId: 'dining-glass', width: ft(8), height: ft(7), sill: ft(1.5) }
     const slide: EditOp = { op: 'moveOpening', openingId: 'dining-glass', side: 's', offset: ft(5.5) }
     for (const ops of [[grow, shrink, fit, slide], [shrink, grow, slide, fit]]) {
       const e = ok(applyOperations(sampleEstate, ops))
-      expect(room(e, 'kitchen')!.rect).toEqual(box(17, 0, 40, 28))
-      expect(room(e, 'dining')!.rect).toEqual(box(57, 0, 11, 28))
+      expect(room(e, 'kitchen')!.rect).toEqual(box(28, 0, 40, 28))
+      expect(room(e, 'dining')!.rect).toEqual(box(17, 0, 11, 28))
     }
   })
 
   it('moveRoom moves within the level and rejects overlaps and unknown rooms', () => {
-    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-58))
+    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-70))
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: ft(10), dy: 0 }))).toMatch(/3-car garage \(garage\) and Library and home office, window seat \(office\) would overlap by 10 ft × 24 ft/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'nope', dx: 0, dy: 0 }))).toMatch(/No room with id "nope"/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: Number.POSITIVE_INFINITY, dy: 0 }))).toMatch(/numbers/)

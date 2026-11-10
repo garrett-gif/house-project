@@ -75,19 +75,19 @@ describe('proposeEdits', () => {
 
   it('tells Claude what a widened kitchen collides with, then accepts a valid fix', async () => {
     const { create, calls } = scripted(
-      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'w' })], 'tool_use'),
+      reply([tool('a', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'e' })], 'tool_use'),
       reply([
-        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'w' }),
-        tool('c', 'resizeRoom', { roomId: 'dining', widthFt: 11, depthFt: 28, anchor: 'e' }),
+        tool('b', 'resizeRoom', { roomId: 'kitchen', widthFt: 40, depthFt: 28, anchor: 'e' }),
+        tool('c', 'resizeRoom', { roomId: 'dining', widthFt: 11, depthFt: 28, anchor: 'w' }),
         tool('d', 'resizeOpening', { openingId: 'dining-glass', widthFt: 8, heightFt: 7, sillFt: 1.5 }),
         tool('e', 'moveOpening', { openingId: 'dining-glass', side: 's', offsetFt: 5.5 }),
       ], 'tool_use'),
-      reply([text('Widened the kitchen 7 ft east and took the space from the dining room.')]),
+      reply([text('Widened the kitchen 7 ft west and took the space from the dining room.')]),
     )
     const out = await proposeEdits(create, request('Make the kitchen 7 feet wider.'))
     const first = calls[1].messages.at(-1)!.content as Anthropic.Beta.Messages.BetaToolResultBlockParam[]
     expect(first[0]).toMatchObject({ is_error: true })
-    expect(first[0].content).toContain('Formal dining (dining) would overlap by 7 ft × 28 ft')
+    expect(first[0].content).toContain('Formal dining (dining) and Eat-in party kitchen, island, breakfast bay (kitchen) would overlap by 7 ft × 28 ft')
     expect(out.ok && out.ops.map(o => o.op)).toEqual(['resizeRoom', 'resizeRoom', 'resizeOpening', 'moveOpening'])
   })
 

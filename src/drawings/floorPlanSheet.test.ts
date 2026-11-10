@@ -42,8 +42,8 @@ describe('floor plan sheets', () => {
     // The bar and both wings, west to east.
     const t = texts(sheets[1].marks)
     expect(t).toContain(`208'-0"`)
-    // North to south, from the wings' south ends to the entry's step out at the front door.
-    expect(t).toContain(`120'-0"`)
+    // North to south, from the primary wing's south end to the entry's step out at the front door.
+    expect(t).toContain(`124'-0"`)
   })
 
   it('follows edits, because sheets are drawn from the model', () => {
@@ -51,7 +51,7 @@ describe('floor plan sheets', () => {
     if (!r.ok) throw new Error(r.error)
     const t = texts(floorPlanSheets(r.estate, info)[1].marks)
     expect(t).toContain(`35'-0" × 28'-0"`)
-    expect(t).toContain(`15'-0" × 14'-0"`)
+    expect(t).toContain(`16'-0" × 28'-0"`)
   })
 
   it('keeps the plan on the paper and clear of the title block', () => {

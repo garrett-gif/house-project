@@ -21,22 +21,25 @@ const vault = (heightFt: number, ridge?: 'ew' | 'ns', extra: Partial<Ceiling> = 
  * - The west wing (x -36 to 0, y -48 to 14) opens off the family hall through an 8 ft opening: a wide gallery to the
  *   extra bedroom and the guest suite below, and upstairs three kids' rooms off a 16 ft wide kids' loft, joined to the
  *   kids' rooms over the bar.
- * - The east wing (x 136 to 172, y -40 to 14) opens off the primary entry: a short gallery to the closets and baths,
- *   the sitting room, and the vaulted bedroom with glass and a deck to the south.
+ * - The east wing (x 136 to 172, y -52 to 14) is the primary suite: a private entry, a gallery between his and her
+ *   closets, and a dressing hall straight into the vaulted bedroom. His bath opens off the bedroom, her bath off the
+ *   dressing hall at the bedroom door, and the sitting room off the bedroom, with glass and a deck to the south.
+ * - Daily flow: garage into the mudroom and laundry, then the family hall or the pantry; the kitchen sits between the
+ *   dining room and the great room, open to both.
  *
  * Bearing lines in the bar: y = 0, 28, 44, 68 and x = 17, 50, 68, 114, 136. In the west wing: x = -36, -30, -16, 0.
  */
 const walkout: Room[] = [
   // West: theater (buried on the north), a game room, the woodshop and mechanical on the courtyard side.
-  r('theater', '20-seat theater', 'living', 0, 44, 36, 24),
-  r('game-room', 'Game room, pool table and darts', 'living', 0, 28, 36, 16),
+  r('theater', '20-seat theater', 'living', 0, 44, 35, 24),
+  r('game-room', 'Game room, pool table and darts', 'living', 0, 28, 35, 16),
   r('woodshop', 'Dust-controlled woodshop', 'service', 0, 0, 22, 28),
-  r('mech', 'Mechanical', 'service', 22, 0, 14, 12),
-  r('pool-equip', 'Pool equipment', 'service', 22, 12, 14, 16),
+  r('mech', 'Mechanical', 'service', 22, 0, 13, 12),
+  r('pool-equip', 'Pool equipment', 'service', 22, 12, 13, 16),
   // Middle: the gym open to the courtyard, the craft room behind it, the theater lobby at the foot of the stair.
-  r('gym', 'Gym (free weights, machines, mats, Pilates)', 'wellness', 36, 0, 32, 29),
-  r('craft', 'Family craft room (paper, 3D printing, sewing)', 'living', 36, 29, 32, 15),
-  r('theater-lobby', 'Theater lobby, candy wall, popcorn and soda', 'circulation', 36, 44, 18, 24),
+  r('gym', 'Gym (free weights, machines, mats, Pilates)', 'wellness', 35, 0, 33, 28),
+  r('craft', 'Family craft room (paper, 3D printing, sewing)', 'living', 35, 28, 33, 16),
+  r('theater-lobby', 'Theater lobby, candy wall, popcorn and soda', 'circulation', 35, 44, 19, 24),
   r('w-stair', 'Stairs', 'circulation', 54, 44, 14, 14),
   r('w-elevator', 'Elevator', 'service', 54, 58, 8, 10),
   r('w-storage', 'Storage', 'service', 62, 58, 6, 10),
@@ -61,15 +64,14 @@ const walkout: Room[] = [
 ]
 
 const main: Room[] = [
-  // West end: the family hall to the guest and kids wing, laundry, and the mudroom off the garage.
-  r('family-hall', 'Family hall, to the guest and kids wing', 'circulation', 0, 0, 17, 14),
-  r('laundry', 'Laundry', 'service', 0, 14, 17, 10),
-  r('mudroom', 'Mudroom, lockers, bench, and dog wash', 'service', 0, 24, 17, 20),
-  // The courtyard side: kitchen with a breakfast bay, dining, the great room, the hearth room.
-  { ...r('kitchen', 'Eat-in party kitchen, island, breakfast bay', 'living', 17, 0, 33, 28), ceiling: vault(17, 'ew') },
-  r('pantry', 'Pantry and cold storage', 'service', 17, 28, 16, 16),
+  // West end: the family hall, with the garage coming in through the mudroom and laundry beside it.
+  r('family-hall', 'Family hall, to the guest wing and the kitchen', 'circulation', 0, 0, 17, 14),
+  r('mudroom', 'Mudroom and laundry, lockers, bench, and dog wash', 'service', 0, 14, 17, 30),
+  // The courtyard side: dining, then the kitchen open to the dining room and the great room, then the hearth room.
+  { ...r('dining', 'Formal dining', 'living', 17, 0, 18, 28), ceiling: { form: 'beamed', height: ft(10), spacing: ft(4) } },
+  { ...r('kitchen', 'Eat-in party kitchen, island, breakfast bay', 'living', 35, 0, 33, 28), ceiling: vault(17, 'ew') },
+  r('pantry', 'Pantry and cold storage, groceries from the mudroom', 'service', 17, 28, 16, 16),
   r('scullery', 'Scullery, full second kitchen', 'service', 33, 28, 17, 16),
-  { ...r('dining', 'Formal dining', 'living', 50, 0, 18, 28), ceiling: { form: 'beamed', height: ft(10), spacing: ft(4) } },
   r('bar', 'Bar and wine alcove', 'living', 50, 28, 18, 16),
   { ...r('great', 'Great room, vaulted, stone fireplace', 'living', 68, 0, 46, 44), ceiling: vault(24, 'ns', { spacing: ft(11), glassEnds: ['s'] }) },
   r('primary-hall', 'Primary suite entry', 'circulation', 114, 0, 22, 14),
@@ -101,18 +103,20 @@ const main: Room[] = [
   r('guest-closet', 'Guest closet', 'service', -36, -48, 8, 14),
   r('guest-bath', 'Guest bath, shared with the bunk room', 'bath', -28, -48, 12, 14),
   r('guest-bunk', 'Guest suite bunk room for visiting kids', 'bedroom', -16, -48, 16, 14, 'guest-bath'),
-  // East wing: the primary suite. The gallery opens to the closets and baths, the sitting room, and through it the
-  // bedroom; her bath and vanity sit between the closets and the bedroom.
-  r('primary-gallery', 'Primary gallery', 'circulation', 136, -8, 14, 22),
-  r('closet-his', 'His closet', 'service', 150, 2, 12, 12),
-  r('closet-hers', 'Her closet', 'service', 162, -2, 10, 16),
-  r('bath-his', 'His bath', 'bath', 150, -12, 12, 14),
-  r('vanity', 'Vanity and makeup', 'service', 150, -19, 12, 7),
-  r('bath-hers', 'Her bath', 'bath', 162, -19, 10, 17),
-  r('primary-nook', 'Primary morning bar', 'living', 136, -18, 14, 10),
-  { ...r('primary-sitting', 'Primary sitting room, fireplace, window seat', 'living', 136, -40, 14, 22), ceiling: vault(15, 'ns', { spacing: 0 }) },
-  { ...r('primary', 'Primary bedroom, fireplace, glass to the south', 'bedroom', 150, -40, 22, 21, 'bath-hers'), ceiling: vault(17, 'ew', { spacing: ft(8) }) },
-  r('primary-deck', 'Primary deck over the courtyard', 'outdoor', 136, -56, 36, 16),
+  // East wing: the primary suite. From the bar into a private entry, then a gallery between his and her closets, and
+  // the dressing hall straight into the bedroom. His bath opens off the bedroom; her bath, with its vanity, opens off
+  // the dressing hall at the bedroom door. The sitting room opens wide off the bedroom on the courtyard side.
+  r('primary-vestibule', 'Primary entry', 'circulation', 136, 0, 12, 14),
+  r('primary-gallery', 'Primary gallery', 'circulation', 148, -8, 12, 22),
+  r('dressing-hall', 'Dressing hall', 'circulation', 148, -28, 12, 20),
+  r('closet-hers', 'Her closet', 'service', 136, -14, 12, 14),
+  r('bath-hers', 'Her bath, vanity and makeup', 'bath', 136, -28, 12, 14),
+  r('closet-his', 'His closet', 'service', 160, 0, 12, 14),
+  r('vanity', 'Makeup vanity and coffee bar', 'service', 160, -12, 12, 12),
+  r('bath-his', 'His bath', 'bath', 160, -28, 12, 16),
+  { ...r('primary', 'Primary bedroom, fireplace, glass to the south', 'bedroom', 148, -52, 24, 24, 'bath-his'), ceiling: vault(17, 'ew', { spacing: ft(8) }) },
+  { ...r('primary-sitting', 'Primary sitting room, window seat', 'living', 136, -52, 12, 24), ceiling: vault(15, 'ns', { spacing: 0 }) },
+  r('primary-deck', 'Primary deck over the courtyard', 'outdoor', 136, -68, 36, 16),
 ]
 
 const upper: Room[] = [
@@ -211,7 +215,7 @@ const roofs: Roof[] = [
   roof('roof-porch', 'Courtyard porch roof', 'main', 32, -16, 72, 16, 'shed', 3, 's'),
   roof('roof-screened', 'Screened porch roof', 'main', 136, 31, 16, 16, 'shed', 3, 'e'),
   roof('roof-west-wing', 'Guest and kids wing roof', 'upper', -36, -48, 36, 62, 'gable', 8, 'ns'),
-  roof('roof-primary', 'Primary wing roof', 'main', 136, -40, 36, 54, 'gable', 10, 'ns'),
+  roof('roof-primary', 'Primary wing roof', 'main', 136, -52, 36, 66, 'gable', 10, 'ns'),
 ]
 
 const firstPass: HouseModel = withHouseDefaults({
@@ -243,19 +247,20 @@ const HAND: Opening[] = [
   opening('family-guest', 'family-hall', 'w', 7, 8),
   opening('landing-kids', 'kids-landing', 'w', 7, 8),
   opening('primary-hall-gallery', 'primary-hall', 'e', 7, 8),
+  opening('primary-entry-gallery', 'primary-vestibule', 'e', 7, 8),
+  opening('dressing-bedroom', 'dressing-hall', 's', 6, 6),
   // Service: the garage into the mudroom, the kitchen into the pantry and scullery.
   door('garage-mudroom', 'garage', 's', 8, 36, { swing: 'out' }),
-  opening('kitchen-pantry', 'kitchen', 'n', 8, 3.5),
-  opening('kitchen-scullery', 'kitchen', 'n', 25, 4),
+  opening('kitchen-scullery', 'kitchen', 'n', 8, 4),
+  door('mudroom-pantry', 'mudroom', 'e', 22, 32),
   // Primary suite: the bedroom opens wide to its sitting area; the vanity belongs with her bath.
-  opening('primary-sitting-open', 'primary', 'w', 10, 8),
+  opening('primary-sitting-open', 'primary', 'w', 12, 10),
   opening('guest-sitting-bed', 'guest-sitting', 'w', 8, 6),
   // The kids' closet opens from their living area, not through two baths.
   door('u-closet-door', 'u-closet', 'n', 2, 30),
-  door('vanity-bath-hers', 'vanity', 'e', 3.5, 30),
   // Open plan: wide cased openings between the kitchen, dining, bar, great room, foyer, den, and hearth room.
-  opening('kitchen-dining', 'kitchen', 'e', 14, 16),
-  opening('dining-great', 'dining', 'e', 14, 12),
+  opening('kitchen-dining', 'kitchen', 'w', 14, 16),
+  opening('kitchen-great', 'kitchen', 'e', 14, 16),
   opening('bar-great', 'bar', 'e', 8, 10),
   opening('great-foyer', 'great', 'n', 10, 10),
   opening('great-den', 'great', 'n', 37, 8),
@@ -278,8 +283,8 @@ const HAND: Opening[] = [
   // The tall entry: a glass transom over the front door.
   glass('foyer-glass', 'foyer', 'n', 16, 5, 9, 1),
   // Primary suite: a glass wall south from the bedroom, a window seat bay in the sitting area.
-  glass('primary-glass', 'primary', 's', 11, 16, 8, 1, { operation: 'slider' }),
-  glass('primary-sitting-bay', 'primary-sitting', 'w', 11, 8, 5, 1.5, { bay: { form: 'angled', depth: ft(2.5), seat: true }, operation: 'casement' }),
+  glass('primary-glass', 'primary', 's', 12, 16, 8, 1, { operation: 'slider' }),
+  glass('primary-sitting-bay', 'primary-sitting', 'w', 12, 8, 5, 1.5, { bay: { form: 'angled', depth: ft(2.5), seat: true }, operation: 'casement' }),
   // The guest gallery's window seat looks onto the courtyard.
   glass('guest-gallery-seat', 'guest-gallery', 'e', 9, 8, 5, 1.5, { bay: { form: 'box', depth: ft(2.5), seat: true }, operation: 'casement' }),
   // A reading nook in a bay off the kids' landing, and a door from the kids' hall to their deck.
@@ -294,7 +299,7 @@ const handIds = new Set(HAND.map(o => o.id))
 const trial = placeOpenings({ ...firstPass, openings: [...HAND, ...firstPass.openings] })
 const clash = new Set(trial.filter(o => !handIds.has(o.id) && /overlaps/.test(o.problem ?? '') && HAND.some(x => o.problem!.includes(x.id))).map(o => o.id))
 /** First-pass doors that the hand-placed ones replace: the garage into the library, his bath into her vanity, the kids' closet through their baths. */
-const REPLACED: [string, string][] = [['garage', 'office'], ['bath-his', 'vanity'], ['u-closet', 'kid-7-bath'], ['u-closet', 'kid-3-bath'], ['kid-2', 'u-stair-w'], ['kid-2-closet', 'kid-4'], ['kid-4-closet', 'kid-5']]
+const REPLACED: [string, string][] = [['garage', 'office'], ['bath-his', 'vanity'], ['u-closet', 'kid-7-bath'], ['u-closet', 'kid-3-bath'], ['kid-2', 'u-stair-w'], ['primary-sitting', 'bath-hers'], ['kid-2-closet', 'kid-4'], ['kid-4-closet', 'kid-5']]
 const replaced = new Set(trial.filter(o => REPLACED.some(([a, b]) => (o.roomId === a && o.leadsTo === b) || (o.roomId === b && o.leadsTo === a))).map(o => o.id))
 const finished: HouseModel = { ...firstPass, openings: [...firstPass.openings.filter(o => !clash.has(o.id) && !replaced.has(o.id)), ...HAND] }
 

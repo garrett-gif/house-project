@@ -19,7 +19,7 @@ describe('main house layout v3: a mountain modern courtyard U', () => {
 
   it('opens the kitchen, dining, bar, foyer, den, and hearth room into one another and the great room', () => {
     const graph = doorGraph(house)
-    for (const id of ['dining', 'bar', 'foyer', 'den', 'hearth']) expect(graph.get('great'), id).toContain(id)
+    for (const id of ['kitchen', 'bar', 'foyer', 'den', 'hearth']) expect(graph.get('great'), id).toContain(id)
     expect(graph.get('kitchen')).toContain('dining')
     const wide = placeOpenings(house).filter(o => o.kind === 'opening' && (o.roomId === 'great' || o.leadsTo === 'great' || o.roomId === 'kitchen'))
     expect(wide.filter(o => o.width >= 96).length).toBeGreaterThanOrEqual(6)
@@ -27,7 +27,7 @@ describe('main house layout v3: a mountain modern courtyard U', () => {
 
   it('joins each wing to the bar through an 8 ft opening in a shared wall', () => {
     const p = placeOpenings(house)
-    for (const [a, b] of [['family-hall', 'guest-entry'], ['kids-landing', 'kids-wing-landing'], ['primary-hall', 'primary-gallery']]) {
+    for (const [a, b] of [['family-hall', 'guest-entry'], ['kids-landing', 'kids-wing-landing'], ['primary-hall', 'primary-vestibule']]) {
       expect(p.find(o => o.roomId === a && o.leadsTo === b && !o.problem && o.width >= 96), a).toBeDefined()
     }
   })
@@ -36,9 +36,20 @@ describe('main house layout v3: a mountain modern courtyard U', () => {
     const graph = doorGraph(house)
     for (const [bed, hub] of [['extra-bed', 'guest-gallery'], ['kid-2', 'kids-living'], ['kid-4', 'kids-living'], ['kid-5', 'kids-living']]) expect(graph.get(bed), bed).toContain(hub)
     expect(graph.get('primary')).toContain('primary-sitting')
-    expect(graph.get('primary-sitting')).toContain('primary-nook')
-    expect(graph.get('primary-nook')).toContain('primary-gallery')
+    expect(graph.get('primary')).toContain('dressing-hall')
     expect(validateEstate(sampleEstate).find(c => c.id === 'escape-windows')!.status).toBe('pass')
+  })
+
+  it('flows: the garage into the mudroom and laundry, his bath straight off the bedroom, the kitchen open to the great room', () => {
+    const graph = doorGraph(house)
+    expect(graph.get('garage')).toContain('mudroom')
+    expect([...graph.get('mudroom')!]).toEqual(expect.arrayContaining(['family-hall', 'pantry']))
+    // His bath opens only off the bedroom; her bath off the dressing hall at the bedroom door.
+    expect([...graph.get('bath-his')!]).toEqual(['primary'])
+    expect(graph.get('bath-hers')).toContain('dressing-hall')
+    expect([...graph.get('dressing-hall')!]).toEqual(expect.arrayContaining(['primary', 'primary-gallery']))
+    for (const id of ['closet-his', 'closet-hers']) expect([...graph.get(id)!].some(n => /primary-(gallery|vestibule)/.test(n)), id).toBe(true)
+    expect([...graph.get('kitchen')!]).toEqual(expect.arrayContaining(['great', 'dining', 'scullery']))
   })
 
   it('has no long halls on the main floor', () => {
@@ -86,8 +97,8 @@ describe('main house layout v3: a mountain modern courtyard U', () => {
   it('is about two thirds the size of the first layout, and passes every check', () => {
     const finished = rooms.filter(r => r.type !== 'outdoor' && r.type !== 'garage').reduce((s, r) => s + area(r.rect), 0) / 144
     expect(finished).toBeGreaterThan(22000)
-    // Larger than the brief's two thirds of v1 since the wings were widened to be usable; about 27,200 sq ft.
-    expect(finished).toBeLessThan(27500)
+    // Larger than the brief's two thirds of v1 since the wings were widened to be usable; Garrett: size is not the issue.
+    expect(finished).toBeLessThan(28500)
     expect(validateEstate(sampleEstate).filter(c => c.status !== 'pass').map(c => c.id)).toEqual([])
   })
 })

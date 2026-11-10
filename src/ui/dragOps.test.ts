@@ -15,10 +15,10 @@ describe('drag to edit', () => {
   })
 
   it('grabs a wall near an edge and the room elsewhere', () => {
-    const k = room('kitchen') // x 17..50 ft, y 0..28 ft
-    expect(grabRoom(k, ft(49.5), ft(14))).toEqual({ kind: 'wall', side: 'e' })
-    expect(grabRoom(k, ft(33), ft(0.5))).toEqual({ kind: 'wall', side: 's' })
-    expect(grabRoom(k, ft(33), ft(14))).toEqual({ kind: 'room' })
+    const k = room('kitchen') // x 35..68 ft, y 0..28 ft
+    expect(grabRoom(k, ft(67.5), ft(14))).toEqual({ kind: 'wall', side: 'e' })
+    expect(grabRoom(k, ft(51), ft(0.5))).toEqual({ kind: 'wall', side: 's' })
+    expect(grabRoom(k, ft(51), ft(14))).toEqual({ kind: 'room' })
   })
 
   it('turns a drag on the kitchen west wall into moveWall, which the scullery makes room for', () => {
@@ -44,7 +44,7 @@ describe('drag to edit', () => {
   })
 
   it('slides a door along its wall', () => {
-    const door = placeOpenings(sampleEstate.house).find(o => o.roomId === 'kitchen' && o.leadsTo === 'family-hall')!
+    const door = placeOpenings(sampleEstate.house).find(o => o.roomId === 'dining' && o.leadsTo === 'family-hall')!
     // The door runs north-south along the kitchen's west wall, so only the northward part of the drag counts.
     const op = openingDragOp(door, ft(3), ft(1) + 1)!
     expect(op).toEqual({ op: 'moveOpening', openingId: door.id, side: door.side, offset: door.offset + ft(1) })
