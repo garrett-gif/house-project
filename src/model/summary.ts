@@ -16,8 +16,27 @@ import { paletteOf } from './materials'
 const f = (inches: number) => String(Math.round(toFt(inches) * 10) / 10)
 const box = (r: Rect) => `at ${f(r.x)},${f(r.y)} size ${f(r.w)}x${f(r.d)}`
 
-/** Plain-text description of the estate for the chat editor, in feet. */
-export function summarizeEstate(e: Estate): string {
+/**
+ * The detailed buildings a request is about: any whose id or name it mentions, or that holds a room it names. With
+ * none, the main house. The summary lists these in full and the rest by their rooms only, to keep it short.
+ */
+export function buildingsInRequest(e: Estate, request = ''): Set<string> {
+  const text = request.toLowerCase()
+  const hit = allHouses(e).filter(h => {
+    const name = houseName(e, h).toLowerCase()
+    const words = name.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !['building', 'house', 'and'].includes(w))
+    return text.includes(h.buildingId.toLowerCase()) || text.includes(name) || (words.length > 0 && words.every(w => text.includes(w)))
+      // Room ids count only when specific (hyphenated), so a word like dining does not pull in every building.
+      || h.levels.some(l => l.rooms.some(r => r.id.includes('-') && new RegExp(`\\b${r.id.replace(/[-]/g, '\\-')}\\b`).test(text)))
+  }).map(h => h.buildingId)
+  return new Set(hit.length ? hit : [e.house.buildingId])
+}
+
+/**
+ * Plain-text description of the estate for the chat editor, in feet. Buildings in `detail` (by default all of them)
+ * are listed with their openings, furniture, roofs, beams, and stairs; the rest by their rooms only.
+ */
+export function summarizeEstate(e: Estate, detail?: Set<string>): string {
   const lines: string[] = []
   lines.push(`Estate "${e.name}", site layout ${e.layoutVersion}. All numbers are feet.`)
   lines.push(`Site coordinates: x east, y north, origin at the southwest parcel corner. Parcel is ${f(e.parcel.size)} x ${f(e.parcel.size)} ft. Rectangles give the southwest corner, then east-west width x north-south depth.`)
@@ -53,13 +72,15 @@ export function summarizeEstate(e: Estate): string {
 
   for (const house of allHouses(e)) {
   const { origin } = house
+  const full = !detail || detail.has(house.buildingId)
   lines.push('', `${houseName(e, house)} (building ${house.buildingId}). Concept layout. Its house origin is at site ${f(origin.x)},${f(origin.y)}.${house.excavated ? ` Its site is excavated to the walkout by design, about ${Math.round(earthwork(e, house).cutCy / 100) * 100} cubic yards of cut.` : ''}`)
   lines.push('Room positions are house-local to this building: 0,0 is its house origin, x east, y north. The entry faces north. Level ids say which building a new room goes in.')
   lines.push(`Look: ${paletteOf(house).name}.`)
   if (house.wings?.length) lines.push(`Wings (id: name, turned counterclockwise about a house-local pivot): ${house.wings.map(w => `${w.id}: ${w.name}, ${w.angle} degrees about ${f(w.pivot.x)},${f(w.pivot.y)} ft`).join('; ')}. A room marked with a wing has its position in that wing's own coordinates, before the turn; walls only join rooms in the same wing, and a joint opening names the room beyond.`)
   const t = house.wallThickness
   lines.push(`Walls are derived from room edges, which are wall centerlines: exterior ${t.exterior} in, interior ${t.interior} in, foundation ${t.foundation} in. Rooms that share an edge share a wall. Outdoor rooms have no walls.`)
-  lines.push('Furniture is listed under its room as id, catalog kind, center in house-local feet, and rotation (0 faces north, 90 west, 180 south, 270 east).')
+  if (full) lines.push('Furniture is listed under its room as id, catalog kind, center in house-local feet, and rotation (0 faces north, 90 west, 180 south, 270 east).')
+  else lines.push('Rooms only, to keep this short: openings, furniture, roofs, and beams of this building are left out. If the request is about them, ask the owner to name this building so they are included next time.')
   lines.push('Openings are listed under their host room as id: kind, side, offset from that side\'s west or south end to the center, width x height, sill, and what is on the other side.')
   const placed = placeOpenings(house)
   const ft1 = (inches: number) => String(Math.round(inches / 12 * 100) / 100)
@@ -67,6 +88,7 @@ export function summarizeEstate(e: Estate): string {
     lines.push('', `Level ${level.id}: ${level.name}, floor at ${f(level.elevation)} ft, ${f(level.floorHeight)} ft floor to floor. Rooms (id: name, type, position, bath):`)
     for (const r of level.rooms) {
       lines.push(`- ${r.id}: ${r.name}, ${r.type}, ${box(r.rect)}${r.bathId ? `, bath ${r.bathId}` : ''}${r.safeRoom ? ', safe room' : ''}${r.wingId ? `, in wing ${r.wingId}` : ''}${r.ceiling ? `, ceiling ${ceilingNote(house, r)}` : ''}`)
+      if (!full) continue
       const furniture = furnitureLine(house, r)
       if (furniture) lines.push(furniture)
       // Rows of overhead doors in a shop's bays read as one line.
@@ -78,11 +100,13 @@ export function summarizeEstate(e: Estate): string {
     }
   }
 
+  if (!full) continue
   if (house.roofs.length) lines.push('', `Roofs (id: name, over, form, pitch, ridge or low side, overhang; heights above the main floor): ${house.roofs.map(r => `${r.id}: ${r.name}, over ${box(r.rect)} on ${r.levelId}, ${r.form} ${r.pitch}:12, ${r.form === 'shed' ? `low side ${r.low}` : `ridge ${r.ridge}`}, ${f(r.overhang)} ft overhang, top at ${f(ridgeHeight(house, r))} ft`).join('; ')}.`)
   if (house.beams?.length) lines.push('', `Beams (id: carries walls of level, line, from, to, material, posts, planning size; house-local feet): ${house.beams.map(b => `${b.id}: ${b.levelId}, ${b.orientation === 'h' ? 'east-west at y' : 'north-south at x'} ${f(b.at)}, ${f(b.from)} to ${f(b.to)}, ${b.material}${b.posts?.length ? `, posts at ${b.posts.map(f).join(' and ')}` : ''}, ${beamSize(b)}`).join('; ')}.`)
   if (house.stairs.length) lines.push('', `Stairs: ${house.stairs.map(s => `${s.id} from ${s.roomId} up to ${s.toRoomId}, ${s.shape}, ${f(s.width)} ft wide`).join('; ')}.`)
   }
   lines.push('', "This app's planning checks right now (these are planning aids, not code compliance):")
-  for (const c of validateEstate(e)) lines.push(`- ${c.status.toUpperCase()} ${c.label}: ${c.detail}`)
+  // Passing checks by name only, to keep this short; warnings and failures in full.
+  for (const c of validateEstate(e)) lines.push(c.status === 'pass' ? `- PASS ${c.label}` : `- ${c.status.toUpperCase()} ${c.label}: ${c.detail}`)
   return lines.join('\n')
 }

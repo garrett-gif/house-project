@@ -16,7 +16,7 @@ const box = (x: number, y: number, w: number, d: number) => ({ x: ft(x), y: ft(y
 /** One valid example of every operation. */
 const VALID: EditOp[] = [
   { op: 'moveBuilding', buildingId: 'forestry-shop', dx: ft(100), dy: ft(-20) },
-  { op: 'resizeBuilding', buildingId: 'fuel', w: ft(180), d: ft(120), anchor: 'w' },
+  { op: 'resizeBuilding', buildingId: 'rv', w: ft(180), d: ft(120), anchor: 'w' },
   { op: 'moveRoom', roomId: 'primary-deck', dx: 0, dy: ft(-2) },
   { op: 'resizeRoom', roomId: 'gear', w: ft(24), d: ft(32), anchor: 's' },
   { op: 'addRoom', levelId: 'walkout', room: { id: 'root-cellar', name: 'Root cellar', type: 'service', rect: box(-38, 64, 20, 26) } },
@@ -83,14 +83,16 @@ describe('moveBuilding', () => {
 describe('resizeBuilding', () => {
   it('resizes around the anchor', () => {
     const e = ok(applyEdit(sampleEstate, VALID[1]))
-    expect(building(e, 'fuel').rect).toEqual({ ...building(sampleEstate, 'fuel').rect, w: ft(180) })
+    expect(building(e, 'rv').rect).toEqual({ ...building(sampleEstate, 'rv').rect, w: ft(180) })
   })
 
   it('rejects the main house, bad sizes, and bad anchors', () => {
     expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'main-house', w: ft(300), d: ft(100), anchor: 'sw' }))).toMatch(/comes from its rooms/)
-    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'fuel', w: 0, d: ft(10), anchor: 'sw' }))).toMatch(/at least 1 ft/)
-    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'fuel', w: ft(10), d: ft(99999), anchor: 'sw' }))).toMatch(/under/)
-    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'fuel', w: ft(10), d: ft(10), anchor: 'up' as never }))).toMatch(/anchor/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'rv', w: 0, d: ft(10), anchor: 'sw' }))).toMatch(/at least 1 ft/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'rv', w: ft(10), d: ft(99999), anchor: 'sw' }))).toMatch(/under/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'rv', w: ft(10), d: ft(10), anchor: 'up' as never }))).toMatch(/anchor/)
+    // Detailed buildings take their outline from their rooms.
+    expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'fuel', w: ft(10), d: ft(10), anchor: 'sw' }))).toMatch(/comes from its rooms/)
     expect(rejected(applyEdit(sampleEstate, { op: 'resizeBuilding', buildingId: 'nope', w: ft(10), d: ft(10), anchor: 'sw' }))).toMatch(/No building/)
   })
 })

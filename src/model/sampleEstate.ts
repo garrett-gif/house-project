@@ -4,6 +4,7 @@ import { mainHouse } from './house'
 import { guestHouse } from './guestHouse'
 import { SHOP_SPECS, shopBuildings } from './shops'
 import { carBuilding, entertainmentBuilding, officeBuilding } from './amenities'
+import { compoundBuildings } from './compound'
 import { withDerivedGeometry } from './derive'
 
 const SIZE = 6600
@@ -218,7 +219,7 @@ const laidOut: Estate = withDerivedGeometry({
   waterSources,
   utilities,
   house: mainHouse,
-  houses: [guestHouse, ...shopBuildings(), officeBuilding, carBuilding, entertainmentBuilding],
+  houses: [guestHouse, ...shopBuildings(), officeBuilding, carBuilding, entertainmentBuilding, ...compoundBuildings()],
 })
 laidOut.buildings = laidOut.buildings.map(b => ({ ...b, ...PEOPLE[b.id] }))
 

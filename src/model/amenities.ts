@@ -12,17 +12,17 @@ export const OVERHEAD_DOOR_HEIGHT = 16
  * answers on 2026-11-09. Each is a detailed building: rooms in local feet, the first pass of doors, windows, roofs,
  * and furniture, then the doors and machines that need placing by hand.
  */
-type R = [string, string, RoomType, number, number, number, number]
-const rooms = (prefix: string, list: R[], twoStory: string[] = []): Room[] =>
+export type R = [string, string, RoomType, number, number, number, number]
+export const rooms = (prefix: string, list: R[], twoStory: string[] = []): Room[] =>
   list.map(([id, name, type, x, y, w, d]) => ({ id: `${prefix}-${id}`, name, type, rect: { x: ft(x), y: ft(y), w: ft(w), d: ft(d) }, ...(twoStory.includes(id) ? { twoStory: true } : {}) }))
-const door = (id: string, roomId: string, side: Opening['side'], offsetFt: number, widthFt: number, kind: Opening['kind'] = 'door', heightFt = 7): Opening =>
+export const door = (id: string, roomId: string, side: Opening['side'], offsetFt: number, widthFt: number, kind: Opening['kind'] = 'door', heightFt = 7): Opening =>
   ({ id, kind, roomId, side, offset: ft(offsetFt), width: ft(widthFt), height: ft(heightFt), sill: 0, ...(kind === 'door' ? { swing: 'out' as const } : {}) })
 
 /** Builds a detailed building and furnishes it after its own doors are in, keeping any hand-placed pieces. */
-function build(house: Parameters<typeof withHouseDefaults>[0], extraDoors: Opening[] = [], placed: FurnitureItem[] = []): HouseModel {
+export function build(house: Parameters<typeof withHouseDefaults>[0], extraDoors: Opening[] = [], placed: FurnitureItem[] = [], pitch = 4): HouseModel {
   const first = withHouseDefaults({ ...house, furniture: [] })
-  // Big flat-ish gables suit these long spans better than the house's 8:12.
-  const roofs = first.roofs.map(r => ({ ...r, pitch: 4 }))
+  // Big flat-ish gables suit long spans better than the house's 8:12; lodges and cabins pass a steeper pitch.
+  const roofs = house.roofs ?? first.roofs.map(r => ({ ...r, pitch }))
   // Hand-placed doors win: drop any first-pass opening on the same wall that they overlap. Overhead doors are 16 ft.
   const extraIds = new Set(extraDoors.map(o => o.id))
   const trial = placeOpenings({ ...first, openings: [...extraDoors, ...first.openings] })

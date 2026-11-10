@@ -80,10 +80,11 @@ describe('shop drawings and the chat summary', () => {
     for (const m of plan.marks) if (m.t === 'rect') expect(m.x + m.w, JSON.stringify(m).slice(0, 80)).toBeLessThanOrEqual(plan.width)
   })
 
-  it('summarize rows of overhead doors and machines in one line each', () => {
-    const text = summarizeEstate(sampleEstate)
+  it('summarize rows of overhead doors and machines in one line each, and keep the chat summary short', () => {
+    const text = summarizeEstate(sampleEstate, new Set(['wildland-shop']))
     expect(text).toMatch(/\d+ overhead doors, .* one at each end of every lane/)
     expect(text).toMatch(/furniture: 25 engine-t3, 25 engine-t6, 25 water-tender, 3 crew-carrier/)
-    expect(text.length).toBeLessThan(150000)
+    // By default the main house is in full and every other building lists its rooms only.
+    expect(summarizeEstate(sampleEstate, new Set(['main-house'])).length).toBeLessThan(150000)
   })
 })

@@ -220,6 +220,15 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'breakfast-banquette': { name: 'Breakfast banquette and table', w: 96, d: 72, h: 36, category: 'table', place: 'wall', front: 24, seats: 6, material: 'timber',
     parts: [p('Banquette', 0, 0, 96, 22, 36), p('Table', 12, 24, 72, 36, 30)] },
   'wine-wall': { name: 'Glass-fronted wine wall', w: 144, d: 24, h: 96, category: 'storage', place: 'wall', front: 36, kw: 1.5 },
+  // Compound pieces: the commons dining hall, aircraft, and fuel.
+  'dining-hall-160': { name: 'Dining hall tables, 10 tables of 16', w: 648, d: 526, h: 30, category: 'table', place: 'center', around: 36, seats: 160,
+    parts: [0, 108, 216, 324, 432].flatMap(y => [0, 360].flatMap(x => [p('Table', x, y + 22, 288, 42, 30), ...row('Chair', 8, 20, 20, 36, 18.3, x + 2, y), ...row('Chair', 8, 20, 20, 36, 18.3, x + 2, y + 66)])) },
+  helicopter: { name: 'Helicopter, light utility (Type 3)', w: 528, d: 120, h: 144, category: 'vehicle', place: 'floor', around: 72,
+    parts: [p('Cabin', 0, 24, 168, 72, 132), p('Tail boom', 168, 48, 312, 24, 72), p('Tail fin', 480, 36, 48, 48, 144)] },
+  airplane: { name: 'Twin turboprop airplane', w: 648, d: 528, h: 180, category: 'vehicle', place: 'center', around: 48,
+    parts: [p('Wing', 0, 168, 648, 72, 72), p('Fuselage', 288, 0, 72, 528, 96), p('Tail', 216, 456, 216, 72, 180)] },
+  'fuel-dispenser': { name: 'Fuel dispenser on an island', w: 96, d: 36, h: 72, category: 'equipment', place: 'center', around: 60 },
+  'fuel-tank': { name: 'Aboveground fuel tank, 10,000 gal, double wall', w: 120, d: 360, h: 120, category: 'equipment', place: 'floor', around: 36 },
   'wine-rack': { name: 'Wine racks', w: 72, d: 16, h: 84, category: 'storage', place: 'wall', front: 30 },
 }
 
@@ -327,6 +336,34 @@ function recipe(room: Room): string[] {
     'wine-cellar': ['wine-rack'], 'safe-room': ['spa-bench', 'shelving'],
     bunk: ['bunk-bed', 'bunk-bed', 'bunk-bed'],
   }
+  // Compound lodging, commons, classroom, hangars, pool house, and fuel island.
+  if (/couple's room/.test(name)) return ['queen-bed-set', 'desk']
+  if (/private room/.test(name)) return ['twin-bed', 'desk', 'small-dresser']
+  if (/lodge lounge/.test(name)) return ['living-group', 'game-table-4']
+  if (/dining hall/.test(name)) return ['dining-hall-160']
+  if (/camp store/.test(name)) return ['reception-desk', 'shelving', 'shelving', 'shelving']
+  if (/laundry room/.test(name)) return ['laundry-pair', 'laundry-pair', 'laundry-pair', 'laundry-pair', 'folding-counter']
+  if (/lounge and game/.test(name)) return ['sectional-group', 'living-group', 'game-table-4', 'game-table-4', 'tv-console']
+  if (/^classroom/.test(name)) return ['display-wall', 'class-seating-30']
+  if (/forestry lab/.test(name)) return ['prep-table', 'prep-table', 'plan-table', 'shelving', 'shelving']
+  if (/^gear room/.test(name)) return ['gear-lockers', 'gear-lockers', 'gear-lockers', 'shelving']
+  if (/instructor office/.test(name)) return ['desk', 'bookshelf']
+  if (/helicopter hangar/.test(name)) return Array(6).fill('helicopter')
+  if (/airplane hangar/.test(name)) return ['airplane']
+  if (/pilot ready room/.test(name)) return ['living-group', 'long-desk']
+  if (/crew quarters/.test(name)) return ['bunk-bed', 'bunk-bed', 'small-dresser']
+  if (/aircraft maintenance/.test(name)) return ['workbench', 'parts-racks', 'welding-bench']
+  if (/aviation parts/.test(name)) return ['parts-racks', 'parts-racks']
+  if (/^cabin \d+ living/.test(name)) return ['living-group', 'counter-sink', 'kitchen-table-6']
+  if (/^cabin \d+ bedroom/.test(name)) return ['queen-bed-set']
+  if (/^cabin \d+ bunk/.test(name)) return ['bunk-bed']
+  if (/pool bar/.test(name)) return ['bar-counter', 'armchair-pair']
+  if (/outdoor pool deck/.test(name)) return ['pool-basin', 'lounge-chairs', 'lounge-chairs', 'lounge-chairs']
+  if (/loggia/.test(name)) return ['outdoor-kitchen', 'fireplace-outdoor', 'dining-8']
+  if (/changing room/.test(name)) return ['shower', 'bench']
+  if (/fuel canopy/.test(name)) return Array(4).fill('fuel-dispenser')
+  if (/tank farm/.test(name)) return Array(3).fill('fuel-tank')
+  if (/lubricant/.test(name)) return ['shelving', 'shelving', 'parts-racks']
   // Kids' rooms: a twin bed and desk, plus the built-in nook the name asks for.
   // A bunk nook takes the bed's place and a reading nook the desk's; the homework room has desks for everyone.
   if (/^kid bedroom/.test(name)) return [/bunk nook/.test(name) ? 'bunk-nook' : 'twin-bed', /reading nook/.test(name) ? 'reading-nook' : 'desk']

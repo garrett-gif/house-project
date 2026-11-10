@@ -114,8 +114,8 @@ describe('utility checks', () => {
 
   it('count water and power demand from beds, staff, and floor area', () => {
     const lodge = sampleEstate.buildings.find(b => b.id === 'lodge-1')!
-    // 22 beds at 100 gallons a day; 150 x 60 ft on two floors at 4 W per sq ft.
-    expect(demand(sampleEstate, lodge)).toEqual({ waterGpd: 2200, sewageGpd: 1650, kw: 72 })
+    // 22 beds at 100 gallons a day; 108 x 54 ft on two floors, from its rooms, at 4 W per sq ft.
+    expect(demand(sampleEstate, lodge)).toEqual({ waterGpd: 2200, sewageGpd: 1650, kw: 108 * 54 * 2 * 4 / 1000 })
   })
 })
 
@@ -218,8 +218,8 @@ describe('older saves', () => {
   it('leave out utilities that would land on a moved building', () => {
     const old = structuredClone(sampleEstate)
     delete old.utilities
-    // The pool house was moved onto ground the sample uses for the estate drainfield.
-    old.buildings.find(b => b.id === 'outdoor-pool')!.rect = { x: ft(1920), y: ft(4470), w: ft(70), d: ft(45) }
+    // The RV sites were moved onto ground the sample uses for the estate drainfield.
+    old.buildings.find(b => b.id === 'rv')!.rect = { x: ft(1920), y: ft(4470), w: ft(70), d: ft(45) }
     expect(withUtilityDefaults(old).utilities!.some(u => u.id === 'estate-septic')).toBe(false)
   })
 })
@@ -228,7 +228,7 @@ describe('the chat summary', () => {
   it('lists utilities, devices, occupancy, and the safe room', () => {
     const text = summarizeEstate(sampleEstate)
     expect(text).toMatch(/- estate-septic: Estate septic and drainfield, septic, at 1900,4450 size 100x134, 4,000 gallons a day, serves main-house/)
-    expect(text).toMatch(/- lodge-1: Lodge 1, .* sleeps 22, 72 kW, on backup power/)
+    expect(text).toMatch(/- lodge-1: Lodge 1, .* sleeps 22, 47 kW, on backup power/)
     expect(text).toMatch(/- cam-estate-gate: camera at 1000,0, facing \d+ deg, 60 deg view, 400 ft, solar/)
     expect(text).toMatch(/- safe-room: Safe room, service, .*, safe room/)
     expect(text).toMatch(/Utility rules \(planning values\): waterGpdPerBed 100/)

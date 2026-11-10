@@ -4,7 +4,7 @@ import type { EditOp } from '../src/model/edits'
 import type { ChatTurn, ProposeRequest, ProposeResponse } from '../src/chat/protocol'
 import { applyOperations } from '../src/model/edits'
 import { EDIT_TOOLS, toEditOp } from '../src/model/editTools'
-import { summarizeEstate } from '../src/model/summary'
+import { buildingsInRequest, summarizeEstate } from '../src/model/summary'
 import { diffChecks, validateEstate } from '../src/model/validate'
 
 type Params = Anthropic.Beta.Messages.MessageCreateParamsNonStreaming
@@ -72,7 +72,8 @@ export async function proposeEdits(create: CreateMessage, req: ProposeRequest, m
   const ops: EditOp[] = []
   const messages: MessageParam[] = [
     ...historyMessages(req.history),
-    { role: 'user', content: `Current model:\n\n${summarizeEstate(req.estate)}\n\nOwner's request:\n${req.request}` },
+    // Full detail for the buildings the request names (or the main house), rooms only for the rest.
+    { role: 'user', content: `Current model:\n\n${summarizeEstate(req.estate, buildingsInRequest(req.estate, [req.request, ...(req.history ?? []).map(t => t.text ?? '')].join(' ')))}\n\nOwner's request:\n${req.request}` },
   ]
 
   for (let round = 0; round < MAX_ROUNDS; round++) {

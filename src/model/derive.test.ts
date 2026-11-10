@@ -25,7 +25,7 @@ describe('below-grade rooms', () => {
 
   it('cannot be placed under another building, here the pool house south of the courtyard', () => {
     const r = applyOperations(sampleEstate, [
-      { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(60), y: ft(-100), w: ft(30), d: ft(20) } } },
+      { op: 'addRoom', levelId: 'walkout', room: { id: 'tasting-cellar', name: 'Tasting cellar', type: 'service', rect: { x: ft(60), y: ft(-78), w: ft(30), d: ft(20) } } },
     ])
     expect(r.ok).toBe(false)
   })
