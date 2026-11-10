@@ -61,3 +61,19 @@ describe('room touches in every building', () => {
     }
   })
 })
+
+describe('architecture in every building', () => {
+  it('stands porch posts along the open edges of covered porches, and rails decks above the ground', async () => {
+    const { porchPosts, railings } = await import('./architecture')
+    const h = sampleEstate.house
+    const posts = porchPosts(h), rails = railings(h)
+    expect(new Set(posts.map(p => p.roomId))).toEqual(new Set(['terrace', 'screened-porch']))
+    // The porch over the sunken courtyard, the primary deck, and the kids' deck all need guards.
+    expect(new Set(rails.map(r => r.roomId))).toEqual(new Set(['terrace', 'primary-deck', 'kids-deck']))
+    // Posts stand no more than 12 ft apart.
+    const terrace = posts.filter(p => p.roomId === 'terrace' && p.y === -16 * 12).map(p => p.x).sort((a, b) => a - b)
+    for (let i = 1; i < terrace.length; i++) expect(terrace[i] - terrace[i - 1]).toBeLessThanOrEqual(144)
+    // Every covered porch elsewhere gets posts too.
+    for (const id of ['guest-house', 'cabins', 'outdoor-pool', 'fuel']) expect(porchPosts(allHouses(sampleEstate).find(x => x.buildingId === id)!).length, id).toBeGreaterThan(0)
+  })
+})

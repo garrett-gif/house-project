@@ -13,6 +13,7 @@ import { allHouses } from '../model/houses'
 import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
 import { stairGeometry } from '../model/stairs'
 import { roomDecor } from '../model/decor'
+import { porchPosts, railings } from '../model/architecture'
 import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
 import { outwardSide } from '../model/walls'
@@ -269,6 +270,14 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
           const panels = Math.round((o.to - o.from) / 48)
           for (let j = 1; j < panels; j++) { const m = o.from + (o.to - o.from) * j / panels; piece(m - 1.5, m + 1.5, sill, head, pal.frame, 1, 'frame') }
         }
+        if (look.detailed) {
+          // Casings stand a little proud of both faces: black window frames, timber door casings.
+          const trim = o.kind === 'window' ? pal.frame : pal.timber, proud = t + 0.12, cw = 3.5
+          slab(o.from - cw, o.from, 0 + (o.kind === 'window' ? sill - 0.25 : 0), head + 0.3, 0, proud, trim, 1, o.kind === 'window' ? 'frame' : 'timber')
+          slab(o.to, o.to + cw, 0 + (o.kind === 'window' ? sill - 0.25 : 0), head + 0.3, 0, proud, trim, 1, o.kind === 'window' ? 'frame' : 'timber')
+          slab(o.from - cw, o.to + cw, head, head + 0.3, 0, proud, trim, 1, o.kind === 'window' ? 'frame' : 'timber')
+          if (o.kind === 'window' && sill > 0.3) slab(o.from - cw, o.to + cw, sill - 0.25, sill, 0, proud + 0.15, trim, 1, 'frame')
+        }
         cursor = o.to
       }
       piece(cursor, seg.to, 0, wall)
@@ -311,6 +320,25 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
           g.add(m)
         } else addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), color)
       }
+    }
+  }
+  // Porch posts in timber from the floor to the eave, and railings: a timber top rail on posts every 6 ft.
+  const onLevel = (z: number) => visible.find(l => l.elevation === z)
+  for (const pt of porchPosts(estate.house)) {
+    if (!onLevel(pt.z)) continue
+    addBox(frame(pt.wingId), toFt(pt.x) - cx, toFt(pt.z) + toFt(pt.h) / 2, cy - toFt(pt.y), toFt(pt.size), toFt(pt.h), toFt(pt.size), pal.timber, 1, 'timber', look)
+  }
+  for (const rl of railings(estate.house)) {
+    if (!onLevel(rl.z)) continue
+    const g = frame(rl.wingId), len = toFt(Math.hypot(rl.x2 - rl.x1, rl.y2 - rl.y1)), along = rl.y1 === rl.y2
+    const mx = toFt((rl.x1 + rl.x2) / 2) - cx, mz = cy - toFt((rl.y1 + rl.y2) / 2), base = toFt(rl.z), h = toFt(rl.h)
+    addBox(g, mx, base + h, mz, along ? len : 0.3, 0.3, along ? 0.3 : len, pal.timber, 1, 'timber', look)
+    // Steel cable infill reads as a light glass panel at this scale.
+    addBox(g, mx, base + h / 2, mz, along ? len : 0.05, h, along ? 0.05 : len, pal.glass, 0.25, 'glass', look)
+    const n = Math.max(1, Math.round(len / 6))
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, px = toFt(rl.x1 + (rl.x2 - rl.x1) * t) - cx, pz = cy - toFt(rl.y1 + (rl.y2 - rl.y1) * t)
+      addBox(g, px, base + h / 2, pz, 0.3, h, 0.3, pal.timber, 1, 'timber', look)
     }
   }
   // Room touches: rugs, lamps, art, TVs, and plants. Fast mode keeps the rugs and art as flat color.

@@ -17,6 +17,7 @@ import { bayOutline } from '../model/bays'
 import { stairGeometry } from '../model/stairs'
 import { fixtureSymbols } from '../drawings/fixtures'
 import { roomDecor } from '../model/decor'
+import { porchPosts, railings } from '../model/architecture'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -213,6 +214,12 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
           if (d.kind === 'art' || d.kind === 'tv') return <rect key={`decor-${i}`} x={toFt(d.rect.x)} y={top - toFt(d.rect.y) - toFt(d.rect.d)} width={toFt(d.rect.w)} height={toFt(d.rect.d)} fill={hex(d.color)} pointerEvents="none" />
           return <circle key={`decor-${i}`} cx={cx} cy={cy} r={toFt(Math.min(d.rect.w, d.rect.d)) / 2} fill={d.kind === 'plant' ? '#7fa36a' : '#f1e6c8'} stroke="#8a7a66" strokeWidth={0.08} pointerEvents="none" />
         })}
+        {railings(house).filter(rl => inF(rl.wingId) && fRooms.some(r => r.id === rl.roomId)).map((rl, i) => (
+          <line key={`rail-${i}`} x1={toFt(rl.x1)} y1={top - toFt(rl.y1)} x2={toFt(rl.x2)} y2={top - toFt(rl.y2)} stroke="#5a5348" strokeWidth={0.25} pointerEvents="none" />
+        ))}
+        {porchPosts(house).filter(pt => inF(pt.wingId) && fRooms.some(r => r.id === pt.roomId)).map((pt, i) => (
+          <rect key={`post-${i}`} x={toFt(pt.x - pt.size / 2)} y={top - toFt(pt.y + pt.size / 2)} width={toFt(pt.size)} height={toFt(pt.size)} fill="#6e4b2c" pointerEvents="none" />
+        ))}
         {house.stairs.map(st => {
           const geo = stairGeometry(house, st)
           const here = fRooms.find(r => r.id === st.roomId) ? 'UP' : fRooms.find(r => r.id === st.toRoomId) ? 'DN' : null

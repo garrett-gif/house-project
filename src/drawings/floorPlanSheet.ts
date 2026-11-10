@@ -8,6 +8,7 @@ import { ceilingNote } from '../model/ceilings'
 import { bayOutline } from '../model/bays'
 import { stairGeometry } from '../model/stairs'
 import { fixtureSymbols } from './fixtures'
+import { porchPosts, railings } from '../model/architecture'
 const lineOf = ([x1, y1]: [number, number], [x2, y2]: [number, number]) => ({ x1, y1, x2, y2 })
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
@@ -97,6 +98,9 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     for (const o of fOpenings) drawOpening(out, o, X, Y, k)
     for (const o of fOpenings) drawTag(out, o, tags.get(o.id), X, Y)
 
+    // Porch posts as solid squares, railings as a heavy line along the open edges.
+    for (const pt of porchPosts(e.house).filter(x => rooms.some(r => r.id === x.roomId))) out.push({ t: 'rect', x: X(pt.x - pt.size / 2), y: Y(pt.y + pt.size / 2), w: pt.size * k, h: pt.size * k, fill: '#000' })
+    for (const rl of railings(e.house).filter(x => rooms.some(r => r.id === x.roomId))) out.push({ t: 'line', x1: X(rl.x1), y1: Y(rl.y1), x2: X(rl.x2), y2: Y(rl.y2), w: 1.2 })
     // Stairs: every tread and the landing, solid where the stair starts and dashed where it arrives from below.
     for (const st of e.house.stairs) {
       const geo = stairGeometry(e.house, st)
