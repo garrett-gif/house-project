@@ -129,3 +129,23 @@ describe('the covered porch', () => {
     expect(check(e, 'roof-support').elements).toEqual(['g-stray'])
   })
 })
+
+describe('guest house v2: the main house family, smaller', () => {
+  it('has the vaulted, trussed great room with a glass gable, and a beamed kitchen', () => {
+    expect(room(sampleEstate, 'g-great')!.ceiling).toMatchObject({ form: 'vaulted', glassEnds: ['w'] })
+    expect(room(sampleEstate, 'g-great')!.ceiling!.spacing).toBeGreaterThan(0)
+    expect(room(sampleEstate, 'g-kitchen')!.ceiling!.form).toBe('beamed')
+    expect(guest(sampleEstate).style).toBe('mountain-modern')
+    expect(guest(sampleEstate).roofs.find(r => r.id === 'g-roof')!.pitch).toBe(10)
+  })
+
+  it('has window seats in bays, a stone fireplace, and covered porches front and back', async () => {
+    const { placeOpenings } = await import('./walls')
+    const seats = placeOpenings(guest(sampleEstate)).filter(o => o.bay?.seat && !o.problem).map(o => o.roomId)
+    expect(seats).toEqual(expect.arrayContaining(['g-great', 'g-bed-1', 'g-bed-3']))
+    const kinds = (id: string) => guest(sampleEstate).furniture!.filter(i => i.roomId === id).map(i => i.kind)
+    expect(kinds('g-great')).toContain('fireplace-stone-tall')
+    expect(kinds('g-terrace')).toEqual(expect.arrayContaining(['outdoor-kitchen', 'fireplace-outdoor']))
+    expect(guest(sampleEstate).roofs.map(r => r.id)).toEqual(expect.arrayContaining(['g-porch-roof', 'g-terrace-roof']))
+  })
+})

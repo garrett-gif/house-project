@@ -8,8 +8,10 @@ const r = (id: string, name: string, type: RoomType, x: number, y: number, w: nu
 })
 
 /*
- * Guest house, first layout (v1), for big gatherings: a 74 x 38 ft bar on two floors, in the main house's family
- * of simple 8:12 gables. House-local feet, 0,0 at the southwest corner.
+ * Guest house, second layout (v2), for big gatherings: a 74 x 38 ft bar on two floors. Per Garrett's brief it is the
+ * main house's family, smaller: mountain modern, stone base, timber siding, a dark 10:12 standing-seam roof, a vaulted
+ * great room with timber trusses and a glass gable, window seats in bays, and covered porches front and back.
+ * House-local feet, 0,0 at the southwest corner.
  *
  * Bearing lines shared by both floors: y = 22 and 28 (the hall), x = 30, 52, and 66 across the south band, and
  * x = 38 and 52 around the stair in the north band. The great room is two stories, open to the upper hall.
@@ -17,11 +19,12 @@ const r = (id: string, name: string, type: RoomType, x: number, y: number, w: nu
  */
 const main: Room[] = [
   // South band: gathering rooms and one main-floor suite for guests who should not climb stairs.
-  { ...r('g-great', 'Great room, two story, fireplace', 'living', 0, 0, 30, 22), twoStory: true },
-  r('g-kitchen', 'Kitchen and dining for a crowd', 'living', 30, 0, 22, 22),
-  r('g-bed-1', 'Main-floor suite', 'bedroom', 52, 0, 14, 22, 'g-bath-1'),
+  // The great room is open through both floors, vaulted under trusses, with a glass gable to the west.
+  { ...r('g-great', 'Great room, vaulted, stone fireplace', 'living', 0, 0, 30, 22), twoStory: true, ceiling: { form: 'vaulted', height: ft(24), ridge: 'ew', spacing: ft(10), glassEnds: ['w'] } },
+  { ...r('g-kitchen', 'Kitchen and dining for a crowd', 'living', 30, 0, 22, 22), ceiling: { form: 'beamed', height: ft(9), spacing: ft(4) } },
+  r('g-bed-1', 'Main-floor suite, window seat', 'bedroom', 52, 0, 14, 22, 'g-bath-1'),
   r('g-bath-1', 'Main-floor suite bath', 'bath', 66, 0, 8, 22),
-  r('g-terrace', 'South terrace', 'outdoor', 0, -16, 52, 16),
+  r('g-terrace', 'Covered south porch, outdoor kitchen and fireplace', 'outdoor', 0, -16, 52, 16),
   // Covered porch across the front door and the mudroom door, out of the snow.
   r('g-porch', 'Covered north porch', 'outdoor', 0, 38, 40, 8),
   r('g-hall', 'Hall', 'circulation', 0, 22, 74, 6),
@@ -38,7 +41,7 @@ const main: Room[] = [
 const upper: Room[] = [
   r('g-bed-2', 'Guest suite 2', 'bedroom', 30, 0, 16, 22, 'g-bath-2'),
   r('g-bath-2', 'Guest suite 2 bath', 'bath', 46, 0, 6, 22),
-  r('g-bed-3', 'Guest suite 3', 'bedroom', 52, 0, 14, 22, 'g-bath-3'),
+  r('g-bed-3', 'Guest suite 3, window seat', 'bedroom', 52, 0, 14, 22, 'g-bath-3'),
   r('g-bath-3', 'Guest suite 3 bath', 'bath', 66, 0, 8, 22),
   r('g-upper-hall', 'Upper hall, open to the great room', 'circulation', 0, 22, 74, 6),
   r('g-bunk', 'Bunk room, sleeps six', 'bedroom', 0, 28, 22, 10, 'g-bunk-bath'),
@@ -64,11 +67,12 @@ const program: ProgramItem[] = [
 ]
 
 const roofs: Roof[] = [
-  { id: 'g-roof', name: 'Guest house roof', levelId: 'g-upper', rect: { x: 0, y: 0, w: ft(74), d: ft(38) }, form: 'gable', pitch: 8, ridge: 'ew', low: 's', overhang: ft(2) },
+  { id: 'g-roof', name: 'Guest house roof', levelId: 'g-upper', rect: { x: 0, y: 0, w: ft(74), d: ft(38) }, form: 'gable', pitch: 10, ridge: 'ew', low: 's', overhang: ft(2) },
+  { id: 'g-terrace-roof', name: 'South porch roof', levelId: 'g-main', rect: { x: 0, y: ft(-16), w: ft(52), d: ft(16) }, form: 'shed', pitch: 3, ridge: 'ew', low: 's', overhang: ft(1) },
   { id: 'g-porch-roof', name: 'North porch roof', levelId: 'g-main', rect: { x: 0, y: ft(38), w: ft(40), d: ft(8) }, form: 'shed', pitch: 4, ridge: 'ew', low: 'n', overhang: ft(1) },
 ]
 
-/** First layout of the guest house, about 4,960 sq ft. A starting point to react to. */
+/** Second layout of the guest house, about 4,960 sq ft. A starting point to react to. */
 const firstPass: HouseModel = withHouseDefaults({
   buildingId: 'guest-house',
   style: 'mountain-modern',
@@ -86,16 +90,21 @@ const firstPass: HouseModel = withHouseDefaults({
  * The rule-based first pass puts the outside door on the stair hall. The front door belongs on the foyer's north
  * wall, with a second door into the mudroom from the parking side.
  */
+const HAND_WALLS = new Set(['g-great:s', 'g-great:w', 'g-bed-1:s', 'g-bed-3:s', 'g-kitchen:s'])
 const finished: HouseModel = {
   ...firstPass,
   openings: [
-    ...firstPass.openings.filter(o => !(o.roomId === 'g-stair' && o.side === 'n')),
+    ...firstPass.openings.filter(o => !(o.roomId === 'g-stair' && o.side === 'n') && !(o.kind === 'window' && HAND_WALLS.has(`${o.roomId}:${o.side}`))),
     { id: 'g-front-door', kind: 'door', roomId: 'g-foyer', side: 'n', offset: ft(6), width: 42, height: 96, sill: 0, swing: 'in' },
     { id: 'g-mudroom-door', kind: 'door', roomId: 'g-mudroom', side: 'n', offset: ft(7), width: 36, height: 84, sill: 0, swing: 'in' },
-    // South glass for the view: tall fixed windows in the great room, a wide one over the kitchen counter.
+    // South glass for the view: a glass wall in the great room beside its porch door, a wide window over the kitchen counter.
     { id: 'g-great-view-1', kind: 'window', roomId: 'g-great', side: 's', offset: ft(4.5), width: 60, height: 96, sill: 12, operation: 'fixed' },
-    { id: 'g-great-view-2', kind: 'window', roomId: 'g-great', side: 's', offset: ft(23), width: 72, height: 96, sill: 12, operation: 'fixed' },
+    { id: 'g-great-view-2', kind: 'window', roomId: 'g-great', side: 's', offset: ft(24), width: ft(10), height: 108, sill: 12, operation: 'fixed' },
     { id: 'g-kitchen-view', kind: 'window', roomId: 'g-kitchen', side: 's', offset: ft(18), width: 72, height: 48, sill: 42, operation: 'slider' },
+    // Window seats in bays: the great room's west end, the main-floor suite, and suite 3 above it.
+    { id: 'g-great-seat', kind: 'window', roomId: 'g-great', side: 'w', offset: ft(11), width: ft(10), height: 60, sill: 18, operation: 'casement', bay: { form: 'angled', depth: ft(3), seat: true } },
+    { id: 'g-bed-1-seat', kind: 'window', roomId: 'g-bed-1', side: 's', offset: ft(7), width: ft(6), height: 54, sill: 18, operation: 'casement', bay: { form: 'box', depth: ft(2.5), seat: true } },
+    { id: 'g-bed-3-seat', kind: 'window', roomId: 'g-bed-3', side: 's', offset: ft(7), width: ft(6), height: 48, sill: 18, operation: 'casement', bay: { form: 'box', depth: ft(2.5), seat: true } },
   ],
 }
 
