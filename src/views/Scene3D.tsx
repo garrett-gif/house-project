@@ -11,6 +11,7 @@ import { roofPolygons } from '../model/roofs'
 import { wingById } from '../model/wings'
 import { allHouses } from '../model/houses'
 import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
+import { stairGeometry } from '../model/stairs'
 import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
 import { outwardSide } from '../model/walls'
@@ -309,6 +310,17 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
           g.add(m)
         } else addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), color)
       }
+    }
+  }
+  // Stairs: each tread a solid step up from the lower floor, and the landing.
+  for (const st of estate.house.stairs) {
+    const lower = visible.find(l => l.rooms.some(r => r.id === st.roomId))
+    const geo = lower && stairGeometry(estate.house, st)
+    if (!lower || !geo) continue
+    const g = frame(geo.wingId), base = toFt(lower.elevation)
+    for (const q of [...geo.treads.map(t => ({ r: t.rect, top: t.top })), ...(geo.landing ? [{ r: geo.landing.rect, top: geo.landing.top }] : [])]) {
+      const h = toFt(q.top)
+      addBox(g, toFt(q.r.x + q.r.w / 2) - cx, base + h / 2, cy - toFt(q.r.y + q.r.d / 2), toFt(q.r.w), h, toFt(q.r.d), pal.timber, 1, 'timber', look)
     }
   }
   // Ceilings, seen from inside only so the plan from above stays open, and their timber trusses and beams.

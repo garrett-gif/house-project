@@ -1,6 +1,7 @@
 import type { Estate, Side } from '../model/types'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { angleOf, toHouse } from '../model/wings'
+import { stairGeometry } from '../model/stairs'
 import { houseBounds } from '../model/derive'
 import { openingMarks } from './marks'
 
@@ -50,7 +51,7 @@ export function floorPlansDxf(e: Estate): string {
     off = { x: dx, y: dy }
     const L = {
       wall: layer(`A-WALL-${tag}`, 7), door: layer(`A-DOOR-${tag}`, 3), glaz: layer(`A-GLAZ-${tag}`, 4),
-      room: layer(`A-AREA-IDEN-${tag}`, 2), anno: layer(`A-ANNO-${tag}`, 1),
+      room: layer(`A-AREA-IDEN-${tag}`, 2), anno: layer(`A-ANNO-${tag}`, 1), stair: layer(`A-FLOR-STRS-${tag}`, 6),
     }
     wing = undefined
     text(L.anno, dx + b.x + b.w / 2, dy + b.y - 10 * 12, 24, `${level.name.toUpperCase()} PLAN, DRAFT, NOT FOR CONSTRUCTION`)
@@ -90,6 +91,12 @@ export function floorPlansDxf(e: Estate): string {
       }
       const mark = tags.get(o.id)
       if (mark) { const [mx, my] = at((o.from + o.to) / 2, (o.kind === 'window' ? -1 : 1) * (t + 14) * (o.side === 'n' || o.side === 'e' ? 1 : -1)); text(L.anno, mx, my, 6, mark) }
+    }
+    for (const st of house.stairs) {
+      const geo = stairGeometry(house, st)
+      if (!geo || !level.rooms.some(r => r.id === st.roomId || r.id === st.toRoomId)) continue
+      wing = geo.wingId
+      for (const q of [...geo.treads.map(t => t.rect), ...(geo.landing ? [geo.landing.rect] : [])]) rect(L.stair, dx + q.x, dy + q.y, dx + q.x + q.w, dy + q.y + q.d)
     }
     for (const r of level.rooms) {
       wing = r.wingId

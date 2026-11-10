@@ -14,6 +14,7 @@ import type { FurnitureItem } from '../model/types'
 import type { PlacedOpening, WallSegment } from '../model/walls'
 import { toWing, wingById } from '../model/wings'
 import { bayOutline } from '../model/bays'
+import { stairGeometry } from '../model/stairs'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -193,6 +194,19 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
             ))}
           </g>
         ))}
+        {house.stairs.map(st => {
+          const geo = stairGeometry(house, st)
+          const here = fRooms.find(r => r.id === st.roomId) ? 'UP' : fRooms.find(r => r.id === st.toRoomId) ? 'DN' : null
+          if (!geo || !here) return null
+          const all = [...geo.treads.map(t => t.rect), ...(geo.landing ? [geo.landing.rect] : [])]
+          const first = geo.treads[0].rect
+          return (
+            <g key={`stair-${st.id}`} pointerEvents="none">
+              {all.map((q, i) => <rect key={i} x={toFt(q.x)} y={top - toFt(q.y) - toFt(q.d)} width={toFt(q.w)} height={toFt(q.d)} fill="#f7f4ee" stroke="#6d675c" strokeWidth={0.1} strokeDasharray={here === 'DN' ? '0.4 0.3' : undefined} />)}
+              <text x={toFt(first.x + first.w / 2)} y={top - toFt(first.y + first.d / 2)} fontSize={1} textAnchor="middle" className="room-size">{here}</text>
+            </g>
+          )
+        })}
         {beams.filter(bm => inF(bm.wingId)).map(bm => {
           const [a, c] = bm.orientation === 'h' ? [P(bm.from, bm.at), P(bm.to, bm.at)] : [P(bm.at, bm.from), P(bm.at, bm.to)]
           const color = flagged.has(bm.id) ? FLAG[flagged.get(bm.id)!] : '#7a3b1d'

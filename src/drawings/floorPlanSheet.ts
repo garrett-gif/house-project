@@ -6,6 +6,7 @@ import { ARCH_D, PT_PER_IN, ftIn, turnMarks } from './sheet'
 import { toHouse } from '../model/wings'
 import { ceilingNote } from '../model/ceilings'
 import { bayOutline } from '../model/bays'
+import { stairGeometry } from '../model/stairs'
 const lineOf = ([x1, y1]: [number, number], [x2, y2]: [number, number]) => ({ x1, y1, x2, y2 })
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
@@ -95,6 +96,15 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     for (const o of fOpenings) drawOpening(out, o, X, Y, k)
     for (const o of fOpenings) drawTag(out, o, tags.get(o.id), X, Y)
 
+    // Stairs: every tread and the landing, solid where the stair starts and dashed where it arrives from below.
+    for (const st of e.house.stairs) {
+      const geo = stairGeometry(e.house, st)
+      const here = rooms.some(r => r.id === st.roomId) ? 'UP' : rooms.some(r => r.id === st.toRoomId) ? 'DN' : null
+      if (!geo || !here) continue
+      for (const q of [...geo.treads.map(t => t.rect), ...(geo.landing ? [geo.landing.rect] : [])]) out.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#000', sw: 0.4, ...(here === 'DN' ? { dash: [3, 2] } : {}) })
+      const q = geo.treads[0].rect
+      out.push({ t: 'text', x: X(q.x + q.w / 2), y: Y(q.y + q.d / 2) + 2, text: here, size: 5, anchor: 'middle', bold: true })
+    }
     // Furniture and fixtures in thin outline, as plans show them.
     const here = new Set(rooms.map(r => r.id))
     for (const item of (e.house.furniture ?? []).filter(i => here.has(i.roomId) && CATALOG[i.kind])) {
