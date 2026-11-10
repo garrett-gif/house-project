@@ -39,3 +39,25 @@ describe('fixtures and cabinetry in every building', () => {
     expect(fixtureSymbols('Bookshelf', r)).toEqual([])
   })
 })
+
+describe('room touches in every building', () => {
+  it('puts rugs under seating and beds, lamps, art, and plants in the living spaces and bedrooms', async () => {
+    const { roomDecor } = await import('./decor')
+    const d = roomDecor(sampleEstate.house)
+    const inRoom = (id: string) => d.filter(x => x.roomId === id).map(x => x.kind)
+    expect(inRoom('great')).toEqual(expect.arrayContaining(['rug', 'floor-lamp']))
+    expect(inRoom('primary')).toEqual(expect.arrayContaining(['rug', 'table-lamp']))
+    expect(d.filter(x => x.kind === 'art').length).toBeGreaterThan(10)
+    expect(d.filter(x => x.kind === 'tv').length).toBeGreaterThan(0)
+    // Every touch sits inside its room.
+    const rooms = new Map(sampleEstate.house.levels.flatMap(l => l.rooms).map(r => [r.id, r.rect]))
+    for (const x of d) {
+      const r = rooms.get(x.roomId)!
+      expect(x.rect.x >= r.x && x.rect.y >= r.y && x.rect.x + x.rect.w <= r.x + r.w && x.rect.y + x.rect.d <= r.y + r.d, `${x.kind} in ${x.roomId}`).toBe(true)
+    }
+    // And every building with living spaces gets them.
+    for (const h of allHouses(sampleEstate).filter(h => h.levels.some(l => l.rooms.some(r => r.type === 'living' || r.type === 'bedroom')))) {
+      expect(roomDecor(h).length, h.buildingId).toBeGreaterThan(0)
+    }
+  })
+})

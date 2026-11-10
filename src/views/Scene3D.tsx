@@ -12,6 +12,7 @@ import { wingById } from '../model/wings'
 import { allHouses } from '../model/houses'
 import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
 import { stairGeometry } from '../model/stairs'
+import { roomDecor } from '../model/decor'
 import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
 import { outwardSide } from '../model/walls'
@@ -311,6 +312,25 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
         } else addBox(g, toFt(q.x + q.w / 2) - cx, base + h / 2, cy - toFt(q.y + q.d / 2), toFt(q.w), h, toFt(q.d), color)
       }
     }
+  }
+  // Room touches: rugs, lamps, art, TVs, and plants. Fast mode keeps the rugs and art as flat color.
+  for (const d of roomDecor(estate.house)) {
+    const level = visible.find(l => l.rooms.some(r => r.id === d.roomId))
+    if (!level) continue
+    const g = frame(d.wingId), base = toFt(level.elevation) + 0.2
+    const x = toFt(d.rect.x + d.rect.w / 2) - cx, z = cy - toFt(d.rect.y + d.rect.d / 2), w = toFt(d.rect.w), dd = toFt(d.rect.d), h = toFt(d.h), y0 = base + toFt(d.z)
+    if (d.kind === 'rug' || d.kind === 'art' || d.kind === 'tv') { addBox(g, x, y0 + h / 2, z, w, h, dd, d.color, 1, d.kind === 'rug' ? 'fabric' : 'plain', look); continue }
+    if (!look.detailed) continue
+    if (d.kind === 'plant') {
+      addBox(g, x, y0 + 0.6, z, w * 0.7, 1.2, dd * 0.7, 0x6b4a33, 1, 'plain', look)
+      const leaves = new THREE.Mesh(new THREE.SphereGeometry(Math.min(w, dd) * 0.75, 12, 10), look.mat('plain', d.color))
+      leaves.position.set(x, y0 + h - Math.min(w, dd) * 0.6, z); leaves.castShadow = true; g.add(leaves)
+      continue
+    }
+    // Lamps: a slim stand and a glowing shade.
+    addBox(g, x, y0 + (h - 0.9) / 2, z, 0.12, h - 0.9, 0.12, 0x2b2b2b, 1, 'metal', look)
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.65, 0.9, 16, 1, true), new THREE.MeshStandardMaterial({ color: d.color, emissive: 0xffd9a0, emissiveIntensity: 0.35, side: THREE.DoubleSide }))
+    shade.position.set(x, y0 + h - 0.45, z); g.add(shade)
   }
   // Stairs: each tread a solid step up from the lower floor, and the landing.
   for (const st of estate.house.stairs) {

@@ -16,6 +16,7 @@ import { toWing, wingById } from '../model/wings'
 import { bayOutline } from '../model/bays'
 import { stairGeometry } from '../model/stairs'
 import { fixtureSymbols } from '../drawings/fixtures'
+import { roomDecor } from '../model/decor'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -76,6 +77,8 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
     return `translate(${px} ${py}) rotate(${-w.angle}) translate(0 ${-top})`
   }
   const frames = [...new Set(level.rooms.map(r => r.wingId ?? ''))]
+  const decor = showFurniture ? roomDecor(house).filter(d => level.rooms.some(r => r.id === d.roomId)) : []
+  const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`
   const begin = (e: ReactPointerEvent, what: Grabbed) => {
     if (!editable || e.button !== 0) return
     e.preventDefault(); e.stopPropagation()
@@ -186,6 +189,9 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
         })}
         {walls.filter(s => inF(s.wingId)).map(wallRect)}
         {openings.filter(o => inF(o.wall?.wingId)).map(opening)}
+        {decor.filter(d => d.kind === 'rug' && inF(d.wingId)).map((d, i) => (
+          <rect key={`rug-${i}`} x={toFt(d.rect.x)} y={top - toFt(d.rect.y) - toFt(d.rect.d)} width={toFt(d.rect.w)} height={toFt(d.rect.d)} rx={0.4} fill={hex(d.color)} fillOpacity={0.18} stroke={hex(d.color)} strokeOpacity={0.5} strokeWidth={0.1} pointerEvents="none" />
+        ))}
         {showFurniture && (house.furniture ?? []).filter(i => fRooms.some(r => r.id === i.roomId) && CATALOG[i.kind]).map(item => (
           <g key={item.id} onMouseEnter={() => setHover(`${CATALOG[item.kind].name} (${item.id})`)} onMouseLeave={() => setHover(null)}
             onPointerDown={editable ? e => begin(e, { kind: 'furniture', item }) : undefined} style={editable ? { cursor: 'move' } : undefined}>
@@ -202,6 +208,11 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
             ))}
           </g>
         ))}
+        {decor.filter(d => d.kind !== 'rug' && inF(d.wingId)).map((d, i) => {
+          const cx = toFt(d.rect.x + d.rect.w / 2), cy = top - toFt(d.rect.y + d.rect.d / 2)
+          if (d.kind === 'art' || d.kind === 'tv') return <rect key={`decor-${i}`} x={toFt(d.rect.x)} y={top - toFt(d.rect.y) - toFt(d.rect.d)} width={toFt(d.rect.w)} height={toFt(d.rect.d)} fill={hex(d.color)} pointerEvents="none" />
+          return <circle key={`decor-${i}`} cx={cx} cy={cy} r={toFt(Math.min(d.rect.w, d.rect.d)) / 2} fill={d.kind === 'plant' ? '#7fa36a' : '#f1e6c8'} stroke="#8a7a66" strokeWidth={0.08} pointerEvents="none" />
+        })}
         {house.stairs.map(st => {
           const geo = stairGeometry(house, st)
           const here = fRooms.find(r => r.id === st.roomId) ? 'UP' : fRooms.find(r => r.id === st.toRoomId) ? 'DN' : null
