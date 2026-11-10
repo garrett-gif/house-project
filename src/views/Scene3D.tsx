@@ -9,6 +9,7 @@ import { CATALOG, parts } from '../model/furniture'
 import { levelWalls, placeOpenings } from '../model/walls'
 import { roofPolygons } from '../model/roofs'
 import { wingById } from '../model/wings'
+import { allHouses } from '../model/houses'
 import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
 import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
@@ -149,7 +150,19 @@ function buildSite(scene: THREE.Scene, estate: Estate) {
     const cx = toFt(r.x + r.w / 2), cy = toFt(r.y + r.d / 2)
     addBox(scene, X(cx), elev(cx, cy) + height / 2, Z(cy), toFt(r.w), height, toFt(r.d), color)
   }
-  estate.buildings.forEach(b => partsOf(b).forEach(part => rectBox(part, toFt(b.height), COLORS[b.access])))
+  // Detailed buildings show their own look: a stone base, siding walls, and a roof cap in the palette's colors. Simple site
+  // boxes keep the access colors.
+  estate.buildings.forEach(b => {
+    const house = allHouses(estate).find(h => h.buildingId === b.id)
+    if (!house) return partsOf(b).forEach(part => rectBox(part, toFt(b.height), COLORS[b.access]))
+    const pal = paletteOf(house), H = toFt(b.height), base = Math.min(H * 0.25, toFt(pal.baseHeight) || 0), cap = Math.min(4, H * 0.2)
+    for (const r of partsOf(b)) {
+      const cx = toFt(r.x + r.w / 2), cy = toFt(r.y + r.d / 2), g = elev(cx, cy)
+      if (base) addBox(scene, X(cx), g + base / 2, Z(cy), toFt(r.w), base, toFt(r.d), pal.stone)
+      addBox(scene, X(cx), g + base + (H - base - cap) / 2, Z(cy), toFt(r.w), H - base - cap, toFt(r.d), pal.siding)
+      addBox(scene, X(cx), g + H - cap / 2, Z(cy), toFt(r.w) + 3, cap, toFt(r.d) + 3, pal.roof)
+    }
+  })
   const pond = estate.zones.find(z => z.kind === 'water')
   if (pond) {
     const cx = toFt(pond.rect.x + pond.rect.w / 2), cy = toFt(pond.rect.y + pond.rect.d / 2)
