@@ -65,8 +65,8 @@ describe('DXF floor plans', () => {
   it('is in inches, at true size', () => {
     const lines = parsed.entities.filter(e => e.type === 'LINE' && e.layer === 'A-WALL-MAIN') as unknown as { vertices: { x: number }[] }[]
     const xs = lines.flatMap(l => l.vertices.map(v => v.x))
-    // The main floor's walls span the bar's 136 ft plus each wing's turned corner: 136 + 44 sin 20 + 62 sin 20, and the walls.
-    const span = ft(136) + ft(106) * Math.sin(20 * Math.PI / 180)
+    // The main floor's walls span the bar's 136 ft and the two 36 ft wings, plus the outside walls.
+    const span = ft(208)
     expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(span)
     expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(span + 12)
   })

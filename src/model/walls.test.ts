@@ -67,7 +67,7 @@ describe('first pass of doors, windows, and stairs', () => {
   it('connects every room to outside, through the stairs between levels', () => {
     const reached = reachableFromOutside(doorGraph(house))
     expect(house.levels.flatMap(l => l.rooms).filter(r => r.type !== 'outdoor' && !reached.has(r.id))).toEqual([])
-    expect(house.stairs.map(s => [s.roomId, s.toRoomId])).toEqual([['w-stair', 'm-stair'], ['m-stair', 'u-stair']])
+    expect(house.stairs.map(s => [s.roomId, s.toRoomId])).toEqual([['w-stair', 'm-stair'], ['m-stair', 'u-stair'], ['ww-stair', 'u-stair-w']])
   })
 })
 
@@ -178,12 +178,12 @@ describe('wall and opening checks', () => {
   })
 
   it('warns when the only way to a room is through a bedroom', () => {
-    // Leave the kids' living area reachable only through kid bedroom 1, beside it.
-    const others = placed(sampleEstate).filter(o => o.kind !== 'window' && (o.roomId === 'kids-living' || o.leadsTo === 'kids-living'))
+    // Leave the kids' loft reachable only through kid bedroom 2, which opens onto the stair instead.
+    const others = placed(sampleEstate).filter(o => o.kind !== 'window' && (o.roomId === 'kids-living' || o.leadsTo === 'kids-living') && o.roomId !== 'kid-2')
     expect(others.length).toBeGreaterThan(0)
     const e = ok(applyOperations(sampleEstate, [
       ...others.map(o => ({ op: 'removeOpening', openingId: o.id }) as EditOp),
-      { op: 'addDoor', opening: door({ id: 'kid-1-living', roomId: 'kid-1', side: 'e', offset: ft(16) }) },
+      { op: 'addDoor', opening: door({ id: 'kid-2-stair', roomId: 'kid-2', side: 'n', offset: ft(15) }) },
     ]))
     const c = check(e, 'circulation')
     expect(c.status).toBe('warn')

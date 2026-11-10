@@ -39,11 +39,11 @@ describe('floor plan sheets', () => {
   })
 
   it('dimensions the overall house on the main floor', () => {
-    // The center bar; the turned wings are dimensioned by their room sizes.
+    // The bar and both wings, west to east.
     const t = texts(sheets[1].marks)
-    expect(t).toContain(`136'-0"`)
-    // North to south, including the entry's 4 ft step out at the front door.
-    expect(t).toContain(`72'-0"`)
+    expect(t).toContain(`208'-0"`)
+    // North to south, from the wings' south ends to the entry's step out at the front door.
+    expect(t).toContain(`120'-0"`)
   })
 
   it('follows edits, because sheets are drawn from the model', () => {

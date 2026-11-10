@@ -133,7 +133,7 @@ describe('room operations', () => {
   })
 
   it('moveRoom moves within the level and rejects overlaps and unknown rooms', () => {
-    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-78))
+    expect(room(ok(applyEdit(sampleEstate, VALID[2])), 'primary-deck')!.rect.y).toBe(ft(-58))
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: ft(10), dy: 0 }))).toMatch(/3-car garage \(garage\) and Library and home office, window seat \(office\) would overlap by 10 ft × 24 ft/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'nope', dx: 0, dy: 0 }))).toMatch(/No room with id "nope"/)
     expect(rejected(applyEdit(sampleEstate, { op: 'moveRoom', roomId: 'garage', dx: Number.POSITIVE_INFINITY, dy: 0 }))).toMatch(/numbers/)
@@ -159,7 +159,7 @@ describe('room operations', () => {
   })
 
   it('rejects moving the main house into the outdoor pool house south of it', () => {
-    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'main-house', dx: 0, dy: ft(-60) }))).toMatch(/Outdoor pool and pool house/)
+    expect(rejected(applyEdit(sampleEstate, { op: 'moveBuilding', buildingId: 'main-house', dx: 0, dy: ft(-70) }))).toMatch(/Outdoor pool and pool house/)
   })
 
   it('rejects a room that would push the house into the outdoor pool building', () => {

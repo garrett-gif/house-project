@@ -20,8 +20,8 @@ describe('roofs', () => {
     expect([by('roof-great').form, by('roof-great').pitch, by('roof-great').ridge]).toEqual(['gable', 10, 'ns'])
     expect([by('roof-entry').form, by('roof-entry').pitch]).toEqual(['gable', 10])
     expect([by('roof-porch').form, by('roof-screened').form]).toEqual(['shed', 'shed'])
-    expect(by('roof-primary').wingId).toBe('east-wing')
-    expect(by('roof-west-wing').wingId).toBe('west-wing')
+    expect(by('roof-primary').rect.x).toBe(ft(136))
+    expect(by('roof-west-wing').rect.x).toBe(ft(-36))
     // Kids block: eave at 21 ft on the kids floor; half of a 40 ft span at 8:12 rises about 13 ft.
     expect(ridgeHeight(house, roof(sampleEstate, 'roof-kids'))).toBeCloseTo(ft(21) + ft(20) * 8 / 12)
     // Great room: eave at 11 ft; half of a 46 ft span at 10:12 rises about 19 ft.

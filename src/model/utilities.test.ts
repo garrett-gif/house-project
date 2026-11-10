@@ -29,8 +29,8 @@ describe('the sample utilities and security', () => {
     expect(compound.reduce((s, b) => s + occupancy(sampleEstate, b).beds, 0)).toBe(150)
     // 300 working by day, plus 60 at entertainment shop events.
     expect(sampleEstate.buildings.reduce((s, b) => s + occupancy(sampleEstate, b).staff, 0)).toBe(360)
-    // Two per bedroom in the main house: ten bedrooms.
-    expect(occupancy(sampleEstate, sampleEstate.buildings.find(b => b.id === 'main-house')!).beds).toBe(20)
+    // Two per bedroom in the main house: eleven bedrooms, counting the guest suite's bunk room.
+    expect(occupancy(sampleEstate, sampleEstate.buildings.find(b => b.id === 'main-house')!).beds).toBe(22)
   })
 
   it('keep the working forest at 700 acres or more', () => {

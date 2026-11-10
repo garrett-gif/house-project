@@ -16,6 +16,7 @@ v2 felt "boxy and un-house-like." What bothered him: every room a rectangle, fla
 - Look: mountain modern. Big glass, heavy timber, stone bases, metal roofs, a mix of gables and low-slope roofs.
 - Materials: dry-stack stone base, rough-sawn timber siding, dark standing-seam roof, black windows.
 - Massing: a courtyard U with the side wings splayed out 15 to 30 degrees so the courtyard opens to the view.
+- 2026-11-10, after seeing layout v3: the splayed wings were "totally unusable": cramped, chopped-up rooms and roundabout routes inside, the angle itself, and the narrow corner joints to the bar. The wings now run straight south from the ends of the bar (a plain U), joined to it by wide openings, with simple rooms off short galleries and lofts.
 - Wings: living (great room, kitchen, dining) in the center bar facing the courtyard; primary suite in one wing; kids and guests in the other.
 - Ceilings: vaulted great room with timber trusses; vaulted or beamed kitchen and dining; vaulted primary suite with beams; tall entry with a timber canopy; a lower, cozier hearth room for contrast.
 - Glass: generous but balanced. Large windows everywhere, full glass walls in the great room and primary suite.
