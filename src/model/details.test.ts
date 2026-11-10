@@ -77,3 +77,26 @@ describe('architecture in every building', () => {
     for (const id of ['guest-house', 'cabins', 'outdoor-pool', 'fuel']) expect(porchPosts(allHouses(sampleEstate).find(x => x.buildingId === id)!).length, id).toBeGreaterThan(0)
   })
 })
+
+describe('the outdoors around every building', () => {
+  it('paves a path from the front door and aprons at the garage, lights the doors, plants beds and trees, and lights the fire pit', async () => {
+    const { landscape } = await import('./landscape')
+    const l = landscape(sampleEstate.house)
+    const foyer = sampleEstate.house.levels[1].rooms.find(r => r.id === 'foyer')!.rect
+    // The front path starts at the foyer's north wall and runs north.
+    expect(l.paving.some(p => p.kind === 'path' && p.rect.y === foyer.y + foyer.d && p.rect.x >= foyer.x && p.rect.x + p.rect.w <= foyer.x + foyer.w)).toBe(true)
+    expect(l.paving.filter(p => p.kind === 'apron').length).toBe(2)
+    expect(l.fixtures.filter(f => f.kind === 'sconce').length).toBeGreaterThanOrEqual(4)
+    expect(l.fixtures.some(f => f.kind === 'fire-pit')).toBe(true)
+    expect(l.plants.filter(p => p.kind === 'tree').length).toBeGreaterThanOrEqual(6)
+    // Nothing is planted inside the house.
+    const solid = sampleEstate.house.levels.flatMap(lv => lv.rooms).filter(r => r.type !== 'outdoor').map(r => r.rect)
+    for (const p of l.plants) expect(solid.some(r => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.d), `${p.kind} at ${p.x},${p.y}`).toBe(false)
+    // Every building gets trees and lights.
+    for (const h of allHouses(sampleEstate)) {
+      const x = landscape(h)
+      expect(x.plants.some(p => p.kind === 'tree'), h.buildingId).toBe(true)
+      expect(x.fixtures.some(f => f.kind === 'sconce'), h.buildingId).toBe(true)
+    }
+  })
+})

@@ -18,6 +18,7 @@ import { stairGeometry } from '../model/stairs'
 import { fixtureSymbols } from '../drawings/fixtures'
 import { roomDecor } from '../model/decor'
 import { porchPosts, railings } from '../model/architecture'
+import { landscape } from '../model/landscape'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -172,6 +173,18 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
       </div>
       <svg ref={svg} viewBox={`${minX} -2 ${maxX - minX} ${y1 - y0 + 16}`} role="img" aria-label={`${level.name} floor plan`}
         onPointerMove={move} onPointerUp={() => end(false)} onPointerCancel={() => end(true)} style={{ touchAction: editable ? 'none' : undefined }}>
+        {/* The outdoors at this floor: paths and aprons, and planting beds. */}
+        {(() => {
+          const land = landscape(house)
+          const atLevel = (z: number) => Math.abs(z - level.elevation) < 24
+          return (
+            <g pointerEvents="none">
+              {land.paving.filter(p => atLevel(p.z)).map((p, i) => <rect key={`pave-${i}`} x={toFt(p.rect.x)} y={top - toFt(p.rect.y) - toFt(p.rect.d)} width={toFt(p.rect.w)} height={toFt(p.rect.d)} fill={p.kind === 'apron' ? '#d9d6cf' : '#e5dccb'} stroke="#b9b1a2" strokeWidth={0.08} />)}
+              {land.plants.filter(p => p.kind === 'shrub' && atLevel(p.z)).map((p, i) => <circle key={`shrub-${i}`} cx={toFt(p.x)} cy={top - toFt(p.y)} r={toFt(p.r)} fill="#9fbf86" stroke="#6f8f5a" strokeWidth={0.08} />)}
+              {land.fixtures.filter(f => f.kind === 'fire-pit' && atLevel(f.z)).map((f, i) => <circle key={`pit-${i}`} cx={toFt(f.x)} cy={top - toFt(f.y)} r={toFt(f.r)} fill="#3a2f28" stroke="#8a8378" strokeWidth={0.4} />)}
+            </g>
+          )
+        })()}
         {frames.map(f => {
         const inF = (wingId?: string) => (wingId ?? '') === f
         const fRooms = level.rooms.filter(r => inF(r.wingId))

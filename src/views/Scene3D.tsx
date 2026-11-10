@@ -14,6 +14,8 @@ import { ceilingOf, ceilingPolygons, ceilingTimber } from '../model/ceilings'
 import { stairGeometry } from '../model/stairs'
 import { roomDecor } from '../model/decor'
 import { porchPosts, railings } from '../model/architecture'
+import { landscape } from '../model/landscape'
+import { gradeAt } from '../model/designGrade'
 import { SEAT, bayOutline } from '../model/bays'
 import { floorColor, paletteOf } from '../model/materials'
 import { outwardSide } from '../model/walls'
@@ -89,6 +91,64 @@ function addPolys(group: THREE.Object3D, polys: Poly3[], toScene: (p: P3) => num
     return
   }
   group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side, transparent: opacity < 1, opacity })))
+}
+
+/**
+ * The ground around a house on its designed grade: up at the main floor where the land meets it, down at the walkout
+ * in a dug courtyard. Under the building it drops below the lowest floor so every level shows from above.
+ */
+function addGround(scene: THREE.Scene, house: Estate['house'], cx: number, cy: number, W: number, D: number, look: Look) {
+  const step = 5, nx = Math.ceil(W / step), nz = Math.ceil(D / step)
+  const geo = new THREE.PlaneGeometry(W, D, nx, nz)
+  geo.rotateX(-Math.PI / 2)
+  const pos = geo.attributes.position as THREE.BufferAttribute
+  const lowest = Math.min(0, ...house.levels.map(l => l.elevation))
+  const boxes = house.levels.flatMap(l => l.rooms.filter(r => r.type !== 'outdoor' && !r.wingId).map(r => r.rect))
+  for (let i = 0; i < pos.count; i++) {
+    const hx = ft(pos.getX(i) + cx), hy = ft(cy - pos.getZ(i))
+    const under = boxes.some(r => hx > r.x + 6 && hx < r.x + r.w - 6 && hy > r.y + 6 && hy < r.y + r.d - 6)
+    pos.setY(i, toFt(under ? lowest - 12 : gradeAt(house, hx, hy)) - 0.4)
+  }
+  geo.computeVertexNormals()
+  if (look.detailed) worldUV(geo, 'grass')
+  const mesh = new THREE.Mesh(geo, look.mat('grass', look.detailed ? 0x6f8f4a : 0xa9bb8c))
+  mesh.receiveShadow = look.detailed
+  scene.add(mesh)
+}
+
+/** Paths and drive aprons, planting beds, conifers, door sconces, and fire pits from the model's landscape. */
+function addLandscape(scene: THREE.Scene, house: Estate['house'], cx: number, cy: number, look: Look) {
+  const { paving, plants, fixtures } = landscape(house)
+  const X = (x: number) => toFt(x) - cx, Z = (y: number) => cy - toFt(y)
+  for (const p of paving) addBox(scene, X(p.rect.x + p.rect.w / 2), toFt(p.z) - 0.25, Z(p.rect.y + p.rect.d / 2), toFt(p.rect.w), 0.3, toFt(p.rect.d), p.kind === 'apron' ? 0x9a9a96 : 0xb3aa98, 1, p.kind === 'apron' ? 'slab' : 'stone', look)
+  for (const p of plants) {
+    if (p.kind === 'shrub') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(toFt(p.r), 10, 8), look.mat('plain', 0x4d6b3c))
+      m.scale.y = 0.7; m.position.set(X(p.x), toFt(p.z) + toFt(p.r) * 0.5, Z(p.y)); m.castShadow = look.detailed
+      scene.add(m)
+      continue
+    }
+    // A conifer: a trunk and two stacked cones.
+    const h = toFt(p.h), r = toFt(p.r)
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, h * 0.3, 8), look.mat('timber', 0x5a4232))
+    trunk.position.set(X(p.x), toFt(p.z) + h * 0.15, Z(p.y)); scene.add(trunk)
+    for (const [k, s] of [[0.45, 1], [0.75, 0.65]] as const) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r * s, h * 0.55, 10), look.mat('plain', 0x2f4a2e))
+      cone.position.set(X(p.x), toFt(p.z) + h * k, Z(p.y)); cone.castShadow = look.detailed
+      scene.add(cone)
+    }
+  }
+  for (const f of fixtures) {
+    if (f.kind === 'sconce') {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.5), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffc982, emissiveIntensity: look.detailed ? 0.8 : 0.2 }))
+      m.position.set(X(f.x), toFt(f.z), Z(f.y)); scene.add(m)
+      continue
+    }
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(toFt(f.r), toFt(f.r), 1.4, 20), look.mat('stone'))
+    ring.position.set(X(f.x), toFt(f.z) + 0.7, Z(f.y)); ring.castShadow = look.detailed; scene.add(ring)
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(toFt(f.r) - 0.8, toFt(f.r) - 0.8, 0.1, 20), look.mat('plain', 0x1d1612))
+    pit.position.set(X(f.x), toFt(f.z) + 1.45, Z(f.y)); scene.add(pit)
+  }
 }
 
 function buildSite(scene: THREE.Scene, estate: Estate) {
@@ -208,7 +268,8 @@ function buildHouse(scene: THREE.Scene, estate: Estate, levelId: string, onlyThi
   const b = houseBounds(estate.house)
   const pal = paletteOf(estate.house)
   const cx = toFt(b.x + b.w / 2), cy = toFt(b.y + b.d / 2)
-  addBox(scene, 0, -12.5, 0, toFt(b.w) + 192, 1, toFt(b.d) + 152, look.detailed ? 0x6f8f4a : 0xa9bb8c, 1, 'grass', look)
+  addGround(scene, estate.house, cx, cy, toFt(b.w) + 192, toFt(b.d) + 152, look)
+  addLandscape(scene, estate.house, cx, cy, look)
   // Each wing is a group turned about its pivot; inside it, rooms, walls, and furniture use the wing's own inches.
   const frames = new Map<string, THREE.Object3D>()
   const frame = (wingId?: string): THREE.Object3D => {
