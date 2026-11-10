@@ -98,7 +98,7 @@ describe('main house layout v3: a mountain modern courtyard U', () => {
     const finished = rooms.filter(r => r.type !== 'outdoor' && r.type !== 'garage').reduce((s, r) => s + area(r.rect), 0) / 144
     expect(finished).toBeGreaterThan(22000)
     // Larger than the brief's two thirds of v1 since the wings were widened to be usable; Garrett: size is not the issue.
-    expect(finished).toBeLessThan(28500)
+    expect(finished).toBeLessThan(30000)
     expect(validateEstate(sampleEstate).filter(c => c.status !== 'pass').map(c => c.id)).toEqual([])
   })
 })

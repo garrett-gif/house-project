@@ -7,6 +7,7 @@ import { toHouse } from '../model/wings'
 import { ceilingNote } from '../model/ceilings'
 import { bayOutline } from '../model/bays'
 import { stairGeometry } from '../model/stairs'
+import { fixtureSymbols } from './fixtures'
 const lineOf = ([x1, y1]: [number, number], [x2, y2]: [number, number]) => ({ x1, y1, x2, y2 })
 import { openingMarks } from './marks'
 import { sectionCuts } from './sectionCuts'
@@ -108,7 +109,14 @@ export function floorPlanSheet(e: Estate, level: Level, number: string, info: Sh
     // Furniture and fixtures in thin outline, as plans show them.
     const here = new Set(rooms.map(r => r.id))
     for (const item of (e.house.furniture ?? []).filter(i => here.has(i.roomId) && CATALOG[i.kind])) {
-      for (const q of furnitureParts(item)) out.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#6b6b6b', sw: 0.35 })
+      for (const q of furnitureParts(item)) {
+        out.push({ t: 'rect', x: X(q.x), y: Y(q.y + q.d), w: q.w * k, h: q.d * k, stroke: '#6b6b6b', sw: 0.35 })
+        for (const sy of fixtureSymbols(CATALOG[item.kind].parts ? q.name : `${q.name} ${item.kind}`, q)) {
+          if (sy.t === 'line') out.push({ t: 'line', x1: X(sy.x1), y1: Y(sy.y1), x2: X(sy.x2), y2: Y(sy.y2), w: 0.25 })
+          else if (sy.t === 'rect') out.push({ t: 'rect', x: X(sy.x), y: Y(sy.y + sy.d), w: sy.w * k, h: sy.d * k, stroke: '#6b6b6b', sw: 0.25 })
+          else { const rx = sy.rx * k, ry = sy.ry * k, x0 = X(sy.cx), y0 = Y(sy.cy); out.push({ t: 'path', d: `M ${x0 - rx} ${y0} A ${rx} ${ry} 0 1 0 ${x0 + rx} ${y0} A ${rx} ${ry} 0 1 0 ${x0 - rx} ${y0} Z`, stroke: '#6b6b6b', sw: 0.25 }) }
+        }
+      }
     }
 
     // Beams in this level's ceiling, dashed as "above", with posts as small squares and a schedule mark.

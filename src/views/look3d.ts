@@ -239,6 +239,43 @@ export function partModel(look: Look, s: PartShape): THREE.Object3D {
     return g
   }
   if (/pool basin|pool-basin/.test(n)) { add(box(look, s.w, 0.3, s.d, 'water'), 0, 0.15, 0); return g }
+  const porcelain = 0xf6f6f2
+  if (/toilet/.test(s.name.toLowerCase()) && s.h < 4) {
+    // A bowl in front, a tank against the back wall.
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(Math.min(s.w, s.d) * 0.38, Math.min(s.w, s.d) * 0.3, 1.25, 20), look.mat('plain', porcelain))
+    bowl.castShadow = true
+    add(bowl, -bx * 0.25, 0.62, -bz * 0.25)
+    backSlab(0.7, 2.5, 0, 'plain', porcelain)
+    return g
+  }
+  if (/^tub$|tub\b/.test(s.name.toLowerCase()) && s.h < 3) {
+    add(box(look, s.w, s.h, s.d, 'plain', porcelain), 0, s.h / 2, 0)
+    add(box(look, s.w - 0.6, 0.05, s.d - 0.6, 'water'), 0, s.h - 0.2, 0)
+    return g
+  }
+  if (/shower/.test(s.name.toLowerCase())) {
+    add(box(look, s.w, 0.25, s.d, 'tile'), 0, 0.12, 0)
+    // Glass on the open sides, the tile wall at the back.
+    backSlab(0.2, Math.min(7, s.h), 0, 'tile')
+    for (const k of [-1, 1]) {
+      if (bx !== 0) add(box(look, s.w, Math.min(7, s.h), 0.05, 'glass'), 0, Math.min(7, s.h) / 2, k * s.d / 2)
+      else add(box(look, 0.05, Math.min(7, s.h), s.d, 'glass'), k * s.w / 2, Math.min(7, s.h) / 2, 0)
+    }
+    return g
+  }
+  if (/sink|vanity|lavatory/.test(s.name.toLowerCase()) && s.h <= 3.5) {
+    add(box(look, s.w, s.h - 0.15, s.d, 'timber'), 0, (s.h - 0.15) / 2, 0)
+    add(box(look, s.w, 0.15, s.d, 'stone', 0xe7e4dc), 0, s.h - 0.075, 0)
+    const basins = /double/.test(n) ? [-s.w / 4, s.w / 4] : [0]
+    for (const o of basins) add(box(look, Math.min(1.5, s.w * 0.4), 0.05, Math.min(1.2, s.d * 0.5), 'plain', porcelain), bx !== 0 ? 0 : o, s.h + 0.01, bx !== 0 ? o : 0)
+    return g
+  }
+  if (/fridge|refrigerator/.test(n)) { add(box(look, s.w, s.h, s.d, 'metal', 0xc9ccd0), 0, s.h / 2, 0); return g }
+  if (/\brange\b/.test(s.name.toLowerCase())) {
+    add(box(look, s.w, s.h - 0.1, s.d, 'metal', 0xb8bbbf), 0, (s.h - 0.1) / 2, 0)
+    add(box(look, s.w, 0.1, s.d, 'plain', 0x1d1d1d), 0, s.h - 0.05, 0)
+    return g
+  }
   if (/\bbed\b|bunk|twin|king|queen|mattress/.test(n) && !/nightstand/.test(n)) {
     const frameH = Math.min(1.1, s.h * 0.45)
     add(box(look, s.w, frameH, s.d, 'timber'), 0, frameH / 2, 0)

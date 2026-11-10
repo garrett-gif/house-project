@@ -42,6 +42,14 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'long-desk': { name: 'Long desk, three seats', w: 144, d: 50, h: 30, category: 'table', place: 'wall', parts: [p('Desk', 0, 0, 144, 26, 30), ...row('Chair', 3, 22, 22, 32, 26, 13, 28)] },
   bookshelf: { name: 'Bookshelf', w: 36, d: 14, h: 84, category: 'storage', place: 'wall', front: 24 },
   shelving: { name: 'Shelving', w: 72, d: 18, h: 84, category: 'storage', place: 'wall', front: 30 },
+  'closet-rods-short': { name: 'Closet rod and shelf', w: 48, d: 24, h: 84, category: 'storage', place: 'wall', front: 24 },
+  'bath-set-compact': { name: 'Shower, toilet, and sink', w: 96, d: 36, h: 84, category: 'bath', place: 'wall', front: 24,
+    parts: [p('Shower', 0, 0, 36, 36, 84), p('Toilet', 44, 0, 20, 28, 30), p('Sink', 68, 0, 28, 20, 34)] },
+  'toilet-stalls-3': { name: 'Three toilet stalls', w: 108, d: 60, h: 72, category: 'bath', place: 'wall', front: 42,
+    parts: [0, 36, 72].flatMap(x => [p('Toilet', x + 8, 0, 20, 28, 30), p('Stall partition', x + 35, 0, 1, 60, 72)]) },
+  'lav-counter-3': { name: 'Counter with three sinks', w: 108, d: 24, h: 34, category: 'bath', place: 'wall', front: 36,
+    parts: [p('Counter', 0, 0, 108, 24, 34), ...[18, 54, 90].map(x => p('Sink', x - 9, 4, 18, 14, 35))] },
+  'pantry-wall': { name: 'Tall cabinets and pantry wall', w: 96, d: 26, h: 96, category: 'kitchen', place: 'wall', front: 42, material: 'timber' },
   'closet-rods': { name: 'Closet rods and shelves', w: 96, d: 24, h: 84, category: 'storage', place: 'wall', front: 30 },
   // Seating groups and living pieces.
   'living-group': { name: 'Sofa, coffee table, two chairs', w: 132, d: 124, h: 30, category: 'seating', place: 'wall', seats: 5,
@@ -299,7 +307,7 @@ function recipe(room: Room): string[] {
   const area = room.rect.w * room.rect.d / 144
   const byId: Record<string, string[]> = {
     great: ['fireplace-stone-tall', 'sectional-group', 'living-group', 'piano'],
-    kitchen: ['counter-range', 'counter-sink', 'fridge', 'island-table'],
+    kitchen: ['counter-range', 'counter-sink', 'fridge', 'pantry-wall', 'island-table'],
     dining: ['dining-12', 'console-table'],
     office: ['desk', 'built-in-shelves', 'armchair'],
     den: ['living-group', 'window-seat'],
@@ -336,6 +344,16 @@ function recipe(room: Room): string[] {
     'wine-cellar': ['wine-rack'], 'safe-room': ['spa-bench', 'shelving'],
     bunk: ['bunk-bed', 'bunk-bed', 'bunk-bed'],
   }
+  // Utility rooms, closets, gear rooms, and restrooms.
+  if (/mechanical/.test(name)) return ['electrical-panels', 'water-heater', 'boiler']
+  if (/pool equipment/.test(name)) return ['pool-filter', 'shelving']
+  if (/dish room/.test(name)) return ['counter-sink', 'prep-table', 'shelving']
+  if (/coat/.test(name)) return ['closet-rods-short']
+  if (/gear room/.test(name)) return ['gear-lockers', 'gear-lockers', 'bench', 'shelving']
+  if (/changing room/.test(name)) return ['toilet', 'vanity-single', 'shower', 'bench']
+  if (/restrooms and showers|showers and lockers|fitness restrooms/.test(name)) return ['toilet-stalls-3', 'lav-counter-3', 'shower', 'bench']
+  if (/^restroom$/.test(name)) return ['toilet', 'vanity-single']
+  if (/^restrooms$/.test(name)) return ['toilet-stalls-3', 'lav-counter-3']
   // Compound lodging, commons, classroom, hangars, pool house, and fuel island.
   if (/couple's room/.test(name)) return ['queen-bed-set', 'desk']
   if (/private room/.test(name)) return ['twin-bed', 'desk', 'small-dresser']
@@ -346,7 +364,6 @@ function recipe(room: Room): string[] {
   if (/lounge and game/.test(name)) return ['sectional-group', 'living-group', 'game-table-4', 'game-table-4', 'tv-console']
   if (/^classroom/.test(name)) return ['display-wall', 'class-seating-30']
   if (/forestry lab/.test(name)) return ['prep-table', 'prep-table', 'plan-table', 'shelving', 'shelving']
-  if (/^gear room/.test(name)) return ['gear-lockers', 'gear-lockers', 'gear-lockers', 'shelving']
   if (/instructor office/.test(name)) return ['desk', 'bookshelf']
   if (/helicopter hangar/.test(name)) return Array(6).fill('helicopter')
   if (/airplane hangar/.test(name)) return ['airplane']
@@ -360,7 +377,6 @@ function recipe(room: Room): string[] {
   if (/pool bar/.test(name)) return ['bar-counter', 'armchair-pair']
   if (/outdoor pool deck/.test(name)) return ['pool-basin', 'lounge-chairs', 'lounge-chairs', 'lounge-chairs']
   if (/loggia/.test(name)) return ['outdoor-kitchen', 'fireplace-outdoor', 'dining-8']
-  if (/changing room/.test(name)) return ['shower', 'bench']
   if (/fuel canopy/.test(name)) return Array(4).fill('fuel-dispenser')
   if (/tank farm/.test(name)) return Array(3).fill('fuel-tank')
   if (/lubricant/.test(name)) return ['shelving', 'shelving', 'parts-racks']
@@ -422,10 +438,12 @@ function recipe(room: Room): string[] {
   if (room.type === 'bedroom') return area >= 280 ? ['queen-bed-set', 'dresser'] : ['twin-bed', 'desk', 'small-dresser']
   if (room.type === 'bath') {
     if (/powder/.test(name)) return ['toilet', 'vanity-single']
+    // Small baths get a compact three-piece set that fits along one wall.
+    if (area < 75) return ['bath-set-compact']
     if (area >= 180) return ['tub', 'shower', 'vanity-double', 'toilet']
     return area >= 110 ? ['shower', 'vanity-single', 'toilet'] : ['shower-small', 'vanity-single', 'toilet']
   }
-  if (/closet/.test(name) && !/coat/.test(name)) return ['closet-rods', 'closet-rods']
+  if (/closet/.test(name) && !/coat/.test(name)) return area < 90 ? ['closet-rods-short', 'closet-rods-short'] : ['closet-rods', 'closet-rods']
   if (/vanity/.test(name)) return ['vanity-double', 'bench']
   if (/storage|linen/.test(name)) return ['shelving', 'shelving']
   if (/terrace/.test(name)) return ['dining-8', 'living-group']

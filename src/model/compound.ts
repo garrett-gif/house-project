@@ -18,22 +18,22 @@ const gable = (id: string, name: string, levelId: string, x: number, y: number, 
 // ---------------------------------------------------------------------------------------------------------------
 // Lodges: all private rooms, each with its own bath ("it cuts down on drama"), most for one person, some for couples.
 // Two floors on a single corridor, 9 rooms a floor: 14 singles and 4 couples' rooms, 22 beds. A lodge lounge at the
-// west end, a stair at each end, and a housekeeping closet. 108 x 54 ft.
+// west end, a stair at each end, and a housekeeping closet. 118 x 54 ft.
 function lodgeFloor(level: 'a' | 'b'): R[] {
   const out: R[] = []
   const couples = level === 'b'
-  // A room: a 12 x 24 ft bedroom on the corridor, with its bath on the corridor side and a closet on the window side.
+  // A room: a 12 x 24 ft bedroom on the corridor, with an 8 x 9 ft bath on the corridor side and a walk-in closet on the window side.
   const unit = (n: number, x: number, south: boolean) => {
     const name = south || !couples ? `Private room ${n}` : `Couple's room ${n}`
-    if (south) out.push([`room-${n}`, name, 'bedroom', x, 0, 12, 24], [`bath-${n}`, `Bath ${n}`, 'bath', x + 12, 15, 6, 9], [`closet-${n}`, `Closet ${n}`, 'service', x + 12, 0, 6, 15])
-    else out.push([`room-${n}`, name, 'bedroom', x, 30, 12, 24], [`bath-${n}`, `Bath ${n}`, 'bath', x + 12, 30, 6, 9], [`closet-${n}`, `Closet ${n}`, 'service', x + 12, 39, 6, 15])
+    if (south) out.push([`room-${n}`, name, 'bedroom', x, 0, 12, 24], [`bath-${n}`, `Bath ${n}`, 'bath', x + 12, 15, 8, 9], [`closet-${n}`, `Closet ${n}`, 'service', x + 12, 0, 8, 15])
+    else out.push([`room-${n}`, name, 'bedroom', x, 30, 12, 24], [`bath-${n}`, `Bath ${n}`, 'bath', x + 12, 30, 8, 9], [`closet-${n}`, `Closet ${n}`, 'service', x + 12, 39, 8, 15])
   }
   out.push([`lounge`, 'Lodge lounge', 'living', 0, 0, 18, 24])
-  ;[18, 36, 54, 72, 90].forEach((x, i) => unit(i + 1, x, true))
-  out.push(['corridor', 'Corridor', 'circulation', 0, 24, 108, 6])
+  ;[18, 38, 58, 78, 98].forEach((x, i) => unit(i + 1, x, true))
+  out.push(['corridor', 'Corridor', 'circulation', 0, 24, 118, 6])
   out.push(['stair-w', 'Stairs, west', 'circulation', 0, 30, 14, 24])
-  ;[14, 32, 50, 68].forEach((x, i) => unit(i + 6, x, false))
-  out.push(['stair-e', 'Stairs, east', 'circulation', 86, 30, 14, 24], ['housekeeping', 'Housekeeping closet', 'service', 100, 30, 8, 24])
+  ;[14, 34, 54, 74].forEach((x, i) => unit(i + 6, x, false))
+  out.push(['stair-e', 'Stairs, east', 'circulation', 94, 30, 14, 24], ['housekeeping', 'Housekeeping closet', 'service', 108, 30, 10, 24])
   return out
 }
 /** Each room's bath is its own: rooms name their baths. */
@@ -47,7 +47,7 @@ function lodge(n: number, cx: number, cy: number): HouseModel {
     ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(i => [`${pre}a-room-${i}`, `${pre}b-room-${i}`].map(id => ({ roomId: id, need: 'A private room with its own bath', minArea: 150, near: [id.replace('-room-', '-bath-')] }))),
   ]
   return build({
-    buildingId: `lodge-${n}`, origin: p(cx - 54, cy - 27), concept: true, program, style: 'lodge',
+    buildingId: `lodge-${n}`, origin: p(cx - 59, cy - 27), concept: true, program, style: 'lodge',
     levels: [
       { id: `${pre}-ground`, name: 'Ground floor', elevation: 0, floorHeight: ft(10), rooms: lv('a') },
       { id: `${pre}-upper`, name: 'Upper floor', elevation: ft(10), floorHeight: ft(9), rooms: lv('b') },
@@ -102,9 +102,9 @@ export const commonsBuilding = (): HouseModel => build({
 function cabinRooms(n: number, x: number, y: number): R[] {
   return [
     [`${n}-living`, `Cabin ${n} living and kitchenette`, 'living', x, y, 16, 26],
-    [`${n}-bed`, `Cabin ${n} bedroom`, 'bedroom', x + 16, y + 14, 12, 12],
-    [`${n}-bunk`, `Cabin ${n} bunk room`, 'bedroom', x + 16, y + 5, 12, 9],
-    [`${n}-bath`, `Cabin ${n} bath`, 'bath', x + 16, y, 12, 5],
+    [`${n}-bed`, `Cabin ${n} bedroom`, 'bedroom', x + 16, y + 15, 12, 11],
+    [`${n}-bunk`, `Cabin ${n} bunk room`, 'bedroom', x + 16, y + 7, 12, 8],
+    [`${n}-bath`, `Cabin ${n} bath`, 'bath', x + 16, y, 12, 7],
     [`${n}-porch`, `Cabin ${n} covered porch`, 'outdoor', x, y - 8, 16, 8],
   ]
 }

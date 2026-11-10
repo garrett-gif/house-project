@@ -38,7 +38,7 @@ describe('elevation sheets', () => {
     expect(t).toContain('SOUTH ELEVATION')
     expect(t).toContain(`MAIN FLOOR 0'-0"`)
     expect(t).toContain(`WALKOUT LEVEL -11'-0"`)
-    expect(t).toContain(`TOP OF HIGHEST RIDGE 34'-4"`)
+    expect(t).toContain(`TOP OF HIGHEST RIDGE 35'-0"`)
     expect(texts(ew.marks)).toEqual(expect.arrayContaining(['EAST ELEVATION', 'WEST ELEVATION']))
   })
 

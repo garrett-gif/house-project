@@ -183,7 +183,7 @@ describe('wall and opening checks', () => {
     expect(others.length).toBeGreaterThan(0)
     const e = ok(applyOperations(sampleEstate, [
       ...others.map(o => ({ op: 'removeOpening', openingId: o.id }) as EditOp),
-      { op: 'addDoor', opening: door({ id: 'kid-2-stair', roomId: 'kid-2', side: 'n', offset: ft(15) }) },
+      { op: 'addDoor', opening: door({ id: 'kid-2-stair', roomId: 'kid-2', side: 'n', offset: ft(20) }) },
     ]))
     const c = check(e, 'circulation')
     expect(c.status).toBe('warn')

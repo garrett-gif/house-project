@@ -41,9 +41,9 @@ describe('floor plan sheets', () => {
   it('dimensions the overall house on the main floor', () => {
     // The bar and both wings, west to east.
     const t = texts(sheets[1].marks)
-    expect(t).toContain(`208'-0"`)
-    // North to south, from the primary wing's south end to the entry's step out at the front door.
-    expect(t).toContain(`124'-0"`)
+    expect(t).toContain(`214'-0"`)
+    // North to south, from the west wing's south end to the entry's step out at the front door.
+    expect(t).toContain(`132'-0"`)
   })
 
   it('follows edits, because sheets are drawn from the model', () => {

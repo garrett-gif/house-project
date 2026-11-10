@@ -18,7 +18,7 @@ const vault = (heightFt: number, ridge?: 'ew' | 'ns', extra: Partial<Ceiling> = 
  *   vaulted great room with a glass gable and a floor-to-ceiling stone fireplace, and the lower, cozier hearth room.
  *   The north side holds the garage, library, stair, the tall entry under a timber canopy, the den, and a gear room.
  *   The walkout under the bar opens onto the sunken courtyard, with the indoor pool under the great room.
- * - The west wing (x -36 to 0, y -48 to 14) opens off the family hall through an 8 ft opening: a wide gallery to the
+ * - The west wing (x -42 to 0, y -60 to 14) opens off the family hall through an 8 ft opening: a wide gallery to the
  *   extra bedroom and the guest suite below, and upstairs three kids' rooms off a 16 ft wide kids' loft, joined to the
  *   kids' rooms over the bar.
  * - The east wing (x 136 to 172, y -52 to 14) is the primary suite: a private entry, a gallery between his and her
@@ -27,7 +27,7 @@ const vault = (heightFt: number, ridge?: 'ew' | 'ns', extra: Partial<Ceiling> = 
  * - Daily flow: garage into the mudroom and laundry, then the family hall or the pantry; the kitchen sits between the
  *   dining room and the great room, open to both.
  *
- * Bearing lines in the bar: y = 0, 28, 44, 68 and x = 17, 50, 68, 114, 136. In the west wing: x = -36, -30, -16, 0.
+ * Bearing lines in the bar: y = 0, 28, 44, 68 and x = 17, 50, 68, 114, 136. In the west wing: x = -42, -16, 0 and y = -20, -40.
  */
 const walkout: Room[] = [
   // West: theater (buried on the north), a game room, the woodshop and mechanical on the courtyard side.
@@ -91,18 +91,18 @@ const main: Room[] = [
   r('terrace', 'Covered courtyard porch, outdoor kitchen and fireplace', 'outdoor', 32, -16, 72, 16),
   r('screened-porch', 'Screened porch', 'outdoor', 136, 31, 16, 16),
   // West wing, main floor: guests. A wide gallery off the family hall, the extra bedroom, and the guest suite.
-  r('guest-entry', 'Guest wing entry, open to the family hall', 'circulation', -12, 0, 12, 14),
-  r('ww-stair', 'Stairs to the kids wing', 'circulation', -26, 0, 14, 14),
-  r('w-linen', 'Linen and storage', 'service', -36, 0, 10, 14),
-  r('guest-gallery', 'Guest gallery, window seat to the courtyard', 'circulation', -16, -18, 16, 18),
-  r('extra-bed', 'Extra bedroom', 'bedroom', -36, -11, 20, 11, 'extra-bath'),
-  r('extra-bath', 'Extra bedroom bath', 'bath', -36, -18, 10, 7),
-  r('extra-closet', 'Extra bedroom closet', 'service', -26, -18, 10, 7),
-  r('guest-sitting', 'Guest suite sitting room', 'living', -16, -34, 16, 16),
-  r('guest-bed', 'Guest or in-law bedroom', 'bedroom', -36, -34, 20, 16, 'guest-bath'),
-  r('guest-closet', 'Guest closet', 'service', -36, -48, 8, 14),
-  r('guest-bath', 'Guest bath, shared with the bunk room', 'bath', -28, -48, 12, 14),
-  r('guest-bunk', 'Guest suite bunk room for visiting kids', 'bedroom', -16, -48, 16, 14, 'guest-bath'),
+  r('guest-entry', 'Guest wing entry, open to the family hall', 'circulation', -14, 0, 14, 14),
+  r('ww-stair', 'Stairs to the kids wing', 'circulation', -28, 0, 14, 14),
+  r('w-linen', 'Linen and storage', 'service', -42, 0, 14, 14),
+  r('guest-gallery', 'Guest gallery, window seat to the courtyard', 'circulation', -16, -20, 16, 20),
+  r('extra-bed', 'Extra bedroom', 'bedroom', -42, -12, 26, 12, 'extra-bath'),
+  r('extra-bath', 'Extra bedroom bath', 'bath', -42, -20, 12, 8),
+  r('extra-closet', 'Extra bedroom closet', 'service', -30, -20, 14, 8),
+  r('guest-sitting', 'Guest suite sitting room', 'living', -16, -40, 16, 20),
+  r('guest-bed', 'Guest or in-law bedroom', 'bedroom', -42, -40, 26, 20, 'guest-bath'),
+  r('guest-closet', 'Guest walk-in closet', 'service', -42, -60, 14, 20),
+  r('guest-bath', 'Guest bath, shared with the bunk room', 'bath', -28, -60, 12, 20),
+  r('guest-bunk', 'Guest suite bunk room for visiting kids', 'bedroom', -16, -60, 16, 20, 'guest-bath'),
   // East wing: the primary suite. From the bar into a private entry, then a gallery between his and her closets, and
   // the dressing hall straight into the bedroom. His bath opens off the bedroom; her bath, with its vanity, opens off
   // the dressing hall at the bedroom door. The sitting room opens wide off the bedroom on the courtyard side.
@@ -137,20 +137,17 @@ const upper: Room[] = [
   r('u-elevator', 'Elevator', 'service', 54, 58, 8, 10),
   r('u-storage', 'Kids storage', 'service', 62, 58, 6, 10),
   // West wing, upper floor: the kids' loft, open to the landing over the bar, with three kids' rooms and their deck.
-  r('kids-wing-landing', 'Kids wing landing', 'circulation', -12, 0, 12, 14),
-  r('u-stair-w', 'Stairs to the guest wing', 'circulation', -26, 0, 14, 14),
-  r('kids-linen', 'Kids linen', 'service', -36, 0, 10, 14),
-  r('kids-living', 'Kids living loft, desks and window seats', 'living', -16, -48, 16, 48),
-  r('kid-2', 'Kid bedroom 2, bunk nook', 'bedroom', -36, -11, 20, 11, 'kid-2-bath'),
-  r('kid-2-bath', 'Bath 2', 'bath', -36, -16, 10, 5),
-  r('kid-2-closet', 'Closet 2', 'service', -26, -16, 10, 5),
-  r('kid-4', 'Kid bedroom 4, bunk nook', 'bedroom', -36, -27, 20, 11, 'kid-4-bath'),
-  r('kid-4-bath', 'Bath 4', 'bath', -36, -32, 10, 5),
-  r('kid-4-closet', 'Closet 4', 'service', -26, -32, 10, 5),
-  r('kid-5', 'Kid bedroom 5', 'bedroom', -36, -43, 20, 11, 'kid-5-bath'),
-  r('kid-5-bath', 'Bath 5', 'bath', -36, -48, 10, 5),
-  r('kid-5-closet', 'Closet 5', 'service', -26, -48, 10, 5),
-  r('kids-deck', 'Kids deck', 'outdoor', -16, -60, 16, 12),
+  // Each room runs from the outside wall to the loft, with its bath and a walk-in closet behind it.
+  r('kids-wing-landing', 'Kids wing landing', 'circulation', -14, 0, 14, 14),
+  r('u-stair-w', 'Stairs to the guest wing', 'circulation', -28, 0, 14, 14),
+  r('kids-linen', 'Kids linen', 'service', -42, 0, 14, 14),
+  r('kids-living', 'Kids living loft, desks and window seats', 'living', -16, -60, 16, 60),
+  ...[[2, 0], [4, -20], [5, -40]].flatMap(([n, y]) => [
+    r(`kid-${n}`, `Kid bedroom ${n}${n === 5 ? '' : ', bunk nook'}`, 'bedroom', -42, y - 12, 26, 12, `kid-${n}-bath`),
+    r(`kid-${n}-bath`, `Bath ${n}`, 'bath', -42, y - 20, 12, 8),
+    r(`kid-${n}-closet`, `Closet ${n}`, 'service', -30, y - 20, 14, 8),
+  ]),
+  r('kids-deck', 'Kids deck', 'outdoor', -16, -72, 16, 12),
 ]
 
 /** The brief as checkable requirements. Sizes are working targets, to wall centerlines. */
@@ -214,7 +211,7 @@ const roofs: Roof[] = [
   roof('roof-hearth', 'Hearth room roof', 'main', 114, 0, 22, 44, 'gable', 6, 'ns'),
   roof('roof-porch', 'Courtyard porch roof', 'main', 32, -16, 72, 16, 'shed', 3, 's'),
   roof('roof-screened', 'Screened porch roof', 'main', 136, 31, 16, 16, 'shed', 3, 'e'),
-  roof('roof-west-wing', 'Guest and kids wing roof', 'upper', -36, -48, 36, 62, 'gable', 8, 'ns'),
+  roof('roof-west-wing', 'Guest and kids wing roof', 'upper', -42, -60, 42, 74, 'gable', 8, 'ns'),
   roof('roof-primary', 'Primary wing roof', 'main', 136, -52, 36, 66, 'gable', 10, 'ns'),
 ]
 
@@ -290,8 +287,9 @@ const HAND: Opening[] = [
   // A reading nook in a bay off the kids' landing, and a door from the kids' hall to their deck.
   glass('kids-landing-seat', 'kids-landing', 'w', 21, 6, 5, 1.5, { bay: { form: 'box', depth: ft(2.5), seat: true }, operation: 'casement' }),
   door('kids-deck-door', 'kids-living', 's', 8, 36, { swing: 'out' }),
-  // Kid bedroom 2 opens onto the loft like the others, not onto the stair.
-  door('kid-2-loft', 'kid-2', 'e', 5.5, 32),
+  // Kid bedroom 2 opens onto the loft like the others, and the extra bedroom onto the gallery, not onto the stairs.
+  door('kid-2-loft', 'kid-2', 'e', 6, 32),
+  door('extra-bed-gallery', 'extra-bed', 'e', 6, 32),
 ]
 
 /** The first pass's doors, windows, and openings, less any on a wall where a hand-placed one overlaps them. */
@@ -299,7 +297,7 @@ const handIds = new Set(HAND.map(o => o.id))
 const trial = placeOpenings({ ...firstPass, openings: [...HAND, ...firstPass.openings] })
 const clash = new Set(trial.filter(o => !handIds.has(o.id) && /overlaps/.test(o.problem ?? '') && HAND.some(x => o.problem!.includes(x.id))).map(o => o.id))
 /** First-pass doors that the hand-placed ones replace: the garage into the library, his bath into her vanity, the kids' closet through their baths. */
-const REPLACED: [string, string][] = [['garage', 'office'], ['bath-his', 'vanity'], ['u-closet', 'kid-7-bath'], ['u-closet', 'kid-3-bath'], ['kid-2', 'u-stair-w'], ['primary-sitting', 'bath-hers'], ['kid-2-closet', 'kid-4'], ['kid-4-closet', 'kid-5']]
+const REPLACED: [string, string][] = [['garage', 'office'], ['bath-his', 'vanity'], ['u-closet', 'kid-7-bath'], ['u-closet', 'kid-3-bath'], ['kid-2', 'u-stair-w'], ['extra-bed', 'ww-stair'], ['primary-sitting', 'bath-hers'], ['kid-2-closet', 'kid-4'], ['kid-4-closet', 'kid-5']]
 const replaced = new Set(trial.filter(o => REPLACED.some(([a, b]) => (o.roomId === a && o.leadsTo === b) || (o.roomId === b && o.leadsTo === a))).map(o => o.id))
 const finished: HouseModel = { ...firstPass, openings: [...firstPass.openings.filter(o => !clash.has(o.id) && !replaced.has(o.id)), ...HAND] }
 

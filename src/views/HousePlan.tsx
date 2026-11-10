@@ -15,6 +15,7 @@ import type { PlacedOpening, WallSegment } from '../model/walls'
 import { toWing, wingById } from '../model/wings'
 import { bayOutline } from '../model/bays'
 import { stairGeometry } from '../model/stairs'
+import { fixtureSymbols } from '../drawings/fixtures'
 
 export const ROOM_COLOR: Record<RoomType, string> = {
   bedroom: '#d9e3d0', bath: '#c9dde3', living: '#efe3cb', service: '#e6e0d6',
@@ -189,8 +190,15 @@ export function HousePlan({ house, levelId, flagged = new Map(), onDrag, onDrop 
           <g key={item.id} onMouseEnter={() => setHover(`${CATALOG[item.kind].name} (${item.id})`)} onMouseLeave={() => setHover(null)}
             onPointerDown={editable ? e => begin(e, { kind: 'furniture', item }) : undefined} style={editable ? { cursor: 'move' } : undefined}>
             {furnitureParts(item).map((q, i) => (
-              <rect key={i} x={toFt(q.x)} y={top - toFt(q.y) - toFt(q.d)} width={toFt(q.w)} height={toFt(q.d)} rx={0.25}
-                fill={item.kind === 'pool-basin' ? '#7fc0dd' : '#fbfaf7'} fillOpacity={0.92} stroke={flagged.has(item.id) ? FLAG[flagged.get(item.id)!] : '#8a7a66'} strokeWidth={flagged.has(item.id) ? 0.35 : 0.12} />
+              <g key={i}>
+                <rect x={toFt(q.x)} y={top - toFt(q.y) - toFt(q.d)} width={toFt(q.w)} height={toFt(q.d)} rx={0.25}
+                  fill={item.kind === 'pool-basin' ? '#7fc0dd' : '#fbfaf7'} fillOpacity={0.92} stroke={flagged.has(item.id) ? FLAG[flagged.get(item.id)!] : '#8a7a66'} strokeWidth={flagged.has(item.id) ? 0.35 : 0.12} />
+                {fixtureSymbols(CATALOG[item.kind].parts ? q.name : `${q.name} ${item.kind}`, q).map((sy, j) => sy.t === 'ellipse'
+                  ? <ellipse key={j} cx={toFt(sy.cx)} cy={top - toFt(sy.cy)} rx={toFt(sy.rx)} ry={toFt(sy.ry)} fill="none" stroke="#8a7a66" strokeWidth={0.1} />
+                  : sy.t === 'line'
+                    ? <line key={j} x1={toFt(sy.x1)} y1={top - toFt(sy.y1)} x2={toFt(sy.x2)} y2={top - toFt(sy.y2)} stroke="#8a7a66" strokeWidth={0.08} />
+                    : <rect key={j} x={toFt(sy.x)} y={top - toFt(sy.y) - toFt(sy.d)} width={toFt(sy.w)} height={toFt(sy.d)} fill="none" stroke="#8a7a66" strokeWidth={0.08} />)}
+              </g>
             ))}
           </g>
         ))}
